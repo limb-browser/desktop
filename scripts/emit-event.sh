@@ -12,7 +12,15 @@
 # Output: appends one JSON line to $LIMB_EVENT_LOG (default: logs/events.jsonl)
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Resolve to the real repo root, not a worktree.
+# git worktrees set core.worktree; commondir points to the main .git
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -f "$SCRIPT_DIR/.git" ]; then
+  # This is a worktree -- .git is a file pointing to the real .git dir
+  REPO_ROOT="$(cd "$(cat "$SCRIPT_DIR/.git" | sed 's/gitdir: //' | xargs dirname | xargs dirname)" && pwd)"
+else
+  REPO_ROOT="$SCRIPT_DIR"
+fi
 EVENT_LOG="${LIMB_EVENT_LOG:-$REPO_ROOT/logs/events.jsonl}"
 mkdir -p "$(dirname "$EVENT_LOG")"
 

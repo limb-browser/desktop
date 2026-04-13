@@ -8,11 +8,11 @@ set -uo pipefail
 TASK_FILE="$1"
 WORKTREE="$2"
 TASK_NAME=$(basename "$TASK_FILE" .md)
-REPO_ROOT="$(cd "$WORKTREE/../.." && pwd)"
 
 cd "$WORKTREE"
 
-emit() { bash "$REPO_ROOT/scripts/emit-event.sh" "$@"; }
+# Use the worktree's own copy of emit-event.sh (it resolves the real repo root internally)
+emit() { bash "$WORKTREE/scripts/emit-event.sh" "$@"; }
 
 log() {
   echo "[$(date '+%H:%M:%S')] [$TASK_NAME] $*" >> "$WORKTREE/.worker.log"
@@ -55,7 +55,8 @@ while [ $ROUND -lt $MAX_ROUNDS ]; do
     not-started|needs-revision)
       # Rebase onto main worktree root to pick up merged work from other workers
       log "--- Rebasing onto main HEAD (round $ROUND)"
-      MAIN_ROOT="$(cd "$WORKTREE/../.." && pwd)"
+      # Resolve the main repo from the worktree's .git file
+      MAIN_ROOT="$(cd "$(cat "$WORKTREE/.git" | sed 's/gitdir: //' | xargs dirname | xargs dirname)" && pwd 2>/dev/null || echo "$WORKTREE")"
       git fetch "$MAIN_ROOT" HEAD 2>/dev/null && git rebase FETCH_HEAD 2>/dev/null || \
         log "!!! Rebase failed (may need manual resolution)"
 
