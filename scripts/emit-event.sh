@@ -16,8 +16,10 @@ set -euo pipefail
 # git worktrees set core.worktree; commondir points to the main .git
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 if [ -f "$SCRIPT_DIR/.git" ]; then
-  # This is a worktree -- .git is a file pointing to the real .git dir
-  REPO_ROOT="$(cd "$(cat "$SCRIPT_DIR/.git" | sed 's/gitdir: //' | xargs dirname | xargs dirname)" && pwd)"
+  # This is a worktree -- .git is a file like "gitdir: /path/to/repo/.git/worktrees/name"
+  # We need the repo root, which is 3 dirnames up from the gitdir path
+  _gitdir=$(cat "$SCRIPT_DIR/.git" | sed 's/gitdir: //')
+  REPO_ROOT="$(cd "$(dirname "$(dirname "$(dirname "$_gitdir")")")" && pwd)"
 else
   REPO_ROOT="$SCRIPT_DIR"
 fi

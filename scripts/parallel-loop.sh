@@ -60,7 +60,12 @@ find_eligible_tasks() {
     [ -f "$f" ] || continue
     [ "$(get_progress "$f")" = "needs-revision" ] && echo "$f"
   done
-  # Priority 2: not-started tasks with satisfied deps
+  # Priority 2: in-progress tasks (stale from a previous loop run)
+  for f in "$REPO_ROOT"/specs/tasks/task-*.md; do
+    [ -f "$f" ] || continue
+    [ "$(get_progress "$f")" = "in-progress" ] && echo "$f"
+  done
+  # Priority 3: not-started tasks with satisfied deps
   for f in "$REPO_ROOT"/specs/tasks/task-*.md; do
     [ -f "$f" ] || continue
     [ "$(get_progress "$f")" != "not-started" ] && continue
@@ -110,7 +115,22 @@ merge_worker() {
   local worktree="${ACTIVE_WORKERS[$task_name]}"
   local branch="worker/$task_name"
 
-  log "<<< Creating PR for $task_name"
+  # Check if the task actually completed or just timed out
+  local wt_task="$worktree/specs/tasks/$task_name.md"
+  local wt_status=""
+  if [ -f "$wt_task" ]; then
+    wt_status=$(bash "$REPO_ROOT/scripts/task-field.sh" "$wt_task" progress 2>/dev/null || echo "unknown")
+  fi
+
+  if [ "$wt_status" != "complete" ] && [ "$wt_status" != "ready-for-review" ]; then
+    log "<<< Skipping PR for $task_name (status: $wt_status -- incomplete/timed out)"
+    git worktree remove "$worktree" --force 2>/dev/null
+    git branch -D "$branch" 2>/dev/null
+    unset "ACTIVE_WORKERS[$task_name]"
+    return 1
+  fi
+
+  log "<<< Creating PR for $task_name (status: $wt_status)"
 
   # Push the worker branch to origin
   if ! git push origin "$branch" -u 2>/dev/null; then

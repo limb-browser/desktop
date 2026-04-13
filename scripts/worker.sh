@@ -59,11 +59,13 @@ while [ $ROUND -lt $MAX_ROUNDS ]; do
   status=$(get_status)
 
   case "$status" in
-    not-started|needs-revision)
+    not-started|needs-revision|in-progress)
       # Rebase onto dev to pick up merged work from other workers.
       # Preserve our task/review files -- dev has stale versions.
       log "--- Rebasing onto dev (round $ROUND)"
-      MAIN_ROOT="$(cd "$(cat "$WORKTREE/.git" | sed 's/gitdir: //' | xargs dirname | xargs dirname)" && pwd 2>/dev/null || echo "$WORKTREE")"
+      # Resolve main repo root: gitdir is like /path/to/repo/.git/worktrees/name (3 levels up)
+      _gitdir=$(cat "$WORKTREE/.git" | sed 's/gitdir: //')
+      MAIN_ROOT="$(cd "$(dirname "$(dirname "$(dirname "$_gitdir")")")" && pwd 2>/dev/null || echo "$WORKTREE")"
       cp "$TASK_FILE" "$TASK_FILE.bak" 2>/dev/null
       cp -r specs/reviews/ /tmp/limb-reviews-$TASK_NAME/ 2>/dev/null
       git fetch "$MAIN_ROOT" HEAD 2>/dev/null && git rebase FETCH_HEAD 2>/dev/null || \
@@ -127,6 +129,14 @@ while [ $ROUND -lt $MAX_ROUNDS ]; do
         pr_duration=$((pr_end - pr_start))
         emit worker.process-revision.done task="$TASK_NAME" round=$ROUND duration_s=$pr_duration
         log "<<< Process Revision done (${pr_duration}s)"
+      elif [ "$new_status" = "complete" ]; then
+        emit worker.verify.done task="$TASK_NAME" round=$ROUND verdict=PASS findings=$findings duration_s=$duration
+        # complete will be handled at top of next iteration
+      elif [ "$new_status" = "ready-for-review" ]; then
+        # Verifier didn't change status -- treat as stuck, force needs-revision
+        log "    !!! Verifier did not update task status -- forcing needs-revision"
+        emit worker.verify.done task="$TASK_NAME" round=$ROUND verdict=STUCK findings=$findings duration_s=$duration
+        sed -i 's/^progress: ready-for-review/progress: needs-revision/' "$TASK_FILE"
       else
         emit worker.verify.done task="$TASK_NAME" round=$ROUND verdict=PASS findings=$findings duration_s=$duration
       fi
@@ -138,6 +148,7 @@ while [ $ROUND -lt $MAX_ROUNDS ]; do
       touch "$WORKTREE/.done"
       exit 0
       ;;
+
 
     *)
       log "!!! Unknown status: $status -- aborting"
