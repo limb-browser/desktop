@@ -75,6 +75,19 @@ while [ $ROUND -lt $MAX_ROUNDS ]; do
       cp -r /tmp/limb-reviews-$TASK_NAME/* specs/reviews/ 2>/dev/null
       rm -rf /tmp/limb-reviews-$TASK_NAME 2>/dev/null
 
+      # Re-check status after rebase -- verifier may have set complete
+      status=$(get_status)
+      if [ "$status" = "complete" ]; then
+        log "=== Task $TASK_NAME complete (detected after rebase) ==="
+        emit worker.complete task="$TASK_NAME" rounds=$ROUND $(git_stats)
+        touch "$WORKTREE/.done"
+        exit 0
+      fi
+      if [ "$status" = "ready-for-review" ]; then
+        log "    Status is ready-for-review after rebase -- skipping to verifier"
+        continue
+      fi
+
       log ">>> Implementation (round $ROUND, status=$status)"
       emit worker.implement.start task="$TASK_NAME" round=$ROUND status="$status"
       local_start=$(date '+%s')
