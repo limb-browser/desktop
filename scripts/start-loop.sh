@@ -9,10 +9,12 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SESSION=${LIMB_TMUX_SESSION:-limb-loop}
 
-# Kill existing session if running
-tmux kill-session -t "$SESSION" 2>/dev/null || true
-
-tmux new-session -d -s "$SESSION" -c "$REPO_ROOT"
-tmux set-option -t "$SESSION" mouse on
-tmux send-keys -t "$SESSION" "LIMB_AUTO_MERGE=1 bash scripts/parallel-loop.sh" Enter
-tmux attach -t "$SESSION"
+# Attach to existing session, or create a new one
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+  tmux attach -t "$SESSION"
+else
+  tmux new-session -d -s "$SESSION" -c "$REPO_ROOT"
+  tmux set-option -t "$SESSION" mouse on
+  tmux send-keys -t "$SESSION" "LIMB_AUTO_MERGE=1 bash scripts/parallel-loop.sh" Enter
+  tmux attach -t "$SESSION"
+fi
