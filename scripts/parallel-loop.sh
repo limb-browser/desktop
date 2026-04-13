@@ -263,6 +263,14 @@ while true; do
   emit pm.done iteration=$ITERATION duration_s=$pm_duration tasks_total=$tasks_total tasks_complete=$tasks_complete
   log "<<< Project Manager done (${pm_duration}s, $tasks_total tasks)"
 
+  # 1b. Propagate latest scripts to active worktrees
+  for task_name in "${!ACTIVE_WORKERS[@]}"; do
+    local worktree="${ACTIVE_WORKERS[$task_name]}"
+    cp "$REPO_ROOT/scripts/worker.sh" "$worktree/scripts/worker.sh" 2>/dev/null
+    cp "$REPO_ROOT/scripts/emit-event.sh" "$worktree/scripts/emit-event.sh" 2>/dev/null
+    cp "$REPO_ROOT/scripts/task-field.sh" "$worktree/scripts/task-field.sh" 2>/dev/null
+  done
+
   # 2. Merge completed workers back to dev
   for task_name in "${!ACTIVE_WORKERS[@]}"; do
     if check_worker_done "$task_name"; then
