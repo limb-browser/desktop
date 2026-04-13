@@ -146,10 +146,20 @@ while [ $ROUND -lt $MAX_ROUNDS ]; do
         emit worker.verify.done task="$TASK_NAME" round=$ROUND verdict=PASS findings=$findings duration_s=$duration
         # complete will be handled at top of next iteration
       elif [ "$new_status" = "ready-for-review" ]; then
-        # Verifier didn't change status -- treat as stuck, force needs-revision
-        log "    !!! Verifier did not update task status -- forcing needs-revision"
-        emit worker.verify.done task="$TASK_NAME" round=$ROUND verdict=STUCK findings=$findings duration_s=$duration
-        sed -i 's/^progress: ready-for-review/progress: needs-revision/' "$TASK_FILE"
+        # Verifier didn't change status. Check the review file for verdict.
+        review_verdict=""
+        if [ -n "$review_file" ]; then
+          review_verdict=$(grep -oP '^\s*(PASS|FAIL)' "$review_file" 2>/dev/null | tail -1)
+        fi
+        if [ "$review_verdict" = "PASS" ]; then
+          log "    Verifier forgot to update status but review says PASS -- setting complete"
+          emit worker.verify.done task="$TASK_NAME" round=$ROUND verdict=PASS findings=$findings duration_s=$duration
+          sed -i 's/^progress: ready-for-review/progress: complete/' "$TASK_FILE"
+        else
+          log "    !!! Verifier did not update task status -- forcing needs-revision"
+          emit worker.verify.done task="$TASK_NAME" round=$ROUND verdict=STUCK findings=$findings duration_s=$duration
+          sed -i 's/^progress: ready-for-review/progress: needs-revision/' "$TASK_FILE"
+        fi
       else
         emit worker.verify.done task="$TASK_NAME" round=$ROUND verdict=PASS findings=$findings duration_s=$duration
       fi
