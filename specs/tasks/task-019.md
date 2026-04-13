@@ -1,8 +1,9 @@
 ---
 title: "Implement tree navigation keyboard shortcuts"
-spec_ref: "navigation.md S4.2 S4.3"
+spec_ref: "navigation.md S4.1 S4.2 S4.3"
 depends_on:
   - task-009
+  - task-007
 progress: not-started
 review: ""
 coverage_sections: []
