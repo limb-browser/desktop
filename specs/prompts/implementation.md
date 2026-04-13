@@ -68,5 +68,5 @@ Before marking a task `ready-for-review`:
 6. Run `npx vitest run`. All tests must pass.
 7. Run through the Self-Verification Checklist.
 8. Update the task status to `ready-for-review`.
-9. Commit using conventional commits, author: "Implementation <implementation@limb.dev>"
+9. Commit using conventional commits, author: "Implementation <jsell-rh.implementation@agents.redhat.com>"
 10. Call `kill $PPID`.

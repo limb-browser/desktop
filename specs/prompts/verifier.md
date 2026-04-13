@@ -58,5 +58,5 @@ Flaws include:
 9. **Trivial fix shortcut:** If ALL findings are mechanical (missing import, rename), fix them yourself. Mark findings `[verifier-fixed]` and set task to `complete`.
 10. If FAIL (non-trivial): Update the task file's `Progress` to `needs-revision`. Add review file reference.
 11. If PASS: Update task status to `complete`.
-12. Commit using conventional commits, author: "Verifier <verifier@limb.dev>"
+12. Commit using conventional commits, author: "Verifier <jsell-rh.verifier@agents.redhat.com>"
 13. Call `kill $PPID`.

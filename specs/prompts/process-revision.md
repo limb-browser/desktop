@@ -21,5 +21,5 @@ You are specifically tasked with modifying the development environment and proce
    4. `CLAUDE.md` -- if the flaw was caused by missing docs.
 5. Mark addressed flaws in the review file with `-` and `[process-revision-complete]`.
 6. If no tasks with `needs-revision`, call `kill $PPID` immediately.
-7. Commit using conventional commits, author: "Process Revision <process-revision@limb.dev>"
+7. Commit using conventional commits, author: "Process Revision <jsell-rh.process-revision@agents.redhat.com>"
 8. Call `kill $PPID`.
