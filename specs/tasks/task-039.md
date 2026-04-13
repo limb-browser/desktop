@@ -1,9 +1,8 @@
 ---
-title: "Implement zoom-out-and-back animation on new child creation"
-spec_ref: "navigation.md S1.1"
+title: "Implement LOD performance optimizations — spatial index and frame skipping"
+spec_ref: "performance.md S2.1 S2.3"
 depends_on:
-  - task-012
-  - task-014
+  - task-011
 progress: not-started
 review: ""
 coverage_sections: []
@@ -12,30 +11,38 @@ commits: []
 
 ## Spec Excerpt
 
-> When a user opens a link in a new tab (via Ctrl+click, middle-click, or right-click -> "Open in new tab"):
-> ...
-> 6. If currently zoomed in (`level >= 0.9`), animate a brief zoom-out-and-back to show the branching, then zoom into the new node.
+> Do NOT recompute LOD for every node on every frame. Instead:
+> - Maintain a spatial index of node positions.
+> - On zoom/pan change, query only nodes whose viewport status might have changed.
+> - Use a dirty flag per node. Only recompute nodes whose `nodeScreenWidth` crossed a tier boundary.
+>
+> If LOD computation takes longer than 4ms in a single frame:
+> - Process only the highest-priority nodes (closest to viewport center) this frame.
+> - Defer remaining nodes to the next frame.
+> - Priority: focused node > ancestors > siblings > descendants > distant nodes.
 
 ## Current State
 
-Link interception (task-012) creates child nodes for new-tab links. Click-to-focus (task-014) provides zoom animation infrastructure. But when a new child is created while zoomed in, the tree silently adds the node and focuses it — there is no visual indication of the branching to the user.
+LODComputer (task-011) recomputes tiers for all nodes on every frame. This works for small trees but will not scale to trees with hundreds of nodes.
 
 ## What To Build
 
-1. Hook into the child-creation flow (from task-012's link interception):
-   - After `addChild` creates the new node, check if `zoomLevel >= 0.9`.
-   - If zoomed in, trigger the zoom-out-and-back animation instead of an instant focus change.
-2. Implement the zoom-out-and-back choreography:
-   - Phase 1 (zoom out): Animate from current level (~1.0) to an intermediate level where both the parent and new child are visible (~0.6-0.7, computed from their positions). Duration: ~200ms, ease-out.
-   - Phase 2 (hold): Brief pause at the intermediate level so the user sees the new branch. Duration: ~150ms.
-   - Phase 3 (zoom in): Animate from intermediate level to 1.0 centered on the new child node. Duration: ~250ms, ease-out.
-   - Total duration: ~600ms.
-3. During the animation, the tree layout should update to show the new node (the add-node animation from task-029 plays concurrently with the zoom-out phase).
-4. If the user initiates any input (scroll, click) during the animation, cancel and jump to the final state (zoomed into the new child).
-5. Skip the animation when `zoomLevel < 0.9` (the user is already seeing the tree, so just focus the new node normally).
-6. Write tests for:
-   - Animation triggers when a child is created at zoom >= 0.9.
-   - Animation does not trigger when zoom < 0.9.
-   - Animation zooms out far enough to show both parent and child.
-   - User input cancels the animation.
-   - Final state is zoomed into the new child at level 1.0.
+1. Add a spatial index to LODComputer:
+   - Index node positions for fast viewport intersection queries.
+   - On zoom/pan change, query only nodes near the viewport boundary whose visibility status might have changed.
+   - Interior nodes (fully visible or fully culled) skip recomputation if their `nodeScreenWidth` hasn't crossed a tier boundary.
+2. Implement dirty flags per node:
+   - Mark a node dirty when its `nodeScreenWidth` crosses a tier boundary threshold.
+   - Only recompute tier for dirty nodes.
+   - Clear dirty flags after processing.
+3. Implement frame-budget-aware LOD processing:
+   - Measure elapsed time during LOD computation.
+   - If computation exceeds 4ms, stop and defer remaining nodes to the next frame.
+   - Process nodes in priority order: focused node first, then ancestors, siblings, descendants, distant nodes.
+4. Ensure deferred nodes retain their previous tier (no visual glitch from skipping a frame).
+5. Write tests for:
+   - Spatial index returns correct nodes for a given viewport.
+   - Dirty flags are set when screen width crosses a threshold.
+   - Frame skipping defers low-priority nodes.
+   - Priority order is respected (focused node always processed first).
+   - No visual artifacts from deferred computation.

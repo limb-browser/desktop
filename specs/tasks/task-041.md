@@ -1,8 +1,9 @@
 ---
-title: "Implement Places DB persistent storage for tree data and screenshots"
-spec_ref: "persistence.md S1.2 S4"
+title: "Implement frame budget enforcement with graceful degradation"
+spec_ref: "interaction-feel.md S6"
 depends_on:
-  - task-003
+  - task-022
+  - task-011
 progress: not-started
 review: ""
 coverage_sections: []
@@ -11,39 +12,36 @@ commits: []
 
 ## Spec Excerpt
 
-> | Data | Storage | Reason |
-> |------|---------|--------|
-> | Inactive branch nodes | Places database (SQLite) | Persistent, searchable |
-> | Screenshots | Separate table in Places or dedicated SQLite | Large blobs, evictable |
+> All animations must maintain 60fps. If a frame takes longer than 16ms, the system should:
 >
-> Low-res (320px wide): JPEG quality 60, ~15-30KB
-> High-res (1024px wide): JPEG quality 85, ~80-150KB
+> 1. Skip animation frames (jump to final state) rather than stutter.
+> 2. Reduce LOD tier thresholds temporarily (show more screenshots, fewer live views).
+> 3. Never block the main thread with layout computation.
 
 ## Current State
 
-BrowsingTree (task-003) manages tree data in memory only. SessionStore persistence (task-023) will persist active branch tabs via tab attributes. No persistent storage exists for inactive branch tree structure or screenshots across browser restarts. Tasks that need persistent storage (task-027 lazy loading, task-030 screenshot eviction, task-032 search) have no backend to read from or write to.
+FrameScheduler (task-022) manages the demand-driven frame loop but does not monitor frame duration or trigger degradation. LODComputer (task-011) uses fixed tier thresholds. PerformanceProbe (task-033) detects budget overruns but only reports — it does not enforce. Animation tasks (task-014, task-029, task-037) have no skip-to-end capability.
 
 ## What To Build
 
-1. Create `src/limb/tree/TreeStorage.mjs` with a SQLite-backed storage layer:
-   - Create a dedicated SQLite database using Firefox's `Sqlite.sys.mjs` API.
-   - Database file: `limb-tree.sqlite` in the profile directory.
-   - Table `limb_nodes`: `id` TEXT PRIMARY KEY, `url` TEXT, `title` TEXT, `favicon` TEXT, `parent_id` TEXT, `child_ids` TEXT (JSON array), `created_at` INTEGER, `last_visited_at` INTEGER, `descendant_count` INTEGER, `branch_root_id` TEXT.
-   - Table `limb_screenshots`: `node_id` TEXT, `resolution` TEXT (low/high), `data` BLOB, `captured_at` INTEGER, PRIMARY KEY (`node_id`, `resolution`).
-2. Implement storage API methods:
-   - `saveBranch(branchRootId, nodes[])` — persist all nodes in a branch.
-   - `loadBranch(branchRootId)` — load all nodes for a branch, return as TreeNode array.
-   - `deleteBranch(branchRootId)` — remove a branch and all its descendant nodes and screenshots.
-   - `getBranchSummaries()` — return branch root nodes with metadata (for launcher display without loading full subtrees).
-   - `saveScreenshot(nodeId, resolution, jpegBlob)` — persist a screenshot.
-   - `loadScreenshot(nodeId, resolution)` — retrieve a screenshot blob.
-   - `deleteScreenshots(nodeIds[])` — remove screenshots for given nodes.
-   - `getScreenshotMemoryUsage()` — return total byte size of stored screenshots.
-3. Ensure database schema is created on first access and includes a version number for future migrations.
-4. Write tests for:
-   - Saving and loading a branch round-trips all node fields correctly.
-   - Branch summaries return correct metadata without loading full subtrees.
-   - Screenshots are stored and retrieved at correct resolutions.
-   - Deleting a branch removes all associated nodes and screenshots.
-   - `getScreenshotMemoryUsage()` returns accurate totals.
-   - Database is created in the profile directory on first access.
+1. Add frame budget monitoring to FrameScheduler:
+   - Measure each frame's total duration (from start of tick to end of paint).
+   - Track a rolling window of the last 5 frames.
+   - If 3 of the last 5 frames exceed 16ms, enter "degraded mode".
+   - Exit degraded mode after 10 consecutive frames under 12ms.
+2. Implement animation skip-to-end:
+   - Add a `skipToEnd()` method to the animation base (used by zoom animation, layout animation, reveal animation).
+   - In degraded mode, any animation that has been running for more than 2 frames is skipped to its final state.
+   - Ensure skipping produces no visual glitches (final state is applied atomically).
+3. Implement temporary LOD threshold reduction:
+   - In degraded mode, raise all LOD tier entry thresholds by 50% (e.g., Live threshold goes from 600px to 900px).
+   - This causes more nodes to remain at Screenshot tier, reducing live tab rendering.
+   - Restore original thresholds when exiting degraded mode.
+4. Integrate with PerformanceProbe: emit a `degradedModeEntered` / `degradedModeExited` event for observability.
+5. Write tests for:
+   - Degraded mode activates after consecutive slow frames.
+   - Degraded mode deactivates after consecutive fast frames.
+   - Animations skip to final state in degraded mode.
+   - LOD thresholds are raised in degraded mode.
+   - LOD thresholds restore on exit from degraded mode.
+   - No visual glitches when animations are skipped.

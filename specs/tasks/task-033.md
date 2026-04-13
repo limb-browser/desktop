@@ -1,8 +1,10 @@
 ---
-title: "Implement performance probes"
-spec_ref: "performance.md S6"
+title: "Implement search — about:limb-search and Ctrl+K"
+spec_ref: "unified-tree.md S5; persistence.md S5"
 depends_on:
-  - task-022
+  - task-023
+  - task-025
+  - task-027
 progress: not-started
 review: ""
 coverage_sections: []
@@ -11,34 +13,32 @@ commits: []
 
 ## Spec Excerpt
 
-> The `PerformanceProbe` interface emits:
-> - `frameBudgetExceeded(actualMs, budgetMs)` when a frame takes longer than 16ms.
-> - `lodComputationTime(ms)` per frame.
-> - `memorySnapshot(heapMB, screenshotsMB, tabCount)` periodic report.
+> Full-text search across all persisted nodes (title, URL). Uses FTS5 if backed by SQLite, or Places' existing search infrastructure.
 >
-> Any commit that increases idle CPU usage above the budget is a defect, not a tradeoff.
+> Results return: node title, URL, branch name, timestamp, favicon. Clicking a result loads that branch and focuses the node.
+>
+> Search bar on the launcher page. `Ctrl+K` from anywhere opens `about:limb-search`.
 
 ## Current State
 
-Frame scheduler (task-022) manages the paint loop. No performance measurement or reporting exists.
+SessionStore persistence (task-023) stores tree data. Launcher page (task-025) has a search bar placeholder. No search implementation exists.
 
 ## What To Build
 
-1. Create `src/limb/tree/PerformanceProbe.mjs`:
-   - `frameBudgetExceeded(actualMs, budgetMs)` — called when a frame takes > 16ms.
-   - `lodComputationTime(ms)` — called after each LOD computation.
-   - `memorySnapshot(heapMB, screenshotsMB, tabCount)` — called periodically.
-2. Integrate with FrameScheduler:
-   - Measure each frame's duration (start/end timestamps around paint).
-   - If duration > 16ms, call `frameBudgetExceeded`.
-3. Integrate with LODComputer:
-   - Measure LOD computation time per frame.
-   - Report via `lodComputationTime`.
-4. Periodic memory snapshot:
-   - Every 30 seconds, collect heap size, screenshot memory usage, active tab count.
-   - Report via `memorySnapshot`.
-5. Log probe data to browser console for debugging. Optionally expose via `about:limb-debug` or devtools.
+1. Register `about:limb-search` as a Firefox about: page.
+2. Implement search backend:
+   - Search across all persisted nodes (active and inactive branches).
+   - Match against node `title` and `url` fields.
+   - Use Firefox's Places database infrastructure if feasible, or implement a simple in-memory search for the initial version.
+   - Return results with: title, URL, branch name (parent branch root's title), timestamp, favicon.
+3. Implement search UI:
+   - Text input with instant results (filter as you type).
+   - Results list showing title, URL, branch name, timestamp, favicon.
+   - Clicking a result: load that branch (if inactive), focus the node, zoom in.
+4. Wire the launcher search bar to the same search logic.
+5. Register `Ctrl+K` shortcut to navigate to `about:limb-search`.
 6. Write tests for:
-   - Probes fire when budget is exceeded.
-   - LOD computation time is measured correctly.
-   - Memory snapshots include correct data.
+   - Search finds nodes by title substring.
+   - Search finds nodes by URL substring.
+   - Results include correct branch name and timestamp.
+   - Clicking a result activates the correct branch and focuses the node.

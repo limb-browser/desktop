@@ -1,9 +1,10 @@
 ---
-title: "Register about:limb-settings and implement settings UI"
-spec_ref: "settings.md S3"
+title: "Implement lazy tree loading for inactive branches"
+spec_ref: "unified-tree.md S3; persistence.md S2"
 depends_on:
-  - task-021
-  - task-025
+  - task-003
+  - task-023
+  - task-027
 progress: not-started
 review: ""
 coverage_sections: []
@@ -12,32 +13,36 @@ commits: []
 
 ## Spec Excerpt
 
-> Settings are accessible via `about:limb-settings` in the address bar. Registered `about:` page.
-> Keyboard shortcut `Ctrl+,` navigates to `about:limb-settings`.
-> Gear icon on the launcher page links to settings.
+> A tree with thousands of nodes spanning months of browsing cannot all be in memory. Only the active branch needs to be fully materialized.
 >
-> Dark theme matching tree view aesthetic. Vertically scrollable with labeled sections.
+> Load levels:
+> - Root + summaries: Root node + branch roots with metadata. Always in memory.
+> - Active branch: Full subtree loaded when user zooms into a branch.
+> - Inactive branches: Branch root only (summary).
 >
-> General: Homepage text input, Max Live Tabs number input (range 1-12).
-> Changes apply immediately. No "save" button.
+> When switching branches: save current branch, remove descendants from memory, load new branch subtree.
 
 ## Current State
 
-`limb.*` preferences are registered (task-021). `about:limb-home` registration pattern exists (task-025). No settings page exists.
+BrowsingTree (task-003) keeps all nodes in memory. SessionStore persistence (task-023) can save/restore tree data. But there's no concept of active vs. inactive branches or lazy loading.
 
 ## What To Build
 
-1. Register `about:limb-settings` as a Firefox about: page (same pattern as about:limb-home).
-2. Implement settings UI:
-   - Dark theme, vertically scrollable.
-   - **General** section:
-     - "Homepage" — text input bound to `limb.home.url`.
-     - "Max Live Tabs" — number input (1-12) bound to `limb.tree.max-live-tabs`.
-   - Changes write to Firefox prefs immediately (two-way binding via `Services.prefs`).
-3. Register `Ctrl+,` keyboard shortcut to navigate to `about:limb-settings`.
-4. Add a gear icon to the launcher page (about:limb-home) linking to settings.
+1. Extend BrowsingTree with branch activation concept:
+   - `activeBranchId` — the currently active branch root.
+   - `activatesBranch(branchRootId)` — loads full subtree from storage into memory.
+   - `deactivateBranch(branchRootId)` — saves and removes descendants from memory, keeps branch root with summary metadata.
+2. Add `descendantCount` to TreeNode:
+   - Cached count, updated incrementally on addChild/removeNode.
+   - Persisted for inactive branches so launcher can display node counts without loading full subtrees.
+3. Implement branch switch flow:
+   - Save current active branch state.
+   - Deactivate current branch (remove descendants from memory).
+   - Activate new branch (load subtree from storage).
+   - Free screenshots for deactivated branch.
+4. On startup: load only root + branch roots (summaries). Load active branch subtree on demand.
 5. Write tests for:
-   - about:limb-settings page loads.
-   - Changing a setting updates the Firefox pref.
-   - Pref values are reflected in the UI on page load.
-   - Ctrl+, shortcut navigates to settings.
+   - Branch activation loads full subtree.
+   - Branch deactivation removes descendants from memory.
+   - descendantCount is accurate after operations.
+   - Switching branches preserves data integrity.
