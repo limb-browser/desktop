@@ -32,6 +32,13 @@ Flaws include:
 - **Dead code:** Every export should have a consumer outside its own file.
 - **Algorithm completeness:** When reusing helpers, verify the COMPLETE algorithm is used (e.g., `naiveTier` without `applyHysteresis` is incomplete).
 - **Patch minimality:** Patches to Firefox source should be as small as possible.
+- **SQL injection patterns:** Verify no string interpolation (`${...}`) in SQL statements. All values must use parameterized binding (`:param`). Run `scripts/check-sql-interpolation.sh`.
+- **Port-implementation symmetry:** Every public method on an implementation must appear in its port interface, and vice versa. Run `scripts/check-port-completeness.sh`.
+- **Test double behavioral parity:** Compare in-memory fakes against production implementations. They must enforce the same invariants (parameter validation, consistency checks). Different behavior on edge-case inputs is a finding.
+- **Transaction consistency:** If some multi-mutation methods use transactions, verify all multi-mutation methods do.
+- **Test naming accuracy:** Test file names and `describe` blocks must name the actual SUT. If tests instantiate `InMemoryFoo`, the describe should say `InMemoryFoo`, not `Foo`.
+- **Boundary precision:** When specs use "exceeds", "above", or "over", the implementation must use strict `>`. When specs use "below" or "under", it must use strict `<`. Only `>=` / `<=` for "at least", "at most", "reaches". Compare the exact spec wording against the comparison operator in code.
+- **UI completeness:** If a task specifies user-visible behavior (notifications, dialogs, buttons, visual indicators), verify that adapters or handlers exist to produce that behavior — not just domain probes. A probe that fires with no subscriber is missing required behavior.
 
 ## Workflow
 
@@ -41,8 +48,9 @@ Flaws include:
 4. Read the task's referenced spec sections.
 5. Read all code files the task added or modified (check git diff).
 6. Run `npx vitest run` -- failures are automatic findings.
-7. Apply verification targets systematically.
-8. Write findings to `specs/reviews/review-TASK_NNN-RN.md`:
+7. Run `scripts/check-sql-interpolation.sh` and `scripts/check-port-completeness.sh` -- failures are automatic findings.
+8. Apply verification targets systematically.
+9. Write findings to `specs/reviews/review-TASK_NNN-RN.md`:
    ```markdown
    # Review: Task NNN - Round N
 
@@ -55,8 +63,8 @@ Flaws include:
 
    PASS | FAIL (N findings)
    ```
-9. **Trivial fix shortcut:** If ALL findings are mechanical (missing import, rename), fix them yourself. Mark findings `[verifier-fixed]` and set task to `complete`.
-10. If FAIL (non-trivial): Update the task file's `Progress` to `needs-revision`. Add review file reference.
-11. If PASS: Update task status to `complete`.
-12. Commit using conventional commits, author: "Verifier <jsell-rh.verifier@agents.redhat.com>"
-13. Call `kill $PPID`.
+10. **Trivial fix shortcut:** If ALL findings are mechanical (missing import, rename), fix them yourself. Mark findings `[verifier-fixed]` and set task to `complete`.
+11. If FAIL (non-trivial): Update the task file's `Progress` to `needs-revision`. Add review file reference.
+12. If PASS: Update task status to `complete`.
+13. Commit using conventional commits, author: "Verifier <jsell-rh.verifier@agents.redhat.com>"
+14. Call `kill $PPID`.

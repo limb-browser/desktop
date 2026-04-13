@@ -1,8 +1,9 @@
 ---
-title: "Implement LOD performance optimizations — spatial index and frame skipping"
-spec_ref: "performance.md S2.1 S2.3"
+title: "Implement zoom-out reveal animation"
+spec_ref: "interaction-feel.md S5.2"
 depends_on:
-  - task-011
+  - task-006
+  - task-007
 progress: not-started
 review: ""
 coverage_sections: []
@@ -11,38 +12,30 @@ commits: []
 
 ## Spec Excerpt
 
-> Do NOT recompute LOD for every node on every frame. Instead:
-> - Maintain a spatial index of node positions.
-> - On zoom/pan change, query only nodes whose viewport status might have changed.
-> - Use a dirty flag per node. Only recompute nodes whose `nodeScreenWidth` crossed a tier boundary.
->
-> If LOD computation takes longer than 4ms in a single frame:
-> - Process only the highest-priority nodes (closest to viewport center) this frame.
-> - Defer remaining nodes to the next frame.
-> - Priority: focused node > ancestors > siblings > descendants > distant nodes.
+> When zooming out from a focused node:
+> - Sibling nodes appear first (they're closest), then the parent, then more distant relatives.
+> - Nodes appear with a subtle scale-up (from 90% to 100%) as they enter the viewport.
+> - This creates a "revealing" sensation rather than everything appearing at once.
 
 ## Current State
 
-LODComputer (task-011) recomputes tiers for all nodes on every frame. This works for small trees but will not scale to trees with hundreds of nodes.
+Tree rendering (task-006) draws all visible nodes the same way. ZoomState (task-007) handles zoom level changes. When zooming out, nodes pop in at full scale as soon as they enter the viewport — there is no revealing animation.
 
 ## What To Build
 
-1. Add a spatial index to LODComputer:
-   - Index node positions for fast viewport intersection queries.
-   - On zoom/pan change, query only nodes near the viewport boundary whose visibility status might have changed.
-   - Interior nodes (fully visible or fully culled) skip recomputation if their `nodeScreenWidth` hasn't crossed a tier boundary.
-2. Implement dirty flags per node:
-   - Mark a node dirty when its `nodeScreenWidth` crosses a tier boundary threshold.
-   - Only recompute tier for dirty nodes.
-   - Clear dirty flags after processing.
-3. Implement frame-budget-aware LOD processing:
-   - Measure elapsed time during LOD computation.
-   - If computation exceeds 4ms, stop and defer remaining nodes to the next frame.
-   - Process nodes in priority order: focused node first, then ancestors, siblings, descendants, distant nodes.
-4. Ensure deferred nodes retain their previous tier (no visual glitch from skipping a frame).
+1. Track node "reveal progress" in the rendering pipeline:
+   - When a node transitions from culled/off-screen to visible during a zoom-out, start a reveal animation for that node.
+   - Reveal animation: scale from 90% to 100% over 150ms with ease-out timing.
+   - Apply the reveal scale on top of the normal zoom transform when painting the node.
+2. Order reveal priority by tree proximity to the focused node:
+   - Siblings of the focused node reveal first (they appear closest in the viewport).
+   - Parent node reveals next.
+   - More distant relatives reveal later.
+   - Stagger reveal start times by ~30ms per relationship distance.
+3. Only trigger reveal animations during zoom-out (decreasing zoom level), not during pan or zoom-in.
+4. Integrate with FrameScheduler: reveal animations call `markDirty()` until complete.
 5. Write tests for:
-   - Spatial index returns correct nodes for a given viewport.
-   - Dirty flags are set when screen width crosses a threshold.
-   - Frame skipping defers low-priority nodes.
-   - Priority order is respected (focused node always processed first).
-   - No visual artifacts from deferred computation.
+   - Nodes entering viewport during zoom-out start at 90% scale.
+   - Nodes reach 100% scale after 150ms.
+   - Siblings reveal before parent during zoom-out.
+   - No reveal animation on zoom-in or pan.

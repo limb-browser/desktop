@@ -1,9 +1,9 @@
 ---
-title: "Implement frame budget enforcement with graceful degradation"
-spec_ref: "interaction-feel.md S6"
+title: "Implement zoom-out-and-back animation on new child creation"
+spec_ref: "navigation.md S1.1"
 depends_on:
-  - task-022
-  - task-011
+  - task-012
+  - task-014
 progress: not-started
 review: ""
 coverage_sections: []
@@ -12,36 +12,30 @@ commits: []
 
 ## Spec Excerpt
 
-> All animations must maintain 60fps. If a frame takes longer than 16ms, the system should:
->
-> 1. Skip animation frames (jump to final state) rather than stutter.
-> 2. Reduce LOD tier thresholds temporarily (show more screenshots, fewer live views).
-> 3. Never block the main thread with layout computation.
+> When a user opens a link in a new tab (via Ctrl+click, middle-click, or right-click -> "Open in new tab"):
+> ...
+> 6. If currently zoomed in (`level >= 0.9`), animate a brief zoom-out-and-back to show the branching, then zoom into the new node.
 
 ## Current State
 
-FrameScheduler (task-022) manages the demand-driven frame loop but does not monitor frame duration or trigger degradation. LODComputer (task-011) uses fixed tier thresholds. PerformanceProbe (task-033) detects budget overruns but only reports — it does not enforce. Animation tasks (task-014, task-029, task-037) have no skip-to-end capability.
+Link interception (task-012) creates child nodes for new-tab links. Click-to-focus (task-014) provides zoom animation infrastructure. But when a new child is created while zoomed in, the tree silently adds the node and focuses it — there is no visual indication of the branching to the user.
 
 ## What To Build
 
-1. Add frame budget monitoring to FrameScheduler:
-   - Measure each frame's total duration (from start of tick to end of paint).
-   - Track a rolling window of the last 5 frames.
-   - If 3 of the last 5 frames exceed 16ms, enter "degraded mode".
-   - Exit degraded mode after 10 consecutive frames under 12ms.
-2. Implement animation skip-to-end:
-   - Add a `skipToEnd()` method to the animation base (used by zoom animation, layout animation, reveal animation).
-   - In degraded mode, any animation that has been running for more than 2 frames is skipped to its final state.
-   - Ensure skipping produces no visual glitches (final state is applied atomically).
-3. Implement temporary LOD threshold reduction:
-   - In degraded mode, raise all LOD tier entry thresholds by 50% (e.g., Live threshold goes from 600px to 900px).
-   - This causes more nodes to remain at Screenshot tier, reducing live tab rendering.
-   - Restore original thresholds when exiting degraded mode.
-4. Integrate with PerformanceProbe: emit a `degradedModeEntered` / `degradedModeExited` event for observability.
-5. Write tests for:
-   - Degraded mode activates after consecutive slow frames.
-   - Degraded mode deactivates after consecutive fast frames.
-   - Animations skip to final state in degraded mode.
-   - LOD thresholds are raised in degraded mode.
-   - LOD thresholds restore on exit from degraded mode.
-   - No visual glitches when animations are skipped.
+1. Hook into the child-creation flow (from task-012's link interception):
+   - After `addChild` creates the new node, check if `zoomLevel >= 0.9`.
+   - If zoomed in, trigger the zoom-out-and-back animation instead of an instant focus change.
+2. Implement the zoom-out-and-back choreography:
+   - Phase 1 (zoom out): Animate from current level (~1.0) to an intermediate level where both the parent and new child are visible (~0.6-0.7, computed from their positions). Duration: ~200ms, ease-out.
+   - Phase 2 (hold): Brief pause at the intermediate level so the user sees the new branch. Duration: ~150ms.
+   - Phase 3 (zoom in): Animate from intermediate level to 1.0 centered on the new child node. Duration: ~250ms, ease-out.
+   - Total duration: ~600ms.
+3. During the animation, the tree layout should update to show the new node (the add-node animation from task-029 plays concurrently with the zoom-out phase).
+4. If the user initiates any input (scroll, click) during the animation, cancel and jump to the final state (zoomed into the new child).
+5. Skip the animation when `zoomLevel < 0.9` (the user is already seeing the tree, so just focus the new node normally).
+6. Write tests for:
+   - Animation triggers when a child is created at zoom >= 0.9.
+   - Animation does not trigger when zoom < 0.9.
+   - Animation zooms out far enough to show both parent and child.
+   - User input cancels the animation.
+   - Final state is zoomed into the new child at level 1.0.

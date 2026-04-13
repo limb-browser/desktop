@@ -1,10 +1,9 @@
 ---
-title: "Implement screenshot eviction and memory management"
-spec_ref: "persistence.md S4.2; performance.md S5.1"
+title: "Implement node add/remove layout animations"
+spec_ref: "interaction-feel.md S4"
 depends_on:
-  - task-020
-  - task-024
-  - task-041
+  - task-006
+  - task-004
 progress: not-started
 review: ""
 coverage_sections: []
@@ -13,33 +12,35 @@ commits: []
 
 ## Spec Excerpt
 
-> Screenshot retention:
-> - Active branch: all screenshots kept.
-> - Last 7 days: all screenshots kept.
-> - Older: branch root screenshot only.
+> Node Addition: 1. Parent's subtree shifts to make room (200ms, ease-in-out). 2. New node fades in from 0% opacity (150ms, ease-out, starting 100ms after shift). 3. Edge draws in from parent to child (200ms, ease-out).
 >
-> Eviction runs on startup and hourly.
+> Node Removal: 1. Node and subtree fade out (150ms). 2. Edge fades simultaneously. 3. Siblings shift to fill gap (200ms, ease-in-out, after fade).
 >
-> If total screenshot memory exceeds 20MB, evict the oldest screenshots from culled-tier nodes.
+> Batch changes: all animations play concurrently. Total time <= 400ms.
 
 ## Current State
 
-ScreenshotManager (task-020) captures and stores screenshots in memory. Auto-save (task-024) persists tree state. But there's no eviction policy — screenshots accumulate indefinitely.
+Tree rendering (task-006) and layout (task-004) work but layout changes are instantaneous. Adding or removing a node snaps the tree to its new positions.
 
 ## What To Build
 
-1. Extend ScreenshotManager with eviction logic:
-   - Track total screenshot memory usage (sum of blob sizes).
-   - If total exceeds 20MB, evict screenshots starting from culled-tier nodes, oldest first.
-2. Implement time-based retention:
-   - Branches older than `limb.screenshots.retention-days` (default 7): keep only root screenshot.
-   - Active branch and branches within retention window: keep all screenshots.
-3. Run eviction:
-   - On browser startup.
-   - Every hour via `setInterval`.
-4. Integrate with `limb.screenshots.retention-days` preference.
-5. Write tests for:
-   - Eviction removes screenshots when memory exceeds 20MB.
-   - Old branches retain only root screenshot.
-   - Recent branches retain all screenshots.
-   - Eviction runs on startup and hourly.
+1. Create `src/limb/tree/LayoutAnimator.mjs`:
+   - Tracks previous layout positions for each node.
+   - When layout changes, interpolates from old positions to new positions over time.
+   - Supports per-node opacity animation (fade in/out for add/remove).
+2. Implement node addition animation:
+   - Store old positions before layout recomputation.
+   - After layout, animate existing nodes from old to new positions (200ms, ease-in-out).
+   - New node fades in from opacity 0 (150ms, ease-out, 100ms delay).
+   - New edge animates by drawing progressively from parent to child (200ms).
+3. Implement node removal animation:
+   - Removed node fades out (150ms).
+   - Edge fades simultaneously.
+   - After fade, remaining nodes animate to new positions (200ms, ease-in-out).
+4. Handle batch changes: if multiple nodes change in one frame, animate all concurrently. Cap total animation at 400ms.
+5. Integrate with FrameScheduler: animations call `markDirty()` each frame until complete.
+6. Write tests for:
+   - Positions interpolate smoothly from old to new.
+   - New nodes fade in with correct delay.
+   - Removed nodes fade out before siblings shift.
+   - Batch animations complete within 400ms.
