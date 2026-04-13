@@ -36,3 +36,5 @@ build/signing/private_key.p12
 
 worktrees/
 logs/
+.worker.log
+.done
