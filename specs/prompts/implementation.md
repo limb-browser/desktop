@@ -61,12 +61,12 @@ Before marking a task `ready-for-review`:
 ## Workflow
 
 1. Read `CLAUDE.md` for architecture and conventions.
-2. Read `specs/tasks/*`. Find the `needs-revision` task (priority) or lowest `not-started` task.
-3. Update the task status to `in-progress`.
+2. Read `specs/tasks/*`. Find the task with `progress: needs-revision` (priority) or lowest `progress: not-started` task.
+3. Update the task's `progress` field to `in-progress`.
 4. Read the referenced spec sections.
 5. Implement using TDD: test -> fail -> implement -> pass -> refactor.
 6. Run `npx vitest run`. All tests must pass.
 7. Run through the Self-Verification Checklist.
-8. Update the task status to `ready-for-review`.
+8. Update the task's `progress` field to `ready-for-review`.
 9. Commit using conventional commits, author: "Implementation <jsell-rh.implementation@agents.redhat.com>"
 10. Call `kill $PPID`.
