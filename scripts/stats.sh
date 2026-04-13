@@ -31,9 +31,13 @@ if [[ -f "$_GIT_CACHE" ]]; then
     cp "$_GIT_CACHE" "$_git_tmp" &
     _pid_git=$!
 else
-    (cd "$REPO_ROOT" && git log --all --format="%at %s" --reverse 2>/dev/null | awk -v gap="$OUTLIER_GAP" '
+    # Only count commits after the fork point (first Limb commit, not Zen history)
+    _FORK_POINT=$(cd "$REPO_ROOT" && git log --all --format="%at %s" --reverse 2>/dev/null | grep -m1 'Limb\|limb\|feat:.*rebrand\|chore:.*limb' | awk '{print $1}')
+    _FORK_POINT=${_FORK_POINT:-0}
+    (cd "$REPO_ROOT" && git log --all --format="%at %s" --reverse 2>/dev/null | awk -v gap="$OUTLIER_GAP" -v fork_ts="$_FORK_POINT" '
 {
     ts = $1
+    if (fork_ts > 0 && ts < fork_ts) next
     gl_count++
     if (gl_first == "") gl_first = ts
     gl_last = ts
@@ -55,10 +59,10 @@ else
     }
 }
 END {
-    print "_SUMMARY_\t" gl_first "\t" gl_last "\t" gl_checklist+0 "\t" gl_count+0
+    printf "_SUMMARY_\t%d\t%d\t%d\t%d\n", gl_first+0, gl_last+0, gl_checklist+0, gl_count+0
     for (t in first_ts)
         if (cnt[t] >= 2)
-            print t "\t" first_ts[t] "\t" last_ts[t] "\t" active[t] "\t" cnt[t]
+            printf "%s\t%d\t%d\t%d\t%d\n", t, first_ts[t], last_ts[t], active[t]+0, cnt[t]
 }' | tee "$_GIT_CACHE") > "$_git_tmp" &
     _pid_git=$!
 fi
@@ -196,7 +200,12 @@ while IFS=$'\t' read -r name first last active count; do
 done < "$_git_tmp"
 rm -f "$_git_tmp"
 
-total_wall_seconds=$((last_commit_ts - first_commit_ts))
+# Sanitize: ensure numeric values (strip whitespace, default to 0)
+first_commit_ts=${first_commit_ts// /}; first_commit_ts=${first_commit_ts:-0}
+last_commit_ts=${last_commit_ts// /}; last_commit_ts=${last_commit_ts:-0}
+total_commits=${total_commits// /}; total_commits=${total_commits:-0}
+checklist_items=${checklist_items// /}; checklist_items=${checklist_items:-0}
+total_wall_seconds=$(( ${last_commit_ts:-0} - ${first_commit_ts:-0} ))
 
 IFS=$'\t' read -r limb_lines patch_count spec_lines < "$_code_tmp"
 limb_lines=${limb_lines:-0}
@@ -421,11 +430,11 @@ if [ -f /tmp/limb-loop.log ]; then
         echo "  Last action:        $last_line"
     fi
 
-    iterations=$(grep -c "Orchestrator cycle" /tmp/limb-loop.log 2>/dev/null || echo 0)
+    iterations=$(grep -c "Orchestrator cycle" /tmp/limb-loop.log 2>/dev/null) || iterations=0
     echo "  Iterations:         $iterations"
 
-    merges=$(grep -cE "PR created|Merge successful" /tmp/limb-loop.log 2>/dev/null || echo 0)
-    [ "$merges" -gt 0 ] && echo "  PRs/merges:         $merges"
+    merges=$(grep -cE "PR created|Merge successful" /tmp/limb-loop.log 2>/dev/null) || merges=0
+    [[ "$merges" -gt 0 ]] && echo "  PRs/merges:         $merges"
 else
     echo "  ${DIM}(loop not running)${RESET}"
     echo "  ${DIM}Start: tmux new-session -s limb-loop && bash scripts/parallel-loop.sh${RESET}"
