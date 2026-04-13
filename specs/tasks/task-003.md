@@ -2,7 +2,7 @@
 title: "Implement BrowsingTree model with core operations"
 spec_ref: "tree-model.md S1 S2 S4"
 depends_on: []
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []
