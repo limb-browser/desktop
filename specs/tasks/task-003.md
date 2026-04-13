@@ -2,8 +2,8 @@
 title: "Implement BrowsingTree model with core operations"
 spec_ref: "tree-model.md S1 S2 S4"
 depends_on: []
-progress: not-started
-review: ""
+progress: ready-for-review
+review: "specs/reviews/review-TASK_003-R1.md"
 coverage_sections: []
 commits: []
 ---
