@@ -4,6 +4,7 @@ spec_ref: "persistence.md S4.2; performance.md S5.1"
 depends_on:
   - task-020
   - task-024
+  - task-041
 progress: not-started
 review: ""
 coverage_sections: []

@@ -4,6 +4,7 @@ spec_ref: "unified-tree.md S3; persistence.md S2"
 depends_on:
   - task-003
   - task-023
+  - task-041
 progress: not-started
 review: ""
 coverage_sections: []
