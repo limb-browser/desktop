@@ -181,6 +181,36 @@ describe('BrowsingTree', () => {
       expect(removeCall!.args[1]).toContain(grandchild.id);
     });
 
+    it('fires nodeFocused probe when focus is implicitly moved', () => {
+      const child = tree.addChild(tree.rootId, 'https://child.com');
+      tree.focusNode(child.id);
+      probe.calls.length = 0;
+      tree.removeNode(child.id);
+      const focusCalls = probe.calls.filter((c) => c.method === 'nodeFocused');
+      expect(focusCalls).toHaveLength(1);
+      expect(focusCalls[0].args[0]).toBe(tree.rootId);
+    });
+
+    it('fires nodeFocused probe when focused descendant is implicitly moved', () => {
+      const child = tree.addChild(tree.rootId, 'https://child.com');
+      const grandchild = tree.addChild(child.id, 'https://grandchild.com');
+      tree.focusNode(grandchild.id);
+      probe.calls.length = 0;
+      tree.removeNode(child.id);
+      const focusCalls = probe.calls.filter((c) => c.method === 'nodeFocused');
+      expect(focusCalls).toHaveLength(1);
+      expect(focusCalls[0].args[0]).toBe(tree.rootId);
+    });
+
+    it('does not fire nodeFocused probe when removed node is not focused', () => {
+      const child1 = tree.addChild(tree.rootId, 'https://a.com');
+      tree.addChild(tree.rootId, 'https://b.com');
+      probe.calls.length = 0;
+      tree.removeNode(child1.id);
+      const focusCalls = probe.calls.filter((c) => c.method === 'nodeFocused');
+      expect(focusCalls).toHaveLength(0);
+    });
+
     it('preserves sibling order after removal', () => {
       const c1 = tree.addChild(tree.rootId, 'https://a.com');
       const c2 = tree.addChild(tree.rootId, 'https://b.com');
@@ -253,9 +283,9 @@ describe('BrowsingTree', () => {
       const grandchild = tree.addChild(child1.id, 'https://c.com');
       const descendants = tree.getDescendants(tree.rootId);
       const ids = descendants.map((n) => n.id);
-      expect(ids[0]).toBe(tree.rootId);
-      expect(ids.indexOf(child1.id)).toBeLessThan(ids.indexOf(grandchild.id));
-      expect(ids).toContain(child2.id);
+      // BFS: root, then all depth-1 (child1, child2), then depth-2 (grandchild)
+      // DFS would produce: root, child1, grandchild, child2 — which must fail
+      expect(ids).toEqual([tree.rootId, child1.id, child2.id, grandchild.id]);
     });
 
     it('returns just the node for a leaf', () => {
@@ -368,6 +398,34 @@ describe('BrowsingTree', () => {
       const child = tree.addChild(tree.rootId, 'https://a.com');
       tree.focusNode(child.id);
       expect(tree.nodes.has(tree.focusedNodeId)).toBe(true);
+    });
+
+    it('maintains ordered children by createdAt (S4.6)', () => {
+      const c1 = tree.addChild(tree.rootId, 'https://a.com');
+      const c2 = tree.addChild(tree.rootId, 'https://b.com');
+      const c3 = tree.addChild(tree.rootId, 'https://c.com');
+      const root = tree.nodes.get(tree.rootId)!;
+      const childCreatedAts = root.childIds.map(
+        (id) => tree.nodes.get(id)!.createdAt
+      );
+      for (let i = 1; i < childCreatedAts.length; i++) {
+        expect(childCreatedAts[i]).toBeGreaterThanOrEqual(childCreatedAts[i - 1]);
+      }
+    });
+
+    it('maintains ordered children by createdAt after removeNode (S4.6)', () => {
+      const c1 = tree.addChild(tree.rootId, 'https://a.com');
+      const c2 = tree.addChild(tree.rootId, 'https://b.com');
+      const c3 = tree.addChild(tree.rootId, 'https://c.com');
+      tree.removeNode(c2.id);
+      const root = tree.nodes.get(tree.rootId)!;
+      expect(root.childIds).toEqual([c1.id, c3.id]);
+      const childCreatedAts = root.childIds.map(
+        (id) => tree.nodes.get(id)!.createdAt
+      );
+      for (let i = 1; i < childCreatedAts.length; i++) {
+        expect(childCreatedAts[i]).toBeGreaterThanOrEqual(childCreatedAts[i - 1]);
+      }
     });
 
     it('focused node exists after removing the focused node', () => {

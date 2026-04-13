@@ -92,11 +92,12 @@ export class BrowsingTree {
 
     // If focused node is being removed (either the node itself or a descendant),
     // move focus to the removed node's parent.
-    if (
+    const focusMoving =
       this.focusedNodeId === nodeId ||
-      descendantIds.includes(this.focusedNodeId)
-    ) {
+      descendantIds.includes(this.focusedNodeId);
+    if (focusMoving) {
       this.focusedNodeId = node.parentId!;
+      this.#probe?.nodeFocused(this.focusedNodeId);
     }
 
     // Remove from parent's childIds
