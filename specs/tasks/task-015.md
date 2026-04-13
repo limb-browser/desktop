@@ -1,0 +1,34 @@
+---
+title: "Implement address bar visibility tied to zoom level"
+spec_ref: "navigation.md S2.1 S2.2"
+depends_on:
+  - task-007
+progress: not-started
+review: ""
+coverage_sections: []
+commits: []
+---
+
+## Spec Excerpt
+
+> The address bar is visible when `zoomLevel >= 0.85`. It fades in over the range `[0.85, 0.95]` (opacity 0.0 at 0.85, opacity 1.0 at 0.95). Below 0.85, no address bar is shown.
+>
+> The address bar displays: focused node's favicon, current URL (editable), back/forward buttons, reload button.
+
+## Current State
+
+Firefox's built-in urlbar exists (Zen's urlbar patches are in place). ZoomState (task-007) provides the current zoom level. The urlbar is always visible regardless of zoom.
+
+## What To Build
+
+1. Create a CSS class or stylesheet that controls urlbar visibility based on a `limb-zoom-level` attribute on the browser window or a container element.
+2. When zoom level changes (via ZoomState observer):
+   - Set the urlbar container's opacity: 0.0 below 0.85, linearly interpolated between 0.85-0.95, 1.0 above 0.95.
+   - When opacity is 0.0, also set `pointer-events: none` to prevent interaction.
+3. Ensure the urlbar displays the focused node's URL (this may already work via Firefox's native tab-urlbar sync).
+4. Add CSS transition for smooth opacity changes (don't rely on per-frame JS for the fade).
+5. Write tests verifying:
+   - At zoom 1.0, address bar is fully visible.
+   - At zoom 0.5, address bar is hidden.
+   - At zoom 0.9, address bar is at 50% opacity.
+   - Address bar is not interactive when hidden.
