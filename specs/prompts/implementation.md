@@ -22,6 +22,17 @@ Limb is a fork of Zen Browser, which is a fork of Firefox. Custom code lives in 
 
 **Hard constraint:** `src/limb/domain/` must NOT import from browser-specific code, Firefox APIs, or `src/limb/tree/`. Domain is pure logic that runs in any JS environment.
 
+## Relationship to the ported PoC code
+
+`src/limb/domain/` contains code ported from an Electron prototype. Treat it as **reference material, not production code**. The math is useful (zoom curves, LOD thresholds, layout algorithms). The abstractions are often wrong for Firefox.
+
+Specific guidance:
+- **Use the domain math.** Zoom formulas, LOD hysteresis, layout algorithms, pan momentum physics -- these are well-tested and correct.
+- **Do NOT port Electron patterns.** The PoC had `WebviewPool`, `paint-hold`, `ElectronWebviewHandle`, `LinkInterceptor` -- these are workarounds for Electron's `<webview>` tag limitations. Firefox has native tab management, a real compositor, `SessionStore`, and process isolation. Use Firefox's built-in capabilities.
+- **Do NOT copy renderer code.** The PoC's `src/renderer/main.ts` was a 1200-line composition root for Electron. The Firefox integration should use Firefox's existing chrome architecture (XUL overlays, `browser.xhtml`, `gBrowser` API).
+- **Rewrite port interfaces as needed.** The port interfaces in `src/limb/ports/` were designed for Electron. If a port doesn't make sense for Firefox (e.g., `WebviewHandle` with `setPosition()` and `setSrc()`), rewrite or replace it. Firefox tabs don't need manual positioning.
+- **Quality over speed.** This is not a prototype. It should feel like a polished, native part of Firefox. If the spec says something and the PoC does it badly, implement the spec properly, not the PoC's version.
+
 ## Standards
 
 ### Testing (TDD)

@@ -26,6 +26,8 @@ Firefox fork using Zen Browser's Surfer build tool. Patches applied on top of Fi
 
 **Key constraint:** `src/limb/domain/` must not import from browser-specific code. It runs in any JS environment.
 
+**PoC code warning:** `src/limb/domain/` was ported from an Electron prototype. The math (zoom, LOD, layout) is solid and well-tested. The abstractions (WebviewPool, paint-hold, WebviewHandle) are Electron workarounds -- do NOT replicate them. Firefox has native tab management, a compositor, SessionStore, and process isolation. Use Firefox's capabilities instead of reimplementing Electron hacks. Treat the ported code as reference, not production.
+
 ## Testing
 
 - **Domain tests:** `npx vitest` (pure TS, fast)

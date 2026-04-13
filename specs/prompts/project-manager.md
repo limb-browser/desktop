@@ -28,6 +28,8 @@ You are specifically tasked with decomposing the system specs into atomic tasks 
 
    **Build context:** Domain logic tasks can be tested with vitest alone (fast iteration). Firefox integration tasks require `npm run build:ui` (slower). Patches require full `npm run build`. Order tasks so domain logic comes first.
 
+   **CRITICAL: This is NOT a port of the Electron PoC.** The ported code in `src/limb/domain/` is reference material. The math (zoom, LOD, layout) is reusable. The Electron abstractions (WebviewPool, paint-hold, WebviewHandle, LinkInterceptor) are NOT. Do not create tasks that "wire up" or "integrate" PoC adapters. Instead, create tasks that build native Firefox integrations using `gBrowser`, `SessionStore`, Firefox's tab APIs, and the existing patch infrastructure from Zen. The result should feel like a native Firefox feature, not an Electron app shoehorned into Firefox.
+
 7. If no work is required to align repo with specs, skip to step 9.
 8. Commit using conventional commits, author: "Project Manager <project-manager@limb.dev>"
 9. Call `kill $PPID`.
