@@ -53,12 +53,18 @@ while [ $ROUND -lt $MAX_ROUNDS ]; do
 
   case "$status" in
     not-started|needs-revision)
-      # Rebase onto dev to pick up merged work from other workers
+      # Rebase onto dev to pick up merged work from other workers.
+      # Preserve our task/review files -- dev has stale versions.
       log "--- Rebasing onto dev (round $ROUND)"
-      # Resolve the main repo from the worktree's .git file
       MAIN_ROOT="$(cd "$(cat "$WORKTREE/.git" | sed 's/gitdir: //' | xargs dirname | xargs dirname)" && pwd 2>/dev/null || echo "$WORKTREE")"
+      cp "$TASK_FILE" "$TASK_FILE.bak" 2>/dev/null
+      cp -r specs/reviews/ /tmp/limb-reviews-$TASK_NAME/ 2>/dev/null
       git fetch "$MAIN_ROOT" HEAD 2>/dev/null && git rebase FETCH_HEAD 2>/dev/null || \
         log "!!! Rebase failed (may need manual resolution)"
+      # Restore our task/review state after rebase
+      cp "$TASK_FILE.bak" "$TASK_FILE" 2>/dev/null && rm -f "$TASK_FILE.bak"
+      cp -r /tmp/limb-reviews-$TASK_NAME/* specs/reviews/ 2>/dev/null
+      rm -rf /tmp/limb-reviews-$TASK_NAME 2>/dev/null
 
       log ">>> Implementation (round $ROUND, status=$status)"
       emit worker.implement.start task="$TASK_NAME" round=$ROUND status="$status"
