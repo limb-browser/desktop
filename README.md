@@ -40,10 +40,8 @@ For UI-only changes (JS/CSS), use `npm run build:ui` for fast rebuilds.
 
 ```
 specs/              Product specs (what we're building)
-src/limb/           Limb-specific code
-  domain/           Pure logic: tree model, zoom, LOD, layout (no browser deps)
-  ports/            Interfaces for browser integration
-  tree/             Tree view UI (canvas renderer in Firefox chrome)
+src/limb/           Limb-specific code (loaded in Firefox chrome context)
+  tree/             Tree view UI (canvas renderer)
 src/browser/        Firefox patches
 configs/            Platform-specific build configs (mozconfig)
 prefs/              Default preferences (YAML)

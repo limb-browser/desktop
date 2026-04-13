@@ -18,20 +18,15 @@ Firefox fork using Zen Browser's Surfer build tool. Patches applied on top of Fi
 
 | Layer | Directory | Role |
 |---|---|---|
-| Domain | `src/limb/domain/` | Pure logic: tree, zoom, LOD, layout. No browser deps. |
-| Ports | `src/limb/ports/` | Interfaces for browser integration |
 | Tree UI | `src/limb/tree/` | Canvas tree renderer in Firefox chrome context |
 | Patches | `src/browser/` | Targeted Firefox source modifications |
 | Specs | `specs/` | Product specifications. Source of truth. |
 
-**Key constraint:** `src/limb/domain/` must not import from browser-specific code. It runs in any JS environment.
-
-**PoC code warning:** `src/limb/domain/` was ported from an Electron prototype. The math (zoom, LOD, layout) is solid and well-tested. The abstractions (WebviewPool, paint-hold, WebviewHandle) are Electron workarounds -- do NOT replicate them. Firefox has native tab management, a compositor, SessionStore, and process isolation. Use Firefox's capabilities instead of reimplementing Electron hacks. Treat the ported code as reference, not production.
+**Important:** An Electron prototype exists at `~/code/scratch/web-mind/` but its code is NOT in this repo. The specs capture the behavior; the implementation should use Firefox's native capabilities (gBrowser, SessionStore, compositor, tab APIs), not Electron patterns.
 
 ## Testing
 
-- **Domain tests:** `npx vitest` (pure TS, fast)
-- **Browser tests:** `npm test` (Firefox test framework, slow)
+- **Browser tests:** `npm test` (Firefox test framework)
 - **TDD:** Write the failing test first, then implement.
 
 ## Specs

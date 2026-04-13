@@ -44,17 +44,13 @@ One logical change per commit.
 
 Limb inherits Zen's patch-based architecture on top of Firefox. Custom code lives in `src/limb/`. See `specs/patch-strategy.md` for details on which Firefox files we patch and why.
 
-### Domain layer (`src/limb/domain/`)
+### Limb modules (`src/limb/`)
 
-Pure business logic. Tree model, zoom math, layout algorithms, LOD computation. No browser dependencies. This code can run in any JS environment and is tested with vitest.
-
-### Ports (`src/limb/ports/`)
-
-Interfaces that the domain layer uses to interact with the browser. Implementations live in the browser chrome layer.
+Limb-specific code that runs in Firefox's chrome context. Uses Firefox APIs (gBrowser, SessionStore, Services) directly.
 
 ### Tree view (`src/limb/tree/`)
 
-The canvas-based tree renderer that replaces the traditional tab bar. This runs in Firefox's chrome context and integrates with the domain layer.
+The canvas-based tree renderer that replaces the traditional tab bar. This runs in Firefox's chrome context.
 
 ### Firefox patches (`src/browser/`)
 
