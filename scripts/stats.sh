@@ -331,6 +331,10 @@ print_task_row() {
     local name="$1" status="$2" title="$3" commits="$4" rounds="$5" findings="$6" active="$7"
     local status_color sc rpad rc fpad at cpad
 
+    # Replace multi-byte dashes with plain dashes for consistent column width
+    title="${title//—/-}"
+    title="${title//–/-}"
+
     # Truncate title to dynamic width
     if [[ ${#title} -gt $TITLE_WIDTH ]]; then
         local half=$(( (TITLE_WIDTH - 2) / 2 ))
