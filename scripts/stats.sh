@@ -134,10 +134,7 @@ for f in "$TASKS_DIR"/task-*.md; do
     fi
     title="${_task_title_map[$name]:-}"
     [[ -z "$title" ]] && title=$(head -1 "$f" | sed 's/^# //')
-    # Truncate long titles
-    if [[ ${#title} -gt 38 ]]; then
-        title="${title:0:18}..${title: -18}"
-    fi
+    # Title truncation handled by print_task_row using dynamic TITLE_WIDTH
     task_names+=("$name")
     task_statuses+=("$status")
     task_titles+=("$title")
@@ -315,9 +312,17 @@ echo "  Spec prose:        $spec_lines lines"
 echo ""
 
 # Per-task breakdown (active tasks, then collapsed completed)
+# Dynamic title width based on terminal width
+TERM_WIDTH=$(tput cols 2>/dev/null || echo 120)
+FIXED_COLS=74  # TASK(10) + STATUS(18) + COMMITS(9) + ROUNDS(8) + FINDINGS(10) + ACTIVE(16) + padding(3)
+TITLE_WIDTH=$((TERM_WIDTH - FIXED_COLS))
+[[ $TITLE_WIDTH -lt 20 ]] && TITLE_WIDTH=20
+[[ $TITLE_WIDTH -gt 80 ]] && TITLE_WIDTH=80
+
 echo "${BOLD}Task Breakdown${RESET}"
-printf "  ${DIM}%-8s  %-38s  %-16s  %7s  %6s  %8s  %14s${RESET}\n" "TASK" "TITLE" "STATUS" "COMMITS" "ROUNDS" "FINDINGS" "ACTIVE TIME"
-printf "  %s%s%s\n" "${DIM}" "------------------------------------------------------------------------------------------------------" "${RESET}"
+printf "  ${DIM}%-8s  %-${TITLE_WIDTH}s  %-16s  %7s  %6s  %8s  %14s${RESET}\n" "TASK" "TITLE" "STATUS" "COMMITS" "ROUNDS" "FINDINGS" "ACTIVE TIME"
+SEP_WIDTH=$((TERM_WIDTH - 2))
+printf "  ${DIM}%*s${RESET}\n" "$SEP_WIDTH" "" | tr ' ' '-'
 
 total_rounds=0; total_findings=0; total_active=0; total_task_commits=0
 done_rounds=0; done_findings=0; done_active=0; done_commits=0
@@ -325,6 +330,12 @@ done_rounds=0; done_findings=0; done_active=0; done_commits=0
 print_task_row() {
     local name="$1" status="$2" title="$3" commits="$4" rounds="$5" findings="$6" active="$7"
     local status_color sc rpad rc fpad at cpad
+
+    # Truncate title to dynamic width
+    if [[ ${#title} -gt $TITLE_WIDTH ]]; then
+        local half=$(( (TITLE_WIDTH - 2) / 2 ))
+        title="${title:0:$half}..${title: -$half}"
+    fi
 
     case "$status" in
         complete)         status_color="$GREEN" ;;
@@ -357,7 +368,7 @@ print_task_row() {
         at="$(printf '%12s' '')${DIM}--${RESET}"
     fi
 
-    printf "  %-8s  %-38s  %s  %s  %s  %s  %s\n" "$name" "$title" "$sc" "$cpad" "$rc" "$fpad" "$at"
+    printf "  %-8s  %-${TITLE_WIDTH}s  %s  %s  %s  %s  %s\n" "$name" "$title" "$sc" "$cpad" "$rc" "$fpad" "$at"
 }
 
 for i in "${!task_names[@]}"; do
@@ -389,8 +400,8 @@ if [[ $complete -gt 0 ]]; then
         "$done_commits" "$done_rounds" "$done_findings" "$done_active"
 fi
 
-printf "  %s%s%s\n" "${DIM}" "------------------------------------------------------------------------------------------------------" "${RESET}"
-printf "  ${BOLD}%-8s  %-38s  %-16s  %7d  %6d  %8d  %14s${RESET}\n" "TOTAL" "" "" "$total_task_commits" "$total_rounds" "$total_findings" "$(fmt_duration $total_active)"
+printf "  ${DIM}%*s${RESET}\n" "$SEP_WIDTH" "" | tr ' ' '-'
+printf "  ${BOLD}%-8s  %-${TITLE_WIDTH}s  %-16s  %7d  %6d  %8d  %14s${RESET}\n" "TOTAL" "" "" "$total_task_commits" "$total_rounds" "$total_findings" "$(fmt_duration $total_active)"
 echo ""
 
 # Review efficiency
