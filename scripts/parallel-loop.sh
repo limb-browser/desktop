@@ -22,6 +22,7 @@ MAX_WORKERS=${LIMB_MAX_WORKERS:-6}
 TMUX_SESSION=${LIMB_TMUX_SESSION:-limb-loop}
 
 log() { echo "[$(date '+%H:%M:%S')] [orchestrator] $*" | tee -a "$LOG"; }
+emit() { bash "$REPO_ROOT/scripts/emit-event.sh" "$@"; }
 
 # --- Task metadata helpers ---
 
@@ -146,6 +147,7 @@ PREOF
 )" 2>&1) || true
 
   if echo "$pr_url" | grep -q 'https://'; then
+    emit pr.created task="$task_name" url="$pr_url"
     log "    PR created: $pr_url"
 
     # Auto-merge if LIMB_AUTO_MERGE is set
@@ -189,6 +191,7 @@ trap cleanup_all EXIT
 mkdir -p "$WORKTREE_BASE"
 > "$LOG"
 log "=== Limb Parallel Dev Loop Started (max $MAX_WORKERS workers) ==="
+emit loop.start max_workers=$MAX_WORKERS
 
 # Pre-flight: handle any ready-for-review tasks on main
 for f in "$REPO_ROOT"/specs/tasks/task-*.md; do
@@ -218,9 +221,18 @@ while true; do
 
   # 1. SERIAL: Project manager (creates/updates tasks on main)
   log ">>> Project Manager"
+  emit pm.start iteration=$ITERATION
+  pm_start=$(date '+%s')
+
   claude --model opus[1m] --dangerously-skip-permissions \
     < specs/prompts/project-manager.md 2>/dev/null
-  log "<<< Project Manager done"
+
+  pm_end=$(date '+%s')
+  pm_duration=$((pm_end - pm_start))
+  tasks_total=$(ls specs/tasks/task-*.md 2>/dev/null | wc -l)
+  tasks_complete=$(grep -rl 'complete' specs/tasks/ 2>/dev/null | wc -l)
+  emit pm.done iteration=$ITERATION duration_s=$pm_duration tasks_total=$tasks_total tasks_complete=$tasks_complete
+  log "<<< Project Manager done (${pm_duration}s, $tasks_total tasks)"
 
   # 2. Merge completed workers back to dev
   for task_name in "${!ACTIVE_WORKERS[@]}"; do
@@ -242,7 +254,17 @@ while true; do
     done
   fi
 
-  # 4. Status report
+  # 4. Chronicler (every 3rd cycle)
+  if [ $((ITERATION % 3)) -eq 0 ] && [ -f logs/events.jsonl ]; then
+    log ">>> Chronicler"
+    emit chronicler.start iteration=$ITERATION
+    claude --model sonnet --dangerously-skip-permissions \
+      < specs/prompts/chronicler.md 2>/dev/null
+    emit chronicler.done iteration=$ITERATION
+    log "<<< Chronicler done"
+  fi
+
+  # 5. Status report
   active=${#ACTIVE_WORKERS[@]}
   log "    Active workers: $active"
   for task_name in "${!ACTIVE_WORKERS[@]}"; do
@@ -256,6 +278,7 @@ while true; do
       not_started=$(grep -rl 'not-started' "$REPO_ROOT"/specs/tasks/ 2>/dev/null | wc -l)
       if [ "$not_started" -eq 0 ]; then
         log "=== All tasks complete ==="
+        emit loop.complete iterations=$ITERATION
         break
       else
         log "    $not_started tasks remaining but blocked on dependencies"
