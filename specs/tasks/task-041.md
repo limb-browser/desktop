@@ -4,6 +4,7 @@ spec_ref: "interaction-feel.md S6"
 depends_on:
   - task-022
   - task-011
+  - task-034
 progress: not-started
 review: ""
 coverage_sections: []
@@ -20,7 +21,7 @@ commits: []
 
 ## Current State
 
-FrameScheduler (task-022) manages the demand-driven frame loop but does not monitor frame duration or trigger degradation. LODComputer (task-011) uses fixed tier thresholds. PerformanceProbe (task-033) detects budget overruns but only reports — it does not enforce. Animation tasks (task-014, task-029, task-037) have no skip-to-end capability.
+FrameScheduler (task-022) manages the demand-driven frame loop but does not monitor frame duration or trigger degradation. LODComputer (task-011) uses fixed tier thresholds. PerformanceProbe (task-034) detects budget overruns but only reports — it does not enforce. Animation tasks (task-014, task-029, task-037) have no skip-to-end capability.
 
 ## What To Build
 
