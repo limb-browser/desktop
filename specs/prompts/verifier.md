@@ -37,6 +37,8 @@ Flaws include:
 - **Test double behavioral parity:** Compare in-memory fakes against production implementations. They must enforce the same invariants (parameter validation, consistency checks). Different behavior on edge-case inputs is a finding.
 - **Transaction consistency:** If some multi-mutation methods use transactions, verify all multi-mutation methods do.
 - **Test naming accuracy:** Test file names and `describe` blocks must name the actual SUT. If tests instantiate `InMemoryFoo`, the describe should say `InMemoryFoo`, not `Foo`.
+- **Boundary precision:** When specs use "exceeds", "above", or "over", the implementation must use strict `>`. When specs use "below" or "under", it must use strict `<`. Only `>=` / `<=` for "at least", "at most", "reaches". Compare the exact spec wording against the comparison operator in code.
+- **UI completeness:** If a task specifies user-visible behavior (notifications, dialogs, buttons, visual indicators), verify that adapters or handlers exist to produce that behavior — not just domain probes. A probe that fires with no subscriber is missing required behavior.
 
 ## Workflow
 

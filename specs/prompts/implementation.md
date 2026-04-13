@@ -61,6 +61,8 @@ Before marking a task `ready-for-review`:
 10. **Test double fidelity:** In-memory fakes must enforce the same invariants as production implementations. If production validates a parameter or enforces a consistency rule, the fake must too. The test double should diverge from production only in I/O mechanism, never in observable behavior.
 11. **Transaction consistency:** If one multi-statement mutation uses a transaction, all similar multi-statement mutations must too.
 12. **Test naming accuracy:** Test file names and `describe` blocks must name the actual SUT being tested (e.g., if tests instantiate `InMemoryFoo`, the describe block should say `InMemoryFoo`, not `Foo`).
+13. **Boundary precision:** When specs use "exceeds", "above", or "over", implement as strict `>`. When specs use "below" or "under", implement as strict `<`. Only use `>=` / `<=` when specs say "at least", "at most", "reaches", or "or more". Get the comparison operator right — off-by-one at thresholds is a spec violation.
+14. **UI completeness:** If a task specifies user-visible behavior (notifications, dialogs, visual indicators, buttons), domain probes alone are not sufficient. There must be a port interface, an adapter or handler that subscribes to the probe and produces the required browser UI. Probes fire events; something must listen and act.
 
 ## Workflow
 
