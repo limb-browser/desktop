@@ -1,8 +1,8 @@
 {
-  "name": "Zen Browser",
-  "vendor": "Zen OSS Team",
-  "appId": "zen",
-  "binaryName": "zen",
+  "name": "Limb Browser",
+  "vendor": "Limb Contributors",
+  "appId": "limb",
+  "binaryName": "limb",
   "version": {
     "product": "firefox",
     "version": "149.0.2",
@@ -15,34 +15,30 @@
   "addons": {},
   "brands": {
     "release": {
-      "backgroundColor": "#282A33",
-      "brandShorterName": "Zen",
-      "brandShortName": "Zen",
-      "brandFullName": "Zen Browser",
+      "backgroundColor": "#1a1a1a",
+      "brandShorterName": "Limb",
+      "brandShortName": "Limb",
+      "brandFullName": "Limb Browser",
       "release": {
-        "displayVersion": "1.19.8b",
+        "displayVersion": "0.1.0a",
         "github": {
-          "repo": "zen-browser/desktop"
+          "repo": "limb-browser/desktop"
         },
         "archives": {
-          "windows": "windows.mar",
-          "macos-aarch64": "macos-aarch64.mar",
           "linux": "linux.mar",
-          "macos-x64": "macos-x64.mar",
-          "windows-arm64": "windows-arm64.mar",
           "linux-aarch64": "linux-aarch64.mar"
         }
       }
     },
-    "twilight": {
-      "backgroundColor": "#282A33",
-      "brandShorterName": "Zen",
-      "brandShortName": "Twilight",
-      "brandFullName": "Zen Twilight",
+    "nightly": {
+      "backgroundColor": "#1a1a1a",
+      "brandShorterName": "Limb",
+      "brandShortName": "Limb Nightly",
+      "brandFullName": "Limb Browser Nightly",
       "release": {
-        "displayVersion": "1.20t",
+        "displayVersion": "0.1.0-nightly",
         "github": {
-          "repo": "zen-browser/desktop"
+          "repo": "limb-browser/desktop"
         }
       }
     }
@@ -52,6 +48,5 @@
       ".*\\.json"
     ],
     "licenseType": "MPL-2.0"
-  },
-  "updateHostname": "updates.zen-browser.app"
+  }
 }

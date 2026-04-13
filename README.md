@@ -3,50 +3,65 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/.
    -->
-<!-- TODO: Get a job -->
-<img src="./docs/assets/zen-dark.svg" width="100px" align="left">
 
-### `Zen Browser`
+# Limb Browser
 
-[![Downloads](https://img.shields.io/github/downloads/zen-browser/desktop/total.svg)](https://github.com/zen-browser/desktop/releases)
-[![Crowdin](https://badges.crowdin.net/zen-browser/localized.svg)](https://crowdin.com/project/zen-browser)
-[![Zen Release builds](https://github.com/zen-browser/desktop/actions/workflows/build.yml/badge.svg?branch=stable)](https://github.com/zen-browser/desktop/actions/workflows/build.yml)
+A browser where tabs are replaced by a zoomable tree. Every page is a node. Opening a link branches a child. Zoom out to see the shape of your browsing. Zoom in to read.
 
-Zen is a firefox-based browser with the aim of pushing your productivity to a new level!
+Built on Firefox via [Zen Browser](https://github.com/zen-browser/desktop). Full extension support. MPL-2.0.
 
-<div flex="true">
-  <a href="https://zen-browser.app/download">
-    Download
-  </a>
-  •
-  <a href="https://zen-browser.app">
-    Website
-  </a>
-  •
-  <a href="https://docs.zen-browser.app">
-    Documentation
-  </a>
-  •
-  <a href="https://zen-browser.app/release-notes/latest">
-    Release Notes
-  </a>
-</div>
+**Status: Early development. Not yet usable.**
 
-### Firefox Versions
+## What makes it different
 
-- [`Release`](https://zen-browser.app/download) - Is currently built using Firefox version `149.0.2`! 🚀
-- [`Twilight`](https://zen-browser.app/download?twilight) - Is currently built using Firefox version `RC 149.0.2`!
+Most browsers hide your history behind a menu. Limb makes it the primary interface. You don't manage tabs. You navigate a tree.
 
-### Contributing
+- Ctrl+click a link: new child node appears in the tree
+- Ctrl+scroll: zoom between single-page view and full tree view
+- Click any node: zoom into it and start browsing
+- Your browsing session is a visible, spatial map
 
-If you'd like to report a bug, please do so on our [GitHub Issues page](https://github.com/zen-browser/desktop/issues/) and for feature requests, you can use [Github Discussions](https://github.com/zen-browser/desktop/discussions).
+## Building from source
 
-Zen is an open-source project, and we welcome contributions from the community! Please take a look at the [contribution guidelines](./docs/contribute.md) before getting started!
+Requires: Python 3, Node.js 21+, Rust, sccache. See [Zen's build docs](https://docs.zen-browser.app/contribute/desktop/building) for platform-specific prerequisites.
 
-#### Partners
+```bash
+git clone https://github.com/limb-browser/desktop.git
+cd desktop
+npm install
+npm run init     # Downloads Firefox source, applies patches (~30 min)
+npm run build    # Full build (~2-4 hours first time)
+npm start        # Run it
+```
 
-Thanks to all the partners of Zen for their support and contributions:
+For UI-only changes (JS/CSS), use `npm run build:ui` for fast rebuilds.
 
-<a href="https://blacksmith.sh">
-  <img src="./docs/assets/blacksmith-yellow.png" width="350px"/>
-</a>
+## Project structure
+
+```
+specs/              Product specs (what we're building)
+src/limb/           Limb-specific code
+  domain/           Pure logic: tree model, zoom, LOD, layout (no browser deps)
+  ports/            Interfaces for browser integration
+  tree/             Tree view UI (canvas renderer in Firefox chrome)
+src/browser/        Firefox patches
+configs/            Platform-specific build configs (mozconfig)
+prefs/              Default preferences (YAML)
+surfer.json         Brand config for the Surfer build tool
+```
+
+## Specs
+
+Product specifications live in `specs/`. They define what the browser should do. Code follows specs, not the reverse. Start with [`specs/vision.md`](specs/vision.md).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: read the specs, pick an issue, write tests first.
+
+## Upstream
+
+Limb is a fork of [Zen Browser](https://github.com/zen-browser/desktop), which is a fork of [Firefox](https://www.mozilla.org/firefox/). We track upstream Zen for security patches and engine updates. The `upstream` remote points to `zen-browser/desktop`.
+
+## License
+
+[Mozilla Public License 2.0](LICENSE)
