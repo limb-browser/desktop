@@ -3,7 +3,7 @@ title: "Implement tree size warnings"
 spec_ref: "performance.md S5.2"
 depends_on:
   - task-003
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []
