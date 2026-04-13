@@ -53,8 +53,8 @@ while [ $ROUND -lt $MAX_ROUNDS ]; do
 
   case "$status" in
     not-started|needs-revision)
-      # Rebase onto main worktree root to pick up merged work from other workers
-      log "--- Rebasing onto main HEAD (round $ROUND)"
+      # Rebase onto dev to pick up merged work from other workers
+      log "--- Rebasing onto dev (round $ROUND)"
       # Resolve the main repo from the worktree's .git file
       MAIN_ROOT="$(cd "$(cat "$WORKTREE/.git" | sed 's/gitdir: //' | xargs dirname | xargs dirname)" && pwd 2>/dev/null || echo "$WORKTREE")"
       git fetch "$MAIN_ROOT" HEAD 2>/dev/null && git rebase FETCH_HEAD 2>/dev/null || \
