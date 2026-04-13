@@ -47,12 +47,48 @@ Each patch file in `src/browser/` must have a comment at the top explaining:
 **Why:** The tree canvas and tab content areas need specific DOM structure for layering and visibility control.
 **Spec:** tree-rendering.md
 
-## S3 Patches We Inherit from Zen
+## S3 Zen Feature Removal
 
-We inherit Zen's patches initially. Over time, we will:
-1. Remove patches for Zen features we don't use (workspaces, folders, glance, compact-mode, split-view).
-2. Keep patches for infrastructure we build on (startup, theming baseline, tabbrowser hooks).
-3. Add our own patches for tree-specific integration.
+We inherit Zen's patches and feature modules. Zen features that Limb does not use must be removed to reduce maintenance burden during upstream rebases.
+
+### S3.1 Modules to Remove
+
+These live in `src/zen/` and have corresponding patches in `src/browser/`:
+
+| Module | Directory | Why remove |
+|---|---|---|
+| Workspaces/Spaces | `src/zen/spaces/` | Limb uses tree branches, not workspaces |
+| Glance | `src/zen/glance/` | Tab preview overlays, replaced by tree LOD |
+| Compact Mode | `src/zen/compact-mode/` | Auto-hiding UI, not relevant to tree view |
+| Split View | `src/zen/split-view/` | Multi-pane browsing, conflicts with tree model |
+| Folders | `src/zen/folders/` | Tab grouping, replaced by tree hierarchy |
+| Live Folders | `src/zen/live-folders/` | Dynamic tab groups, replaced by tree |
+| Mods | `src/zen/mods/` | Zen's theme/mod system |
+| Welcome | `src/zen/welcome/` | Zen's onboarding, replaced by Limb launcher |
+
+### S3.2 Modules to Keep (Initially)
+
+| Module | Directory | Why keep |
+|---|---|---|
+| Common | `src/zen/common/` | Startup, theming baseline, utility code |
+| Tabs | `src/zen/tabs/` | Tab management hooks we build on |
+| Urlbar | `src/zen/urlbar/` | URL bar customizations we may extend |
+| SessionStore | `src/zen/sessionstore/` | Session persistence hooks we need |
+| Toolkit | `src/zen/toolkit/` | Core toolkit patches |
+
+### S3.3 Removal Process
+
+For each module to remove:
+1. Delete the directory from `src/zen/`.
+2. Remove it from `src/zen/moz.build` DIRS list.
+3. Remove any patches in `src/browser/` that only exist to support the removed module.
+4. Remove related preferences from `prefs/`.
+5. Remove references from `src/zen/common/` (startup scripts, manifest).
+6. Build and verify no errors.
+
+### S3.4 Patch Cleanup
+
+After removing modules, audit remaining patches in `src/browser/` for dead code. A patch that adds a `zen-workspace-id` attribute is useless without the workspaces module. Remove the dead parts of patches, keeping only the hooks Limb needs.
 
 ## S4 Upstream Tracking
 
