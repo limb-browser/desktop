@@ -15,8 +15,7 @@ index aefccef39f0b81176a5710a794e8a5e2650d6507..53c838b3bc322cadee4ef9b411d02fc0
  
    *iterateTabs() {
      for (let win of Services.wm.getEnumerator("navigator:browser")) {
--      for (let tab of win.gBrowser.tabs) {
-+      for (let tab of win.gZenWorkspaces.allStoredTabs) {
+       for (let tab of win.gBrowser.tabs) {
          yield { tab, gBrowser: win.gBrowser };
        }
      }

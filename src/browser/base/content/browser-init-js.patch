@@ -11,10 +11,9 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
        PopupAndRedirectBlockerObserver.handleEvent(e)
      );
 @@ -444,6 +445,7 @@ var gBrowserInit = {
- 
+
      this._handleURIToLoad();
- 
-+    gZenWorkspaces.selectStartPage();
+
      Services.obs.addObserver(gIdentityHandler, "perm-changed");
      Services.obs.addObserver(gRemoteControl, "devtools-socket");
      Services.obs.addObserver(gRemoteControl, "marionette-listening");

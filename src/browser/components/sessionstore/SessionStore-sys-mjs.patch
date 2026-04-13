@@ -8,7 +8,6 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
    "SplitViewCreated",
 +  "TabAddedToEssentials",
 +  "TabRemovedFromEssentials",
-+  "ZenWorkspaceDataChanged",
  ];
  
  const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
@@ -39,7 +38,6 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
        case "SwapDocShells":
 +      case "TabRemovedFromEssentials":
 +      case "TabAddedToEssentials":
-+      case "ZenWorkspaceDataChanged":
          this.saveStateDelayed(win);
          break;
        case "TabGroupCreate":
@@ -116,8 +114,7 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
  
      var tabbrowser = aWindow.gBrowser;
  
--    let browsers = Array.from(tabbrowser.browsers);
-+    let browsers = aWindow.gZenWorkspaces.allUsedBrowsers;
+     let browsers = Array.from(tabbrowser.browsers);
  
      TAB_EVENTS.forEach(function (aEvent) {
        tabbrowser.tabContainer.removeEventListener(aEvent, this, true);
@@ -188,8 +185,7 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
 +      tabState.zenIsGlance = false;
 +      tabState.zenGlanceId = null;
 +      tabState.zenHasStaticLabel = false;
-+      tabState.zenWorkspace = aWindow.gZenWorkspaces.activeWorkspace;
- 
+
        if (inBackground === false) {
          aWindow.gBrowser.selectedTab = newTab;
 @@ -4659,6 +4686,8 @@ var SessionStoreInternal = {
@@ -197,7 +193,6 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
        tabIndex: aSource == aTargetWindow ? pos : Infinity,
        pinned: state.pinned,
 +      essential: state.zenEssential,
-+      zenWorkspaceId: state.zenWorkspace,
        userContextId: state.userContextId,
        skipLoad: true,
        preferredRemoteType,
@@ -235,8 +230,7 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
      }
  
      let tabbrowser = aWindow.gBrowser;
--    let tabs = tabbrowser.tabs;
-+    let tabs = aWindow.gZenWorkspaces.allStoredTabs;
+     let tabs = tabbrowser.tabs;
      /** @type {WindowStateData} */
      let winData = this._windows[aWindow.__SSi];
      let tabsData = (winData.tabs = []);
@@ -250,8 +244,6 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
      }
  
 +    winData.folders = aWindow.gZenFolders?.storeDataForSessionStore() || [];
-+    winData.activeZenSpace = aWindow.gZenWorkspaces?.activeWorkspace || null;
-+    winData.spaces = aWindow.gZenWorkspaces?.getWorkspacesForSessionStore();
      // update tab group state for this window
      winData.groups = [];
      for (let tabGroup of aWindow.gBrowser.tabGroups) {
@@ -279,7 +271,6 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
      if (overwriteTabs) {
        for (let i = tabbrowser.browsers.length - 1; i >= 0; i--) {
          if (!tabbrowser.tabs[i].selected) {
-+          aWindow.gZenWorkspaces._shouldOverrideTabs = true;
            tabbrowser.removeTab(tabbrowser.tabs[i]);
          }
        }
@@ -291,7 +282,6 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
 +      aWindow.document.documentElement.setAttribute("zen-unsynced-window", "true");
 +    }
 +    aWindow.gZenFolders?.restoreDataFromSessionStore(winData.folders);
-+    aWindow.gZenWorkspaces?.restoreWorkspacesFromSessionStore(winData);
 +    aWindow.gZenViewSplitter?.restoreDataFromSessionStore(winData.splitViewData);
  
      // Move the originally open tabs to the end.
@@ -316,10 +306,7 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
 +    if (tabData.zenDefaultUserContextId) {
 +      tab.setAttribute("zenDefaultUserContextId", true);
 +    }
-+    if (tabData.zenWorkspace) {
-+      tab.setAttribute("zen-workspace-id", tabData.zenWorkspace);
-+    }
- 
+
      if (tabData.pinned) {
        tabbrowser.pinTab(tab);
 @@ -6797,6 +6857,9 @@ var SessionStoreInternal = {

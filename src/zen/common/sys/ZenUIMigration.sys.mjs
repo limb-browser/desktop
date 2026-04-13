@@ -61,13 +61,6 @@ class nsZenUIMigration {
     const userContentFile = profileDir.clone();
     userContentFile.append("chrome");
     userContentFile.append("userContent.css");
-    Services.prefs.setBoolPref(
-      "zen.workspaces.separate-essentials",
-      Services.prefs.getBoolPref(
-        "zen.workspaces.container-specific-essentials-enabled",
-        false
-      )
-    );
     const theme = Services.prefs.getIntPref(
       "layout.css.prefers-color-scheme.content-override",
       0

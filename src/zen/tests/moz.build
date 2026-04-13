@@ -4,13 +4,11 @@
 
 BROWSER_CHROME_MANIFESTS += [
     "compact_mode/browser.toml",
-    "container_essentials/browser.toml",
     "folders/browser.toml",
     "glance/browser.toml",
     "live-folders/browser.toml",
     "pinned/browser.toml",
     "popover/browser.toml",
-    "spaces/browser.toml",
     "split_view/browser.toml",
     "tabs/browser.toml",
     "ub-actions/browser.toml",

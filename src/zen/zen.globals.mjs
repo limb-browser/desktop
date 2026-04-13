@@ -20,10 +20,7 @@ export default [
   "gZenStartup",
   "gZenMenubar",
 
-  "gZenWorkspaces",
   "gZenKeyboardShortcutsManager",
-  "ZenWorkspacesEngine",
-  "ZenWorkspaceBookmarksStorage",
 
   "ZEN_KEYSET_ID",
 

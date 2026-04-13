@@ -42,7 +42,7 @@ index b006d5e5e64c418fbf930c010401e4ea3a3647a3..27886c04258e40f7c6ec444320a9a2a1
 +                      class="category"
 +                      value="paneZenTabManagement"
 +                      helpTopic="prefs-main"
-+                      data-l10n-id="category-zen-workspaces"
++                      data-l10n-id="category-zen-tabs-management"
 +                      data-l10n-attrs="tooltiptext"
 +                      align="center">
 +          <image class="category-icon"/>

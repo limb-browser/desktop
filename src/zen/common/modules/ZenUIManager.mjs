@@ -54,10 +54,8 @@ window.gZenUIManager = {
       )
     ).observe(gNavToolbox);
 
-    gZenWorkspaces.promiseInitialized.finally(() => {
-      this._hasLoadedDOM = true;
-      this.updateTabsToolbar();
-    });
+    this._hasLoadedDOM = true;
+    this.updateTabsToolbar();
 
     window.addEventListener("TabClose", this.onTabClose.bind(this));
     window.addEventListener(
@@ -267,7 +265,6 @@ window.gZenUIManager = {
     gZenVerticalTabsManager.recalculateURLBarHeight(true);
     if (!this._preventToolbarRebuild) {
       setTimeout(() => {
-        gZenWorkspaces.updateTabsContainers();
       }, 0);
     }
     delete this._preventToolbarRebuild;
@@ -1216,9 +1213,6 @@ window.gZenVerticalTabsManager = {
   },
 
   recalculateURLBarHeight(updateFormat = false) {
-    if (gZenWorkspaces._processingResize) {
-      return;
-    }
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         gURLBar.removeAttribute("--urlbar-height");

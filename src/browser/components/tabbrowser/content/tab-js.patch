@@ -74,11 +74,6 @@ index e4266a159a0d5c42cc294602d00b8f66131f35d5..f3e362f062063ebe08bd26cc694f2d96
 +        }
 +        currentParent = currentParent.group;
 +      }
-+      if (this.pinned && !this.hasAttribute("zen-essential") &&
-+          gZenWorkspaces.activeWorkspaceElement?.hasCollapsedPinnedTabs &&
-+          !gZenWorkspaces.activeWorkspaceElement.collapsiblePins.activeTabs?.includes(this)) {
-+        return false;
-+      }
 +      return true;
      }
  
@@ -102,12 +97,6 @@ index e4266a159a0d5c42cc294602d00b8f66131f35d5..f3e362f062063ebe08bd26cc694f2d96
 +      }
 +      if (gBrowser.isTabGroup(this.parentElement?.parentElement)) {
 +        return this.parentElement.parentElement;
-+      }
-+      if (this.pinned && !this.hasAttribute('zen-essential')) {
-+        let collapsiblePins = gZenWorkspaces.workspaceElement(this.getAttribute('zen-workspace-id'))?.collapsiblePins;
-+        if (collapsiblePins?.collapsed) {
-+          return collapsiblePins;
-+        }
 +      }
      }
  

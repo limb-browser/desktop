@@ -14,9 +14,6 @@ class ZenSessionStore extends nsZenPreloadedFeature {
   });
 
   restoreInitialTabData(tab, tabData) {
-    if (tabData.zenWorkspace) {
-      tab.setAttribute("zen-workspace-id", tabData.zenWorkspace);
-    }
     if (tabData.zenLiveFolderItemId) {
       tab.setAttribute("zen-live-folder-item-id", tabData.zenLiveFolderItemId);
     }

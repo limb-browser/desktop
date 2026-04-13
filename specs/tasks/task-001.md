@@ -2,7 +2,7 @@
 title: "Remove Zen Spaces/Workspaces module"
 spec_ref: "patch-strategy.md S3.1"
 depends_on: []
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []

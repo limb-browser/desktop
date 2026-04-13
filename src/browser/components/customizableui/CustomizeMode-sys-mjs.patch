@@ -24,7 +24,6 @@ index e72ff7eab14f66ff4454850930a1d7266b3acefa..1a5d9c63b8942e8c20e9f91b82b5b116
      return (
        aNode.localName == "toolbarbutton" ||
        aNode.localName == "toolbaritem" ||
-+      aNode.localName == "zen-workspace-icons" ||
        aNode.localName == "toolbarseparator" ||
        aNode.localName == "toolbarspring" ||
        aNode.localName == "toolbarspacer"
