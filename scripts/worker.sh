@@ -24,10 +24,17 @@ get_status() {
 }
 
 git_stats() {
+  # Compare against the point we branched from dev
+  local base
+  base=$(git merge-base HEAD FETCH_HEAD 2>/dev/null || git merge-base HEAD origin/dev 2>/dev/null || echo "")
+  if [ -z "$base" ]; then
+    echo "commits=0 files_changed=0 insertions=0 deletions=0"
+    return
+  fi
   local commits files_changed insertions deletions
-  commits=$(git rev-list --count HEAD ^"$(git merge-base HEAD FETCH_HEAD 2>/dev/null || echo HEAD~1)" 2>/dev/null || echo 0)
+  commits=$(git rev-list --count "$base"..HEAD 2>/dev/null || echo 0)
   local diffstat
-  diffstat=$(git diff --shortstat FETCH_HEAD..HEAD 2>/dev/null || echo "")
+  diffstat=$(git diff --shortstat "$base"..HEAD 2>/dev/null || echo "")
   files_changed=$(echo "$diffstat" | grep -oP '\d+ file' | grep -oP '\d+' || echo 0)
   insertions=$(echo "$diffstat" | grep -oP '\d+ insertion' | grep -oP '\d+' || echo 0)
   deletions=$(echo "$diffstat" | grep -oP '\d+ deletion' | grep -oP '\d+' || echo 0)

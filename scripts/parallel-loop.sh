@@ -154,8 +154,14 @@ PREOF
     if [ "${LIMB_AUTO_MERGE:-}" = "1" ]; then
       if gh pr merge "$pr_url" --squash --delete-branch 2>/dev/null; then
         log "    PR auto-merged and branch deleted"
-        # Pull the merge into local dev
         git pull --rebase origin dev 2>/dev/null
+        # Update task status on dev to reflect completion
+        local task_on_dev="$REPO_ROOT/specs/tasks/$task_name.md"
+        if [ -f "$task_on_dev" ]; then
+          sed -i 's/^progress: .*/progress: complete/' "$task_on_dev"
+          git add "$task_on_dev" && git commit -m "chore: mark $task_name complete after auto-merge" --no-verify 2>/dev/null
+          git push origin dev 2>/dev/null
+        fi
       else
         log "    Auto-merge failed (may need manual review)"
       fi
@@ -230,7 +236,10 @@ while true; do
   pm_end=$(date '+%s')
   pm_duration=$((pm_end - pm_start))
   tasks_total=$(ls specs/tasks/task-*.md 2>/dev/null | wc -l)
-  tasks_complete=$(grep -rl 'complete' specs/tasks/ 2>/dev/null | wc -l)
+  tasks_complete=0
+  for _tf in specs/tasks/task-*.md; do
+    [ -f "$_tf" ] && [ "$(get_progress "$_tf")" = "complete" ] && tasks_complete=$((tasks_complete + 1))
+  done
   emit pm.done iteration=$ITERATION duration_s=$pm_duration tasks_total=$tasks_total tasks_complete=$tasks_complete
   log "<<< Project Manager done (${pm_duration}s, $tasks_total tasks)"
 
