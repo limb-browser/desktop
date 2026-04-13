@@ -1,6 +1,6 @@
 ---
 title: "Implement screenshot capture and tab suspension/restoration"
-spec_ref: "tree-rendering.md S3.3; tab-bridge.md S3.2 S3.3; zoom-lod.md S2.1"
+spec_ref: "tree-rendering.md S3.3; tab-bridge.md S3.2 S3.3; zoom-lod.md S2.1; performance.md S4.2"
 depends_on:
   - task-011
   - task-008
@@ -39,8 +39,9 @@ LOD computation (task-011) assigns tiers to nodes but nothing happens on tier tr
    - Restore the tab: reload from URL or SessionStore cache.
    - Update the node's status.
    - Capture a fresh screenshot once loaded.
-4. Update canvas rendering to draw screenshots for nodes at Screenshot-Low and Screenshot-High tiers.
-5. Write tests for:
+4. Enforce preload budget (performance.md S4.2): limit preloading (warming up tabs approaching Live tier) to one concurrent preload at a time.
+5. Update canvas rendering to draw screenshots for nodes at Screenshot-Low and Screenshot-High tiers.
+6. Write tests for:
    - Screenshot is captured when a tab transitions to Screenshot tier.
    - Tab is suspended after screenshot capture.
    - Tab is restored when promoted back to Live tier.
