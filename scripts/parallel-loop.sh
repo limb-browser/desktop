@@ -1,60 +1,68 @@
 #!/usr/bin/env bash
 # Parallel development loop for Limb Browser.
-# Spawns up to MAX_WORKERS concurrent workers in git worktrees.
-# Each worker handles one task's implement->verify cycle.
-# Main loop merges completed worktrees back to dev.
+#
+# Architecture:
+#   Serial on main:  PM creates/updates tasks
+#   Parallel in worktrees: workers run implement -> verify -> process-revision
+#
+# The PM runs on main each cycle to create tasks from specs. Workers are
+# spawned in git worktrees (one per task) and run independently. Completed
+# worktrees are merged back to dev.
+#
+# Prerequisites: tmux session (set LIMB_TMUX_SESSION, default "limb-loop").
+# Usage: bash scripts/parallel-loop.sh
 set -uo pipefail
 
-REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$REPO_DIR"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT"
 
 LOG=/tmp/limb-loop.log
-WORKTREE_BASE="/tmp/limb-workers"
-MAX_WORKERS=6
+WORKTREE_BASE="$REPO_ROOT/worktrees/workers"
+MAX_WORKERS=${LIMB_MAX_WORKERS:-6}
+TMUX_SESSION=${LIMB_TMUX_SESSION:-limb-loop}
 
-log() {
-  echo "[$(date '+%H:%M:%S')] [orchestrator] $*" >> "$LOG"
+log() { echo "[$(date '+%H:%M:%S')] [orchestrator] $*" | tee -a "$LOG"; }
+
+# --- Task metadata helpers ---
+
+get_progress() {
+  bash "$REPO_ROOT/scripts/task-field.sh" "$1" progress 2>/dev/null || echo ""
 }
 
-# --- Dependency resolution ---
-
 task_is_complete() {
-  local num="$1"
-  local f="specs/tasks/task-${num}.md"
-  [ -f "$f" ] && grep -qP '\*\*Progress:\*\*\s*`complete`' "$f" 2>/dev/null
+  local f="$REPO_ROOT/specs/tasks/task-${1}.md"
+  [ -f "$f" ] && [ "$(get_progress "$f")" = "complete" ]
 }
 
 deps_satisfied() {
   local task_file="$1"
   local deps
-  deps=$(grep -oP 'Depends on:\*?\*?\s*\K.*' "$task_file" 2>/dev/null | head -1)
+  deps=$(bash "$REPO_ROOT/scripts/task-field.sh" "$task_file" depends_on 2>/dev/null)
   [ -z "$deps" ] && return 0
-  echo "$deps" | grep -q "none" && return 0
 
-  for dep in $(echo "$deps" | tr ',' ' '); do
-    dep=$(echo "$dep" | tr -d ' ' | sed 's/task-//')
+  while IFS= read -r dep; do
     [ -z "$dep" ] && continue
-    dep=$(printf "%03d" "$((10#$dep))")
-    if ! task_is_complete "$dep"; then
+    local num
+    num=$(echo "$dep" | sed 's/task-//' | sed 's/^0*//')
+    [ -z "$num" ] && continue
+    num=$(printf "%03d" "$((10#$num))")
+    if ! task_is_complete "$num"; then
       return 1
     fi
-  done
+  done <<< "$deps"
   return 0
 }
 
 find_eligible_tasks() {
-  # needs-revision first, then not-started with deps satisfied
-  for f in specs/tasks/task-*.md; do
+  # Priority 1: needs-revision tasks
+  for f in "$REPO_ROOT"/specs/tasks/task-*.md; do
     [ -f "$f" ] || continue
-    local status
-    status=$(grep -oP 'Progress:\*?\*?\s*`\K[^`]+' "$f" 2>/dev/null)
-    [ "$status" = "needs-revision" ] && echo "$f"
+    [ "$(get_progress "$f")" = "needs-revision" ] && echo "$f"
   done
-  for f in specs/tasks/task-*.md; do
+  # Priority 2: not-started tasks with satisfied deps
+  for f in "$REPO_ROOT"/specs/tasks/task-*.md; do
     [ -f "$f" ] || continue
-    local status
-    status=$(grep -oP 'Progress:\*?\*?\s*`\K[^`]+' "$f" 2>/dev/null)
-    [ "$status" != "not-started" ] && continue
+    [ "$(get_progress "$f")" != "not-started" ] && continue
     deps_satisfied "$f" && echo "$f"
   done
 }
@@ -62,7 +70,6 @@ find_eligible_tasks() {
 # --- Worker management ---
 
 declare -A ACTIVE_WORKERS=()
-declare -A WORKER_PIDS=()
 
 spawn_worker() {
   local task_file="$1"
@@ -72,18 +79,22 @@ spawn_worker() {
 
   git branch -D "worker/$task_name" 2>/dev/null
 
-  git worktree add "$worktree" -b "worker/$task_name" HEAD 2>/dev/null
-  if [ $? -ne 0 ]; then
+  if ! git worktree add "$worktree" -b "worker/$task_name" HEAD 2>/dev/null; then
     log "!!! Failed to create worktree for $task_name"
     return 1
   fi
 
-  ACTIVE_WORKERS[$task_name]="$worktree"
-
   log ">>> Spawning worker: $task_name (worktree: $worktree)"
-  tmux new-window -t limb-loop -n "$task_name" \
-    "bash $REPO_DIR/scripts/worker.sh '$task_file' '$worktree'"
 
+  if ! tmux new-window -t "$TMUX_SESSION" -n "$task_name" \
+    "bash '$REPO_ROOT/scripts/worker.sh' '$task_file' '$worktree'; echo 'Worker $task_name exited'; sleep 5"; then
+    log "!!! Failed to spawn tmux window for $task_name (session '$TMUX_SESSION' exists?)"
+    git worktree remove "$worktree" --force 2>/dev/null
+    git branch -D "worker/$task_name" 2>/dev/null
+    return 1
+  fi
+
+  ACTIVE_WORKERS[$task_name]="$worktree"
   return 0
 }
 
@@ -98,52 +109,79 @@ merge_worker() {
   local worktree="${ACTIVE_WORKERS[$task_name]}"
   local branch="worker/$task_name"
 
-  log "<<< Merging $task_name back to dev"
+  log "<<< Creating PR for $task_name"
 
-  if git merge "$branch" --no-edit -m "merge: integrate $task_name from parallel worker" 2>/dev/null; then
-    log "    Merge successful"
-  else
-    log "    Merge conflict on $task_name -- attempting resolution"
-    git checkout --theirs specs/tasks/ 2>/dev/null
-    git add specs/tasks/ 2>/dev/null
-    local conflicts
-    conflicts=$(git diff --name-only --diff-filter=U 2>/dev/null)
-    if [ -n "$conflicts" ]; then
-      log "    Unresolvable conflicts in: $conflicts"
-      git merge --abort 2>/dev/null
-      log "    !!! Merge aborted for $task_name -- will retry next round"
-      git worktree remove "$worktree" --force 2>/dev/null
-      git branch -D "$branch" 2>/dev/null
-      unset "ACTIVE_WORKERS[$task_name]"
-      return 1
-    fi
-    git commit --no-edit 2>/dev/null
-    log "    Conflict auto-resolved"
+  # Push the worker branch to origin
+  if ! git push origin "$branch" -u 2>/dev/null; then
+    log "    !!! Push failed for $branch"
+    git worktree remove "$worktree" --force 2>/dev/null
+    git branch -D "$branch" 2>/dev/null
+    unset "ACTIVE_WORKERS[$task_name]"
+    return 1
   fi
 
-  if git push 2>/dev/null; then
-    log "    Pushed to remote"
+  # Extract task title for PR
+  local task_file="$REPO_ROOT/specs/tasks/$task_name.md"
+  local task_title
+  task_title=$(bash "$REPO_ROOT/scripts/task-field.sh" "$task_file" title 2>/dev/null || echo "$task_name")
+
+  # Create PR via gh CLI
+  local pr_url
+  pr_url=$(gh pr create \
+    --repo limb-browser/desktop \
+    --head "$branch" \
+    --base dev \
+    --title "$task_title" \
+    --body "$(cat <<PREOF
+## Task
+
+\`$task_name\` -- $task_title
+
+## Changes
+
+See commits on this branch for details. Task file: \`specs/tasks/$task_name.md\`
+
+Generated by the Limb parallel dev loop.
+PREOF
+)" 2>&1) || true
+
+  if echo "$pr_url" | grep -q 'https://'; then
+    log "    PR created: $pr_url"
+
+    # Auto-merge if LIMB_AUTO_MERGE is set
+    if [ "${LIMB_AUTO_MERGE:-}" = "1" ]; then
+      if gh pr merge "$pr_url" --squash --delete-branch 2>/dev/null; then
+        log "    PR auto-merged and branch deleted"
+        # Pull the merge into local dev
+        git pull --rebase origin dev 2>/dev/null
+      else
+        log "    Auto-merge failed (may need manual review)"
+      fi
+    fi
   else
-    log "    Push failed (non-fatal)"
+    log "    PR creation failed: $pr_url"
+    log "    Branch $branch is pushed -- create PR manually"
   fi
 
   git worktree remove "$worktree" --force 2>/dev/null
-  git branch -d "$branch" 2>/dev/null
+  # Keep branch if PR is open; delete if merged
+  if [ "${LIMB_AUTO_MERGE:-}" = "1" ]; then
+    git branch -D "$branch" 2>/dev/null
+  fi
   unset "ACTIVE_WORKERS[$task_name]"
   log "    Cleaned up worktree for $task_name"
   return 0
 }
 
 cleanup_all() {
-  log "Cleaning up all worktrees..."
+  log "Loop exiting -- detaching worktrees (branches preserved for recovery)"
   for task_name in "${!ACTIVE_WORKERS[@]}"; do
     local worktree="${ACTIVE_WORKERS[$task_name]}"
     git worktree remove "$worktree" --force 2>/dev/null
-    git branch -D "worker/$task_name" 2>/dev/null
+    log "    Detached worktree for $task_name (branch worker/$task_name intact)"
   done
   rm -rf "$WORKTREE_BASE" 2>/dev/null
 }
-
 trap cleanup_all EXIT
 
 # --- Main loop ---
@@ -152,23 +190,50 @@ mkdir -p "$WORKTREE_BASE"
 > "$LOG"
 log "=== Limb Parallel Dev Loop Started (max $MAX_WORKERS workers) ==="
 
+# Pre-flight: handle any ready-for-review tasks on main
+for f in "$REPO_ROOT"/specs/tasks/task-*.md; do
+  [ -f "$f" ] || continue
+  status=$(get_progress "$f")
+  [ "$status" = "ready-for-review" ] || continue
+  task_name=$(basename "$f" .md)
+  log ">>> Pre-flight: verifying $task_name on main"
+  {
+    cat specs/prompts/verifier.md
+    printf '\n---\n\n## Pre-computed Target\n\nYour target task file is: `%s` (%s).\nRead this file first. Do not scan other task files to find work.\n' "$f" "$task_name"
+  } | claude --model opus[1m] --dangerously-skip-permissions 2>/dev/null
+  log "<<< Pre-flight verifier done for $task_name"
+
+  new_status=$(get_progress "$f")
+  if [ "$new_status" = "needs-revision" ]; then
+    log ">>> Pre-flight: process revision for $task_name"
+    claude --model opus[1m] --dangerously-skip-permissions < specs/prompts/process-revision.md 2>/dev/null
+    log "<<< Pre-flight process revision done"
+  fi
+done
+
 ITERATION=0
 while true; do
   ITERATION=$((ITERATION + 1))
-  log "--- Iteration $ITERATION (${#ACTIVE_WORKERS[@]} active workers) ---"
+  log "--- Orchestrator cycle $ITERATION (${#ACTIVE_WORKERS[@]} active workers) ---"
 
-  # Check for completed workers and merge them
+  # 1. SERIAL: Project manager (creates/updates tasks on main)
+  log ">>> Project Manager"
+  claude --model opus[1m] --dangerously-skip-permissions \
+    < specs/prompts/project-manager.md 2>/dev/null
+  log "<<< Project Manager done"
+
+  # 2. Merge completed workers back to dev
   for task_name in "${!ACTIVE_WORKERS[@]}"; do
     if check_worker_done "$task_name"; then
       merge_worker "$task_name"
     fi
   done
 
-  # Spawn new workers for eligible tasks
+  # 3. Spawn new workers for eligible tasks
   active=${#ACTIVE_WORKERS[@]}
   if [ "$active" -lt "$MAX_WORKERS" ]; then
     slots=$((MAX_WORKERS - active))
-    eligible=$(find_eligible_tasks | head -$slots)
+    eligible=$(find_eligible_tasks | head -"$slots")
 
     for task_file in $eligible; do
       task_name=$(basename "$task_file" .md)
@@ -177,20 +242,28 @@ while true; do
     done
   fi
 
-  # Check completion
+  # 4. Status report
   active=${#ACTIVE_WORKERS[@]}
+  log "    Active workers: $active"
+  for task_name in "${!ACTIVE_WORKERS[@]}"; do
+    log "      - $task_name"
+  done
+
+  # 5. Check convergence
   if [ "$active" -eq 0 ]; then
     remaining=$(find_eligible_tasks | wc -l)
     if [ "$remaining" -eq 0 ]; then
-      not_started=$(grep -rlP 'Progress:\*?\*?\s*`not-started`' specs/tasks/ 2>/dev/null | wc -l)
+      not_started=$(grep -rl 'not-started' "$REPO_ROOT"/specs/tasks/ 2>/dev/null | wc -l)
       if [ "$not_started" -eq 0 ]; then
-        log "=== All tasks complete! ==="
+        log "=== All tasks complete ==="
         break
       else
-        log "    $not_started tasks remaining but blocked on dependencies. Waiting..."
+        log "    $not_started tasks remaining but blocked on dependencies"
       fi
     fi
   fi
 
   sleep 30
 done
+
+log "=== Loop complete after $ITERATION iterations ==="
