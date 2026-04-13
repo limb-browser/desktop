@@ -32,7 +32,6 @@ index 75ddd82c18979571f377dec94fe1883f1349cc16..129d78214db53fc8dbd17d23b4a5a042
 +      if (gBrowser.selectedTab.hasAttribute("split-view")) {
 +        return;
 +      }
-+      gZenWorkspaces.handleTabCloseWindow();
 +      return;
 +    }
 +

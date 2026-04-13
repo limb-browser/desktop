@@ -10,7 +10,6 @@ export const ZenCustomizableUI = new (class {
   TYPE_TOOLBAR = "toolbar";
   defaultSidebarIcons = [
     "downloads-button",
-    "zen-workspaces-button",
     "zen-create-new-button",
   ];
 
@@ -116,7 +115,7 @@ export const ZenCustomizableUI = new (class {
 
     for (let id of this.defaultSidebarIcons) {
       const elem = window.document.getElementById(id);
-      if (!elem || elem.id === "zen-workspaces-button") {
+      if (!elem) {
         continue;
       }
       elem.setAttribute("removable", "true");
@@ -130,7 +129,7 @@ export const ZenCustomizableUI = new (class {
     const button = window.document.getElementById("zen-create-new-button");
     // If we use "mousedown" event for private windows (which open a new tab on "click"), we might end up with
     // the urlbar flicking and therefore we use "command" event to avoid that.
-    let isPrivateMode = window.gZenWorkspaces.privateWindowOrDisabled;
+    let isPrivateMode = Cu.isInAutomation || window.PrivateBrowsingUtils.isWindowPrivate(window);
     button.addEventListener(isPrivateMode ? "command" : "mousedown", event => {
       if (isPrivateMode) {
         window.document.getElementById("cmd_newNavigatorTab").doCommand();

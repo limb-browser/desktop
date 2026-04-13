@@ -22,10 +22,7 @@ class ZenStartup {
   }
 
   get #shouldUseWatermark() {
-    return (
-      Services.prefs.getBoolPref("zen.watermark.enabled", false) &&
-      gZenWorkspaces.shouldHaveWorkspaces
-    );
+    return Services.prefs.getBoolPref("zen.watermark.enabled", false);
   }
 
   #zenInitBrowserLayout() {
@@ -54,7 +51,6 @@ class ZenStartup {
       // overlap and interaction issues with vertical tabs
       document.getElementById("browser").prepend(deckTemplate);
 
-      gZenWorkspaces.init();
       setTimeout(() => {
         gZenUIManager.init();
         this.#checkForWelcomePage();
@@ -78,31 +74,25 @@ class ZenStartup {
     }
   }
 
-  delayedStartupFinished() {
-    gZenWorkspaces.promiseInitialized.then(async () => {
-      await delayedStartupPromise;
-      await SessionStore.promiseAllWindowsRestored;
-      delete gZenUIManager.promiseInitialized;
-      gZenCompactModeManager.init();
-      // Fix for https://github.com/zen-browser/desktop/issues/7605, specially in compact mode
-      if (gURLBar.hasAttribute("breakout-extend")) {
-        gURLBar.focus();
-      }
-      // A bit of a hack to make sure the tabs toolbar is updated.
-      // Just in case we didn't get the right size.
-      gZenUIManager.updateTabsToolbar();
-      this.closeWatermark();
-      document
-        .getElementById("tabbrowser-arrowscrollbox")
-        .setAttribute("orient", "vertical");
-      this.isReady = true;
-      this.promiseInitializedResolve();
-      delete this.promiseInitializedResolve;
-
-      setTimeout(() => {
-        gZenWorkspaces._invalidateBookmarkContainers();
-      });
-    });
+  async delayedStartupFinished() {
+    await delayedStartupPromise;
+    await SessionStore.promiseAllWindowsRestored;
+    delete gZenUIManager.promiseInitialized;
+    gZenCompactModeManager.init();
+    // Fix for https://github.com/zen-browser/desktop/issues/7605, specially in compact mode
+    if (gURLBar.hasAttribute("breakout-extend")) {
+      gURLBar.focus();
+    }
+    // A bit of a hack to make sure the tabs toolbar is updated.
+    // Just in case we didn't get the right size.
+    gZenUIManager.updateTabsToolbar();
+    this.closeWatermark();
+    document
+      .getElementById("tabbrowser-arrowscrollbox")
+      .setAttribute("orient", "vertical");
+    this.isReady = true;
+    this.promiseInitializedResolve();
+    delete this.promiseInitializedResolve;
   }
 
   openWatermark() {

@@ -6,11 +6,6 @@ index a5f2e4258942010ee61ed7a86497f51793366fcd..f01524a09512ec6cd1972a9fdb173ff4
          id: "browserRestoreSession",
          l10nId: "startup-restore-windows-and-tabs",
        },
-+      {
-+        id: "zenWorkspaceContinueWhereLeftOff",
-+        l10nId: "zen-workspace-continue-where-left-off",
-+        control: "moz-checkbox",
-+      },
        {
          id: "windowsLaunchOnLogin",
          l10nId: "windows-launch-on-login",

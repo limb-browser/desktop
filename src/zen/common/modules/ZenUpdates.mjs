@@ -54,7 +54,6 @@ export async function createWindowUpdateAnimation() {
     return;
   }
   Services.prefs.setStringPref(ZEN_BUILD_ID_PREF, appID);
-  await gZenWorkspaces.promiseInitialized;
   const appWrapper = document.getElementById("zen-main-app-wrapper");
   const element = document.createElement("div");
   element.id = "zen-update-animation";

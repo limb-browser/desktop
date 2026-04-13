@@ -6,7 +6,6 @@ index eb24c3ffdd2cfb33379aca993af5171fdb91ac2c..15d3fbff397df23f112355e22ca5dba5
        }
      }
  
-+    tabData.zenWorkspace = tab.getAttribute("zen-workspace-id");
 +    tabData.zenSyncId = tab.getAttribute("id");
 +    tabData.zenEssential = tab.getAttribute("zen-essential") === "true";
 +    tabData.pinned = tabData.pinned || tabData.zenEssential;

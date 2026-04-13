@@ -733,8 +733,7 @@ var gZenWorkspacesSettings = {
 
     toggleZenCycleByAttrWarning.observe(); // call it once on initial load
 
-    Services.prefs.addObserver("zen.glance.enabled", tabsUnloaderPrefListener); // We can use the same listener for both prefs
-    Services.prefs.addObserver("zen.workspaces.separate-essentials", tabsUnloaderPrefListener);
+    Services.prefs.addObserver("zen.glance.enabled", tabsUnloaderPrefListener);
     Services.prefs.addObserver("zen.glance.activation-method", tabsUnloaderPrefListener);
     Services.prefs.addObserver("zen.window-sync.sync-only-pinned-tabs", tabsUnloaderPrefListener);
     Services.prefs.addObserver(
@@ -745,7 +744,6 @@ var gZenWorkspacesSettings = {
     window.addEventListener("unload", () => {
       Services.prefs.removeObserver("zen.glance.enabled", tabsUnloaderPrefListener);
       Services.prefs.removeObserver("zen.glance.activation-method", tabsUnloaderPrefListener);
-      Services.prefs.removeObserver("zen.workspaces.separate-essentials", tabsUnloaderPrefListener);
       Services.prefs.removeObserver(
         "zen.window-sync.sync-only-pinned-tabs",
         tabsUnloaderPrefListener
@@ -1136,11 +1134,6 @@ Preferences.addAll([
     default: true,
   },
   {
-    id: "zen.workspaces.hide-default-container-indicator",
-    type: "bool",
-    default: true,
-  },
-  {
     id: "zen.tab-unloader.timeout-minutes",
     type: "int",
     default: 10,
@@ -1154,16 +1147,6 @@ Preferences.addAll([
     id: "zen.pinned-tab-manager.close-shortcut-behavior",
     type: "string",
     default: "switch",
-  },
-  {
-    id: "zen.workspaces.force-container-workspace",
-    type: "bool",
-    default: true,
-  },
-  {
-    id: "zen.workspaces.open-new-tab-if-last-unpinned-tab-is-closed",
-    type: "bool",
-    default: true,
   },
   {
     id: "zen.glance.activation-method",
@@ -1181,11 +1164,6 @@ Preferences.addAll([
     default: "float",
   },
   {
-    id: "zen.workspaces.separate-essentials",
-    type: "bool",
-    default: false,
-  },
-  {
     id: "zen.tabs.show-newtab-vertical",
     type: "bool",
     default: true,
@@ -1199,11 +1177,6 @@ Preferences.addAll([
     id: "media.videocontrols.picture-in-picture.enabled",
     type: "bool",
     default: true,
-  },
-  {
-    id: "zen.workspaces.continue-where-left-off",
-    type: "bool",
-    default: false,
   },
   {
     id: "zen.mods.auto-update",

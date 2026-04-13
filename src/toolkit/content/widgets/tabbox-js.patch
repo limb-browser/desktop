@@ -39,8 +39,7 @@ index 24196c658309b1d3c049939f57a13c22d422a153..0cf49a0dc18b34a5be2fad8d2b124c7c
        if (!tab) {
          return;
        }
--      for (let otherTab of this.allTabs) {
-+      for (let otherTab of window.gZenWorkspaces?.allStoredTabs ?? this.allTabs) {
+       for (let otherTab of this.allTabs) {
          if (otherTab != tab && otherTab.selected) {
            otherTab._selected = false;
          }

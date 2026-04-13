@@ -6,26 +6,12 @@ index 384d599c58cefbf80f5a50489fc401df0c8de8a5..aa85972946c3ff7866fbea86b0372432
  
      this._cleanPopup(aPopup);
  
-+    let children = [];
      let cc = resultNode.childCount;
--    if (cc > 0) {
-+    for (let i = 0; i < cc; ++i) {
-+      let child = resultNode.getChild(i);
-+      // Skip nodes that don't belong in current workspace
-+      if (PlacesUtils.nodeIsURI(child) || PlacesUtils.containerTypes.includes(child.type)) {
-+        if (typeof gZenWorkspaces !== 'undefined' && gZenWorkspaces.isBookmarkInAnotherWorkspace(child)) {
-+          continue;
-+        }
-+      }
-+      children.push(child);
-+    }
-+
-+    if (children.length > 0) {
++    if (cc > 0) {
        this._setEmptyPopupStatus(aPopup, false);
        let fragment = document.createDocumentFragment();
--      for (let i = 0; i < cc; ++i) {
--        let child = resultNode.getChild(i);
-+      for (let child of children) {
++      for (let i = 0; i < cc; ++i) {
++        let child = resultNode.getChild(i);
          this._insertNewItemToPopup(child, fragment);
        }
        aPopup.insertBefore(fragment, aPopup._endMarker);
@@ -41,44 +27,22 @@ index 384d599c58cefbf80f5a50489fc401df0c8de8a5..aa85972946c3ff7866fbea86b0372432
        this._rootElt.firstChild.remove();
      }
  
-+    let visibleNodes = [];
      let cc = this._resultNode.childCount;
--    if (cc > 0) {
--      // There could be a lot of nodes, but we only want to build the ones that
--      // are more likely to be shown, not all of them.
--      // We also don't want to wait for reflows at every node insertion, to
--      // calculate a precise number of visible items, thus we guess a size from
--      // the first non-separator node (because separators have flexible size).
-+    for (let i = 0; i < cc; i++) {
-+      let child = this._resultNode.getChild(i);
-+      if (PlacesUtils.nodeIsURI(child) || PlacesUtils.containerTypes.includes(child.type)) {
-+        if (!(typeof gZenWorkspaces !== 'undefined' && gZenWorkspaces.isBookmarkInAnotherWorkspace(child))) {
-+          visibleNodes.push(child);
-+        }
-+      } else {
-+        // Always include separators
-+        visibleNodes.push(child);
-+      }
-+    }
-+
-+    if (visibleNodes.length > 0) {
-+      // Look for the first non-separator node.
++    if (cc > 0) {
++      // There could be a lot of nodes, but we only want to build the ones that
++      // are more likely to be shown, not all of them.
        let startIndex = 0;
        let limit = await this._runBeforeFrameRender(() => {
          if (!this._isAlive) {
--          return cc;
-+          return visibleNodes.length;
+           return cc;
          }
- 
--        // Look for the first non-separator node.
+
++        // Look for the first non-separator node.
          let elt;
--        while (startIndex < cc) {
-+        while (startIndex < visibleNodes.length) {
++        while (startIndex < cc) {
            elt = this._insertNewItem(
--            this._resultNode.getChild(startIndex),
--            this._rootElt
-+              visibleNodes[startIndex],
-+              this._rootElt
++            this._resultNode.getChild(startIndex),
++            this._rootElt
            );
            ++startIndex;
            if (elt.localName != "toolbarseparator") {
@@ -86,27 +50,20 @@ index 384d599c58cefbf80f5a50489fc401df0c8de8a5..aa85972946c3ff7866fbea86b0372432
            }
          }
          if (!elt) {
--          return cc;
-+          return visibleNodes.length;
+           return cc;
          }
- 
+
          return window.promiseDocumentFlushed(() => {
--          // We assume a button with just the icon will be more or less a square,
--          // then compensate the measurement error by considering a larger screen
--          // width. Moreover the window could be bigger than the screen.
--          let size = elt.clientHeight || 1; // Sanity fallback.
--          return Math.min(cc, parseInt((window.screen.width * 1.5) / size));
 +          let size = elt.clientHeight || 1;
-+          return Math.min(visibleNodes.length, parseInt((window.screen.width * 1.5) / size));
++          return Math.min(cc, parseInt((window.screen.width * 1.5) / size));
          });
        });
- 
+
 @@ -1059,7 +1076,7 @@ class PlacesToolbar extends PlacesViewBase {
- 
+
        let fragment = document.createDocumentFragment();
        for (let i = startIndex; i < limit; ++i) {
--        this._insertNewItem(this._resultNode.getChild(i), fragment);
-+        this._insertNewItem(visibleNodes[i], fragment);
++        this._insertNewItem(this._resultNode.getChild(i), fragment);
        }
        await new Promise(resolve => window.requestAnimationFrame(resolve));
        if (!this._isAlive) {

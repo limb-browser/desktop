@@ -22,7 +22,6 @@ export class nsZenMenuBar {
 
   #init() {
     this.#initViewMenu();
-    this.#initSpacesMenu();
     this.#initAppMenu();
     this.#hideWindowRestoreMenus();
   }
@@ -48,14 +47,6 @@ export class nsZenMenuBar {
     parentPopup.prepend(document.createXULElement("menuseparator"));
     parentPopup.prepend(menu);
 
-    const sibling = document.getElementById("viewSidebarMenuMenu");
-    const togglePinnedItem = window.MozXULElement.parseXULToFragment(
-      '<menuitem data-l10n-id="zen-menubar-toggle-pinned-tabs" />'
-    ).querySelector("menuitem");
-    if (!gZenWorkspaces.privateWindowOrDisabled) {
-      sibling.after(togglePinnedItem);
-    }
-
     parentPopup.addEventListener("popupshowing", () => {
       const currentScheme = Services.prefs.getIntPref(WINDOW_SCHEME_PREF);
       for (const [type, value] of Object.entries(WINDOW_SCHEME_MAPPING)) {
@@ -66,48 +57,7 @@ export class nsZenMenuBar {
           menuItem.removeAttribute("checked");
         }
       }
-      const pinnedAreCollapsed =
-        gZenWorkspaces.activeWorkspaceElement?.hasCollapsedPinnedTabs ?? false;
-      const args = { pinnedAreCollapsed };
-      document.l10n.setArgs(togglePinnedItem, args);
     });
-
-    togglePinnedItem.addEventListener("command", () => {
-      gZenWorkspaces.activeWorkspaceElement?.collapsiblePins.toggle();
-    });
-  }
-
-  #initSpacesMenu() {
-    let spacesMenubar = window.MozXULElement.parseXULToFragment(`
-      <menu id="zen-spaces-menubar" data-l10n-id="zen-panel-ui-spaces-label">
-        <menupopup>
-          <menuitem data-l10n-id="zen-panel-ui-workspaces-create" command="cmd_zenOpenWorkspaceCreation"/>
-          <menuitem data-l10n-id="zen-workspaces-change-theme" command="cmd_zenOpenZenThemePicker"/>
-          <menuitem data-l10n-id="zen-workspaces-panel-change-name" command="cmd_zenChangeWorkspaceName"/>
-          <menuitem data-l10n-id="zen-workspaces-panel-change-icon" command="cmd_zenChangeWorkspaceIcon"/>
-          <menuseparator/>
-          <menuitem 
-            data-l10n-id="zen-panel-ui-workspaces-change-forward"
-            command="cmd_zenWorkspaceForward"
-            key="zen-workspace-forward"/>
-          <menuitem
-            data-l10n-id="zen-panel-ui-workspaces-change-back"
-            command="cmd_zenWorkspaceBack"
-            key="zen-workspace-backward"/>
-        </menupopup>
-      </menu>`);
-    document.getElementById("view-menu").after(spacesMenubar);
-    document
-      .getElementById("zen-spaces-menubar")
-      .addEventListener("popupshowing", () => {
-        if (AppConstants.platform === "linux") {
-          // On linux, there seems to be a bug where the menu freezes up and makes the browser
-          // suppiciously unresponsive if we try to update the menu while it's opening.
-          // See https://github.com/zen-browser/desktop/issues/12024
-          return;
-        }
-        gZenWorkspaces.updateWorkspacesChangeContextMenu();
-      });
   }
 
   #initAppMenu() {
