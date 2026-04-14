@@ -259,8 +259,7 @@
 
 #restore-button,
 #fullscreen-button,
-#appMenu-fullscreen-button2,
-.zen-tab-unsplit-button {
+#appMenu-fullscreen-button2 {
   list-style-image: url("fullscreen.svg") !important;
 }
 
