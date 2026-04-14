@@ -3,8 +3,8 @@ title: "Implement tree layout algorithm"
 spec_ref: "tree-model.md S3"
 depends_on:
   - task-003
-progress: ready-for-review
-review: ""
+progress: complete
+review: "specs/reviews/review-TASK_004-R1.md"
 coverage_sections: []
 commits: []
 ---
