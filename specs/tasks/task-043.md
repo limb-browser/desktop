@@ -3,6 +3,7 @@ title: "Implement pan momentum and boundary damping"
 spec_ref: "interaction-feel.md S2"
 depends_on:
   - task-016
+  - task-022
 progress: not-started
 review: ""
 coverage_sections: []

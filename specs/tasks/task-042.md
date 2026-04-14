@@ -3,6 +3,7 @@ title: "Implement zoom momentum (inertial zoom with velocity tracking)"
 spec_ref: "interaction-feel.md S1"
 depends_on:
   - task-007
+  - task-022
 progress: not-started
 review: ""
 coverage_sections: []

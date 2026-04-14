@@ -4,6 +4,7 @@ spec_ref: "navigation.md S1.1"
 depends_on:
   - task-012
   - task-014
+  - task-030
 progress: not-started
 review: ""
 coverage_sections: []

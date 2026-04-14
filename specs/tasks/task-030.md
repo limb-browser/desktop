@@ -4,6 +4,7 @@ spec_ref: "interaction-feel.md S4"
 depends_on:
   - task-006
   - task-004
+  - task-022
 progress: not-started
 review: ""
 coverage_sections: []
