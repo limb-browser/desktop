@@ -1,0 +1,196 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:root {
+  --bg-primary: #1a1a1a;
+  --bg-card: #252525;
+  --bg-card-hover: #2d2d2d;
+  --bg-input: #2a2a2a;
+  --text-primary: #e0e0e0;
+  --text-muted: #888;
+  --text-heading: #aaa;
+  --border-color: #333;
+  --accent: #5b8def;
+  --accent-hover: #4a7de0;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+#launcher {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+/* Search bar */
+#search-bar {
+  margin-bottom: 32px;
+}
+
+#search-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+#search-input::placeholder {
+  color: var(--text-muted);
+}
+
+#search-input:focus {
+  border-color: var(--accent);
+}
+
+/* Time groups */
+.time-group {
+  margin-bottom: 32px;
+}
+
+.time-group-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  padding-left: 4px;
+}
+
+.time-group-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+/* Branch cards */
+.branch-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  text-decoration: none;
+  color: inherit;
+}
+
+.branch-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent);
+}
+
+.branch-card-favicon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  font-size: 18px;
+}
+
+.branch-card-favicon img {
+  width: 20px;
+  height: 20px;
+}
+
+.branch-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.branch-card-name {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.branch-card-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.branch-card-thumbnail {
+  width: 48px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-primary);
+}
+
+/* New branch card */
+.new-branch-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: transparent;
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 14px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.new-branch-card:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.new-branch-plus {
+  font-size: 20px;
+  font-weight: 300;
+}
+
+/* Empty state */
+#empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+#start-browsing-btn {
+  padding: 16px 40px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#start-browsing-btn:hover {
+  background: var(--accent-hover);
+}

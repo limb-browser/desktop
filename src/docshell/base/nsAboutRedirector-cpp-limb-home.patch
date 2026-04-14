@@ -1,0 +1,13 @@
+diff --git a/docshell/base/nsAboutRedirector.cpp b/docshell/base/nsAboutRedirector.cpp
+--- a/docshell/base/nsAboutRedirector.cpp
++++ b/docshell/base/nsAboutRedirector.cpp
+@@ -118,6 +118,10 @@ static const RedirEntry kRedirMap[] = {
+      nsIAboutModule::IS_SECURE_CHROME_UI},
+ #endif
++    // Limb Browser: tree-first home page (spec: unified-tree.md S2)
++    {"limb-home",
++     "chrome://browser/content/limb/launcher/about-limb-home.html",
++     nsIAboutModule::IS_SECURE_CHROME_UI |
++         nsIAboutModule::ALLOW_SCRIPT},
+     {"credits", "https://zen-browser.app/about/",
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
