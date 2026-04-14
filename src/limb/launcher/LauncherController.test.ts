@@ -69,8 +69,10 @@ describe('LauncherController', () => {
       expect(branches[0].title).toBe('Branch A');
       expect(branches[0].favicon).toBe('https://a.com/favicon.ico');
       expect(branches[0].descendantCount).toBe(0);
+      expect(branches[0].screenshotUrl).toBeNull();
       expect(branches[1].id).toBe(child2.id);
       expect(branches[1].title).toBe('Branch B');
+      expect(branches[1].screenshotUrl).toBeNull();
     });
 
     it('computes descendantCount from tree structure', () => {
@@ -98,6 +100,36 @@ describe('LauncherController', () => {
       expect(groups).toHaveLength(1);
       expect(groups[0].label).toBe('Today');
       expect(groups[0].branches[0].title).toBe('Today Branch');
+    });
+  });
+
+  describe('getRenderData', () => {
+    it('returns empty array when no branches exist', () => {
+      const data = controller.getRenderData(Date.now());
+      expect(data).toEqual([]);
+    });
+
+    it('returns groups with relativeTime on each branch', () => {
+      const now = Date.now();
+      const child = tree.addChild(tree.rootId, 'https://a.com');
+      child.title = 'Today Branch';
+      child.lastVisitedAt = now - 5 * 60_000; // 5 minutes ago
+
+      const data = controller.getRenderData(now);
+      expect(data).toHaveLength(1);
+      expect(data[0].label).toBe('Today');
+      expect(data[0].branches[0].title).toBe('Today Branch');
+      expect(data[0].branches[0].relativeTime).toBe('5 minutes ago');
+      expect(data[0].branches[0].screenshotUrl).toBeNull();
+    });
+
+    it('computes relativeTime correctly for older branches', () => {
+      const now = Date.now();
+      const child = tree.addChild(tree.rootId, 'https://a.com');
+      child.lastVisitedAt = now - 3 * 3_600_000; // 3 hours ago
+
+      const data = controller.getRenderData(now);
+      expect(data[0].branches[0].relativeTime).toBe('3 hours ago');
     });
   });
 

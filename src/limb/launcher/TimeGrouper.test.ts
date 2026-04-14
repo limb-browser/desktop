@@ -23,6 +23,7 @@ function makeBranch(
     title: 'Test Branch',
     favicon: null,
     descendantCount: 0,
+    screenshotUrl: null,
     ...overrides,
   };
 }

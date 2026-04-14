@@ -4,7 +4,13 @@
 
 import type { BrowsingTree } from '../tree/BrowsingTree';
 import type { LauncherProbe } from '../ports/LauncherProbe';
-import { groupBranchesByTime, type BranchInfo, type TimeGroup } from './TimeGrouper';
+import {
+  groupBranchesByTime,
+  relativeTimestamp,
+  type BranchInfo,
+  type TimeGroup,
+  type RenderableTimeGroup,
+} from './TimeGrouper';
 
 export class LauncherController {
   #tree: BrowsingTree;
@@ -31,12 +37,24 @@ export class LauncherController {
         favicon: node.favicon,
         descendantCount: descendants.length - 1,
         lastVisitedAt: node.lastVisitedAt,
+        screenshotUrl: null,
       };
     });
   }
 
   getTimeGroups(now: number): TimeGroup[] {
     return groupBranchesByTime(this.getBranches(), now);
+  }
+
+  getRenderData(now: number): RenderableTimeGroup[] {
+    const groups = this.getTimeGroups(now);
+    return groups.map((g) => ({
+      label: g.label,
+      branches: g.branches.map((b) => ({
+        ...b,
+        relativeTime: relativeTimestamp(b.lastVisitedAt, now),
+      })),
+    }));
   }
 
   selectBranch(branchId: string): void {

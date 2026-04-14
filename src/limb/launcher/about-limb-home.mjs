@@ -15,69 +15,11 @@
 const GLOBE_ICON = "\u{1F310}";
 
 /**
- * Compute which time group a timestamp belongs to.
- * @param {number} timestamp
- * @param {number} now
- * @returns {string}
- */
-function classifyTimestamp(timestamp, now) {
-  const startOfDay = new Date(now);
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const startOfYesterday = new Date(now);
-  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-  startOfYesterday.setHours(0, 0, 0, 0);
-
-  const startOfWeek = new Date(now);
-  startOfWeek.setHours(0, 0, 0, 0);
-  const day = startOfWeek.getDay();
-  const diff = (day + 6) % 7;
-  startOfWeek.setDate(startOfWeek.getDate() - diff);
-
-  const startOfMonth = new Date(now);
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-
-  if (timestamp >= startOfDay.getTime()) return "Today";
-  if (timestamp >= startOfYesterday.getTime()) return "Yesterday";
-  if (timestamp >= startOfWeek.getTime()) return "This Week";
-  if (timestamp >= startOfMonth.getTime()) return "This Month";
-
-  const d = new Date(timestamp);
-  const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-  ];
-  return `${months[d.getMonth()]} ${d.getFullYear()}`;
-}
-
-/**
- * @param {number} timestamp
- * @param {number} now
- * @returns {string}
- */
-function relativeTime(timestamp, now) {
-  const diffMs = now - timestamp;
-  const minutes = Math.floor(diffMs / 60_000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (minutes < 1) return "just now";
-  if (minutes === 1) return "1 minute ago";
-  if (hours < 1) return `${minutes} minutes ago`;
-  if (hours === 1) return "1 hour ago";
-  if (days < 1) return `${hours} hours ago`;
-  if (days === 1) return "1 day ago";
-  return `${days} days ago`;
-}
-
-/**
  * Create a branch card DOM element.
- * @param {object} branch
- * @param {number} now
+ * @param {object} branch - A RenderableBranch (pre-computed by LauncherController)
  * @returns {HTMLElement}
  */
-function createBranchCard(branch, now) {
+function createBranchCard(branch) {
   const card = document.createElement("div");
   card.className = "branch-card";
   card.dataset.branchId = branch.id;
@@ -103,7 +45,7 @@ function createBranchCard(branch, now) {
   const metaEl = document.createElement("div");
   metaEl.className = "branch-card-meta";
   const pageLabel = branch.descendantCount === 1 ? "page" : "pages";
-  metaEl.textContent = `${branch.descendantCount} ${pageLabel} \u00B7 ${relativeTime(branch.lastVisitedAt, now)}`;
+  metaEl.textContent = `${branch.descendantCount} ${pageLabel} \u00B7 ${branch.relativeTime}`;
 
   infoEl.appendChild(nameEl);
   infoEl.appendChild(metaEl);
@@ -156,16 +98,15 @@ function createNewBranchCard() {
 
 /**
  * Render the launcher UI.
- * @param {object[]} branches - Array of BranchInfo objects
+ * @param {Array<{label: string, branches: object[]}>} groups - Pre-computed RenderableTimeGroup[]
  */
-function render(branches) {
-  const now = Date.now();
+function render(groups) {
   const branchList = document.getElementById("branch-list");
   const emptyState = document.getElementById("empty-state");
 
   branchList.innerHTML = "";
 
-  if (branches.length === 0) {
+  if (groups.length === 0) {
     branchList.hidden = true;
     emptyState.hidden = false;
     return;
@@ -174,48 +115,19 @@ function render(branches) {
   branchList.hidden = false;
   emptyState.hidden = true;
 
-  // Group branches by time
-  const groupOrder = ["Today", "Yesterday", "This Week", "This Month"];
-  const groups = new Map();
-
-  for (const branch of branches) {
-    const label = classifyTimestamp(branch.lastVisitedAt, now);
-    if (!groups.has(label)) {
-      groups.set(label, []);
-    }
-    groups.get(label).push(branch);
-  }
-
-  // Sort branches within each group by lastVisitedAt descending
-  for (const bucket of groups.values()) {
-    bucket.sort((a, b) => b.lastVisitedAt - a.lastVisitedAt);
-  }
-
-  // Render in order: fixed groups first, then older months
-  const fixedLabels = groupOrder.filter((l) => groups.has(l));
-  const olderLabels = [...groups.keys()]
-    .filter((l) => !groupOrder.includes(l))
-    .sort((a, b) => {
-      const latestA = Math.max(...groups.get(a).map((br) => br.lastVisitedAt));
-      const latestB = Math.max(...groups.get(b).map((br) => br.lastVisitedAt));
-      return latestB - latestA;
-    });
-
-  const orderedLabels = [...fixedLabels, ...olderLabels];
-
-  for (const label of orderedLabels) {
+  for (const group of groups) {
     const groupEl = document.createElement("div");
     groupEl.className = "time-group";
 
     const heading = document.createElement("div");
     heading.className = "time-group-heading";
-    heading.textContent = label;
+    heading.textContent = group.label;
 
     const cardsEl = document.createElement("div");
     cardsEl.className = "time-group-cards";
 
-    for (const branch of groups.get(label)) {
-      cardsEl.appendChild(createBranchCard(branch, now));
+    for (const branch of group.branches) {
+      cardsEl.appendChild(createBranchCard(branch));
     }
 
     groupEl.appendChild(heading);

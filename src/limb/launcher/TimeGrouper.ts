@@ -8,11 +8,21 @@ export interface BranchInfo {
   favicon: string | null;
   descendantCount: number;
   lastVisitedAt: number;
+  screenshotUrl: string | null;
 }
 
 export interface TimeGroup {
   label: string;
   branches: BranchInfo[];
+}
+
+export interface RenderableBranch extends BranchInfo {
+  relativeTime: string;
+}
+
+export interface RenderableTimeGroup {
+  label: string;
+  branches: RenderableBranch[];
 }
 
 const MONTH_NAMES = [
