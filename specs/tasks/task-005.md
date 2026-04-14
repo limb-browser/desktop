@@ -3,8 +3,8 @@ title: "Add limb-tree-canvas to browser.xhtml and wire initialization"
 spec_ref: "tree-rendering.md S1.1"
 depends_on:
   - task-002
-progress: ready-for-review
-review: ""
+progress: complete
+review: "specs/reviews/review-TASK_005-R1.md"
 coverage_sections: []
 commits: []
 ---

@@ -19,6 +19,8 @@ export class LimbTreeView {
   #ctx = null;
   /** @type {boolean} */
   #initialized = false;
+  /** @type {(() => void) | null} */
+  #resizeHandler = null;
 
   /**
    * Initialize the tree view with a canvas element.
@@ -32,13 +34,14 @@ export class LimbTreeView {
     this.#paint();
 
     // Resize canvas when window resizes
-    window.addEventListener("resize", () => this.#resize());
+    this.#resizeHandler = () => this.#resize();
+    window.addEventListener("resize", this.#resizeHandler);
   }
 
   #resize() {
     if (!this.#canvas) return;
-    this.#canvas.width = window.innerWidth;
-    this.#canvas.height = window.innerHeight;
+    this.#canvas.width = this.#canvas.clientWidth;
+    this.#canvas.height = this.#canvas.clientHeight;
     this.#paint();
   }
 
@@ -66,6 +69,10 @@ export class LimbTreeView {
   }
 
   destroy() {
+    if (this.#resizeHandler) {
+      window.removeEventListener("resize", this.#resizeHandler);
+      this.#resizeHandler = null;
+    }
     this.#canvas = null;
     this.#ctx = null;
     this.#initialized = false;
