@@ -3,7 +3,7 @@ title: "Implement Places DB persistent storage for tree data and screenshots"
 spec_ref: "persistence.md S1.2 S4"
 depends_on:
   - task-003
-progress: needs-revision
+progress: complete
 review: "specs/reviews/review-TASK_027-R1.md"
 coverage_sections: []
 commits: []
