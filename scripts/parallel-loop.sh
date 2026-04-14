@@ -151,8 +151,18 @@ merge_worker() {
 
   log "<<< Creating PR for $task_name (status: $wt_status)"
 
+  # Rebase worker branch on current dev so squash-merge stays clean.
+  # Other tasks may have merged since this worker started, causing divergence.
+  if ! (cd "$worktree" && git fetch origin dev 2>/dev/null && git rebase origin/dev 2>/dev/null); then
+    log "    !!! Rebase on dev failed for $task_name -- manual conflict resolution needed"
+    git worktree remove "$worktree" --force 2>/dev/null
+    git branch -D "$branch" 2>/dev/null
+    unset "ACTIVE_WORKERS[$task_name]"
+    return 1
+  fi
+
   # Push the worker branch to origin
-  if ! git push origin "$branch" -u 2>/dev/null; then
+  if ! git push origin "$branch" -u --force-with-lease 2>/dev/null; then
     log "    !!! Push failed for $branch"
     git worktree remove "$worktree" --force 2>/dev/null
     git branch -D "$branch" 2>/dev/null
@@ -191,7 +201,8 @@ PREOF
 
     # Auto-merge if LIMB_AUTO_MERGE is set
     if [ "${LIMB_AUTO_MERGE:-}" = "1" ]; then
-      if gh pr merge "$pr_url" --squash --delete-branch 2>/dev/null; then
+      local merge_err
+      if merge_err=$(gh pr merge "$pr_url" --squash --delete-branch 2>&1); then
         log "    PR auto-merged and branch deleted"
         git pull --rebase origin dev 2>/dev/null
         # Update task status on dev to reflect completion
@@ -202,7 +213,7 @@ PREOF
           git push origin dev 2>/dev/null
         fi
       else
-        log "    Auto-merge failed (may need manual review)"
+        log "    Auto-merge failed: $merge_err"
       fi
     fi
   else
