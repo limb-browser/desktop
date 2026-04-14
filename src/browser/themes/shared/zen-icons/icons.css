@@ -5,7 +5,6 @@
  */
 
 .subviewbutton,
-#zen-welcome-start-button,
 .zen-toast button,
 .zen-current-workspace-indicator-chevron,
 .pinned-tabs-container-separator toolbarbutton {
@@ -63,8 +62,7 @@
 }
 
 #sidebar-button:-moz-locale-dir(ltr):not([positionend]),
-#sidebar-button:-moz-locale-dir(rtl)[positionend],
-#zen-toggle-compact-mode {
+#sidebar-button:-moz-locale-dir(rtl)[positionend] {
   list-style-image: url("sidebar.svg") !important;
 
   :root[zen-right-side="true"] & {

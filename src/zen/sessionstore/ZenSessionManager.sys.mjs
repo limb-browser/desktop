@@ -52,8 +52,7 @@ const REGENERATION_DEBOUNCE_RATE_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
  * Class representing the sidebar object stored in the session file.
- * This object holds all the data related to tabs, groups, folders
- * and split view state.
+ * This object holds all the data related to tabs and groups.
  */
 class nsZenSidebarObject {
   #sidebar = {};
@@ -78,7 +77,7 @@ export class nsZenSessionManager {
    */
   #file = null;
   /**
-   * The sidebar object holding tabs, groups, folders and split view data.
+   * The sidebar object holding tabs and groups data.
    *
    * @type {nsZenSidebarObject}
    */
@@ -418,8 +417,7 @@ export class nsZenSessionManager {
       this.#sidebar = sidebar;
     }
     // Restore all windows with the same sidebar object, this will
-    // guarantee that all tabs, groups, folders and split view data
-    // are properly synced across all windows.
+    // guarantee that all tabs and groups are properly synced across all windows.
     if (!this._shouldRunMigration) {
       this.log(
         `Restoring Zen session data into ${initialState.windows?.length || 0} windows`

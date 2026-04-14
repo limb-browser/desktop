@@ -48,7 +48,6 @@ panel {
   }
 }
 
-/* split-view popup */
 #confirmation-hint {
   --arrowpanel-background: var(--zen-colors-primary);
 }

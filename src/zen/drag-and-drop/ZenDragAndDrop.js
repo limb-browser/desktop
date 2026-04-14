@@ -686,10 +686,6 @@
       }
     }
 
-    _clearDragOverSplit() {
-      // Split view removed — no-op
-    }
-
     handle_windowDragEnter(event) {
       if (!this.#isMovingTab() || !this.#isOutOfWindow) {
         return;
@@ -922,7 +918,6 @@
       super.handle_dragend(event);
       thisFromGlobal.clearDragOverVisuals();
       ownerGlobal.gZenPinnedTabManager.removeTabContainersDragoverClass();
-      thisFromGlobal._clearDragOverSplit();
       this.#maybeClearVerticalPinnedGridDragOver();
       thisFromGlobal.originalDragImageArgs = [];
       window.removeEventListener(
@@ -974,16 +969,9 @@
       }
     }
 
-    clearDragOverVisuals({ clearSplitDropIndicator = true } = {}) {
+    clearDragOverVisuals() {
       this.#removeDragOverBackground();
-      if (clearSplitDropIndicator) {
-        this._clearDragOverSplit();
-      }
       gZenPinnedTabManager.removeTabContainersDragoverClass();
-    }
-
-    #canDropIntoFolder(_dropElement, _draggedTab) {
-      return true;
     }
 
     _moveTogetherSelectedTabs() {

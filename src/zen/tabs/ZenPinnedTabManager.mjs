@@ -199,8 +199,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
   _setResetPinSublabel(tab, accelHeld) {
     let label = tab.querySelector(".zen-tab-sublabel");
     const getLabel = b => (b ? "zen-default-pinned-cmd" : "zen-default-pinned");
-    // We might not want to change the sublabel if it was already customized by,
-    // for example, live folders, so only change it if it's currently the default one.
+    // Only change the sublabel if it's currently the default one.
     if (
       document.l10n.getAttributes(label).args.tabSubtitle !=
       getLabel(!accelHeld)

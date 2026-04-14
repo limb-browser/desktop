@@ -56,8 +56,7 @@
   Very Special Occasions - Complex Layout Fixes
   ========================================================================== */
 
-/* Exclude these complex fixes if in compact mode */
-:root:not([zen-compact-mode='true']) {
+:root {
 
   /* --- Fix: Right Sidebar + Collapsed + Standard Window Buttons --- */
   &[zen-right-side='true']:not([zen-sidebar-expanded='true']):not([zen-window-buttons-reversed='true']) {

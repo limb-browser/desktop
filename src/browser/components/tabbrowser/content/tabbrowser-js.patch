@@ -736,7 +736,7 @@ index d88bc0e5570c8fd428a84fdf5af0f6bab1e2a636..aed843d26eaf56d66883f95c373d4010
       */
      isTabGroup(element) {
 -      return !!(element?.tagName == "tab-group");
-+      return !!(element?.tagName == "tab-group" || element?.tagName == "zen-folder");
++      return !!(element?.tagName == "tab-group");
      }
  
      /**

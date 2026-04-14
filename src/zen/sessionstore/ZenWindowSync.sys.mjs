@@ -1044,8 +1044,7 @@ class nsZenWindowSync {
     let activeTabs = activeBrowsers.map(browser =>
       aWindow.gBrowser.getTabForBrowser(browser)
     );
-    // Ignore previous tabs that are still "active". These scenarios could happen for example,
-    // when selecting on a split view tab that was already active.
+    // Ignore previous tabs that are still "active".
     if (
       aPreviousTab?._zenContentsVisible &&
       !activeTabs.includes(aPreviousTab)
@@ -1531,9 +1530,7 @@ class nsZenWindowSync {
 
   on_TabUngrouped() {
     // No need to sync anything when a tab is ungrouped, since on_TabMove will take
-    // care of moving the tab to the correct position. We still need to listen to this
-    // in order to throw sync events for other components such as live folders to
-    // update their state, but we don't need to do anything here.
+    // care of moving the tab to the correct position.
     return Promise.resolve();
   }
 
