@@ -21,7 +21,7 @@ commits: []
 
 ## Current State
 
-BrowsingTree (task-003) manages tree data in memory only. SessionStore persistence (task-023) will persist active branch tabs via tab attributes. No persistent storage exists for inactive branch tree structure or screenshots across browser restarts. Tasks that need persistent storage (task-028 lazy loading, task-030 screenshot eviction, task-032 search) have no backend to read from or write to.
+BrowsingTree (task-003) manages tree data in memory only. SessionStore persistence (task-023) will persist active branch tabs via tab attributes. No persistent storage exists for inactive branch tree structure or screenshots across browser restarts. Tasks that need persistent storage (task-028 lazy loading, task-031 screenshot eviction, task-033 search) have no backend to read from or write to.
 
 ## What To Build
 
