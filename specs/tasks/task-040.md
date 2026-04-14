@@ -4,7 +4,7 @@ spec_ref: "navigation.md S1.1"
 depends_on:
   - task-012
   - task-014
-  - task-030
+  - task-033
 progress: not-started
 review: ""
 coverage_sections: []
@@ -31,7 +31,7 @@ Link interception (task-012) creates child nodes for new-tab links. Click-to-foc
    - Phase 2 (hold): Brief pause at the intermediate level so the user sees the new branch. Duration: ~150ms.
    - Phase 3 (zoom in): Animate from intermediate level to 1.0 centered on the new child node. Duration: ~250ms, ease-out.
    - Total duration: ~600ms.
-3. During the animation, the tree layout should update to show the new node (the add-node animation from task-030 plays concurrently with the zoom-out phase).
+3. During the animation, the tree layout should update to show the new node (the add-node animation from task-033 plays concurrently with the zoom-out phase).
 4. If the user initiates any input (scroll, click) during the animation, cancel and jump to the final state (zoomed into the new child).
 5. Skip the animation when `zoomLevel < 0.9` (the user is already seeing the tree, so just focus the new node normally).
 6. Write tests for:
