@@ -19,7 +19,7 @@ commits: []
 
 ## Current State
 
-FrameScheduler (task-022) manages the demand-driven frame loop. Click-to-focus (task-014) introduces the first zoom animation. Subsequent tasks add more animation systems: layout animation (task-029), zoom-out reveal (task-038), zoom-out-and-back (task-040). Each animation manages its own state independently with no shared coordination. Frame budget enforcement (task-041) adds skip-to-end but does not address coordination between concurrent animations.
+FrameScheduler (task-022) manages the demand-driven frame loop. Click-to-focus (task-014) introduces the first zoom animation. Subsequent tasks add more animation systems: layout animation (task-030), zoom-out reveal (task-038), zoom-out-and-back (task-040). Each animation manages its own state independently with no shared coordination. Frame budget enforcement (task-041) adds skip-to-end but does not address coordination between concurrent animations.
 
 ## What To Build
 
