@@ -24,9 +24,9 @@ Each tree node stores:
 
 Firefox's SessionStore already persists tab state, history, scroll position, and form data. Limb extends this with tree metadata:
 
-- `zen-tree-node-id` attribute on each tab
-- `zen-tree-parent-id` for tree relationships
-- `zen-tree-created-at` timestamp
+- `limb-node-id` attribute on each tab
+- `limb-tree-parent-id` for tree relationships
+- `limb-tree-created-at` timestamp
 
 On restore, Limb rebuilds the BrowsingTree from these attributes.
 
