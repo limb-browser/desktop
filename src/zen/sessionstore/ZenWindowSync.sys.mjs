@@ -65,9 +65,6 @@ const EVENTS = [
   "TabHide",
   "TabShow",
 
-  "ZenTabRemovedFromSplit",
-  "ZenSplitViewTabsSplit",
-
   ...INSTANT_EVENTS,
   ...UNSYNCED_WINDOW_EVENTS,
 ];
@@ -532,35 +529,6 @@ class nsZenWindowSync {
         "zen-workspace-id"
       );
       this.#syncItemPosition(aOriginalItem, aTargetItem, aWindow);
-    }
-    if (aOriginalItem.hasAttribute("zen-live-folder-item-id")) {
-      this.#maybeSyncAttributeChange(
-        aOriginalItem,
-        aTargetItem,
-        "zen-live-folder-item-id"
-      );
-      this.#maybeSyncAttributeChange(
-        aOriginalItem,
-        aTargetItem,
-        "zen-show-sublabel"
-      );
-      this.#syncTabSubtitle(aWindow, aOriginalItem, aTargetItem);
-    } else if (aTargetItem.hasAttribute("zen-live-folder-item-id")) {
-      aTargetItem.removeAttribute("zen-live-folder-item-id");
-      if (aTargetItem.hasAttribute("zen-show-sublabel")) {
-        this.#syncTabSubtitle(aWindow, aOriginalItem, aTargetItem);
-        aTargetItem.removeAttribute("zen-show-sublabel");
-      }
-    }
-  }
-
-  #syncTabSubtitle(aWindow, aOriginalItem, aTargetItem) {
-    const subLabel = aOriginalItem.getAttribute("zen-show-sublabel");
-    const targetLabel = aTargetItem.querySelector(".zen-tab-sublabel");
-    if (targetLabel) {
-      aWindow.document.l10n.setArgs(targetLabel, {
-        tabSubtitle: subLabel || "zen-default-pinned",
-      });
     }
   }
 
@@ -1310,9 +1278,6 @@ class nsZenWindowSync {
         SYNC_FLAG_ICON | SYNC_FLAG_LABEL | SYNC_FLAG_MOVE
       );
     });
-    if (ignoreExistingId && tab?.splitView) {
-      this.on_ZenSplitViewTabsSplit({ target: tab.group });
-    }
   }
 
   on_ZenTabIconChanged(aEvent) {
@@ -1572,20 +1537,6 @@ class nsZenWindowSync {
     return Promise.resolve();
   }
 
-  on_ZenTabRemovedFromSplit(_aEvent) {
-    // Split view removed — no-op
-  }
-
-  on_ZenSplitViewTabsSplit(_aEvent) {
-    // Split view removed — no-op
-    });
-
-    return new Promise(resolve => {
-      lazy.setTimeout(() => {
-        this.#onTabSwitchOrWindowFocus(window, null).finally(resolve);
-      }, 0);
-    });
-  }
 }
 
 // eslint-disable-next-line mozilla/valid-lazy

@@ -55,7 +55,7 @@ index 24196c658309b1d3c049939f57a13c22d422a153..0cf49a0dc18b34a5be2fad8d2b124c7c
            return null;
          }
 -        if (filter(tab)) {
-+        if (filter(tab) && !tab.hasAttribute("zen-glance-tab") && !tab.hasAttribute("zen-empty-tab")) {
++        if (filter(tab) && !tab.hasAttribute("zen-empty-tab")) {
            return tab;
          }
        }

@@ -48,7 +48,7 @@ index e4266a159a0d5c42cc294602d00b8f66131f35d5..f3e362f062063ebe08bd26cc694f2d96
  
      set _visuallySelected(val) {
 -      if (val == this.hasAttribute("visuallyselected")) {
-+      if (val == this.hasAttribute("visuallyselected") || (!val && this.linkedBrowser?.closest('.browserSidebarContainer').classList.contains('zen-glance-background'))) {
++      if (val == this.hasAttribute("visuallyselected")) {
          return;
        }
  
@@ -133,10 +133,6 @@ index e4266a159a0d5c42cc294602d00b8f66131f35d5..f3e362f062063ebe08bd26cc694f2d96
        this.style.MozUserFocus = "";
      }
  
-+    get glanceTab() {
-+      return this.querySelector("tab[zen-glance-tab]");
-+    }
-+
      on_click(event) {
        if (event.button != 0) {
          return;

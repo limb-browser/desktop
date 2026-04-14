@@ -7,7 +7,7 @@
   & #tabbrowser-tabbox #tabbrowser-tabpanels .browserSidebarContainer {
     overflow: clip;
 
-    :root:not([zen-no-padding="true"]) &:not(.zen-glance-overlay) {
+    :root:not([zen-no-padding="true"]) & {
       border-radius: var(--zen-native-inner-radius);
       box-shadow: var(--zen-big-shadow);
     }

@@ -6,9 +6,6 @@ index ced2bfd88de2d16e2c028ca3f4d9d27516363575..69b45c7dad9d294e4290de4ce878d184
     * @returns {MozTabbrowserTab|vbox}
     */
    const elementToMove = element => {
-+    if (element.group?.hasAttribute("split-view-group")) {
-+      return element.group;
-+    }
      if (isTab(element) || isSplitViewWrapper(element)) {
        return element;
      }
@@ -164,9 +161,6 @@ index ced2bfd88de2d16e2c028ca3f4d9d27516363575..69b45c7dad9d294e4290de4ce878d184
            return null;
          }
        }
-+      if (target?.group?.hasAttribute("split-view-group")) {
-+        target = target.group.labelElement;
-+      }
        return target;
      }
  

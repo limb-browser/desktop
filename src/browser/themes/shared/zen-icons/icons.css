@@ -37,7 +37,6 @@
 
 #stop-button,
 .close-icon,
-.zen-glance-sidebar-close,
 .zen-theme-picker-custom-list-item-remove,
 #appMenu-quit-button2 {
   list-style-image: url("close.svg") !important;
@@ -262,7 +261,6 @@
 
 #restore-button,
 #fullscreen-button,
-.zen-glance-sidebar-open,
 #appMenu-fullscreen-button2,
 .zen-tab-unsplit-button {
   list-style-image: url("fullscreen.svg") !important;
@@ -440,15 +438,6 @@
 #pageAction-panel-bookmark[starred],
 #star-button[starred] {
   list-style-image: url("bookmark.svg") !important;
-}
-
-.zen-glance-sidebar-split {
-  list-style-image: url("split.svg");
-
-  &[disabled="true"] {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
 }
 
 #sidebar-box[sidebarcommand="viewTabsSidebar"] > #sidebar-header > #sidebar-switcher-target > #sidebar-icon,

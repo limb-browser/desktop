@@ -749,8 +749,6 @@ export class nsZenSessionManager {
     sidebarData.tabs = this.#collectUsedTabsFromWindows(aStateWindows);
 
     let firstWindow = aStateWindows[0];
-    sidebarData.folders = firstWindow.folders;
-    sidebarData.splitViewData = firstWindow.splitViewData;
     sidebarData.groups = firstWindow.groups;
     sidebarData.spaces = firstWindow.spaces;
   }
@@ -778,13 +776,7 @@ export class nsZenSessionManager {
       }
       aWindowData.tabs = [...pinnedTabs, ...unpinedWindowTabs];
 
-      // We restore ALL the split view data in the sidebar, if the group doesn't exist in the window,
-      // it should be a no-op anyways.
-      aWindowData.splitViewData = [
-        ...(sidebar.splitViewData || []),
-        ...(aWindowData.splitViewData || []),
-      ];
-      // Same thing with groups, we restore all the groups from the sidebar, if they don't have any
+      // We restore all the groups from the sidebar, if they don't have any
       // existing tabs in the window, they should be a no-op.
       aWindowData.groups = [
         ...(sidebar.groups || []),
@@ -792,17 +784,13 @@ export class nsZenSessionManager {
       ];
     } else {
       aWindowData.tabs = sidebar.tabs || [];
-      aWindowData.splitViewData = sidebar.splitViewData;
       aWindowData.groups = sidebar.groups;
     }
 
-    // Folders are always pinned, so we dont need to check for the pinned state here.
-    aWindowData.folders = sidebar.folders;
     aWindowData.spaces = sidebar.spaces;
     this.log("Restored sidebar data into window", {
       tabs: aWindowData.tabs?.length || 0,
       groups: aWindowData.groups?.length || 0,
-      folders: aWindowData.folders?.length || 0,
       spaces: aWindowData.spaces?.length || 0,
     });
   }

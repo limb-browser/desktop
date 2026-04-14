@@ -182,8 +182,6 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
        tabState.pinned = false;
 +      tabState.zenEssential = false;
 +      tabState.zenSyncId = null;
-+      tabState.zenIsGlance = false;
-+      tabState.zenGlanceId = null;
 +      tabState.zenHasStaticLabel = false;
 
        if (inBackground === false) {
