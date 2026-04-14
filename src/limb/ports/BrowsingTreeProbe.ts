@@ -6,4 +6,6 @@ export interface BrowsingTreeProbe {
   childAdded(parentId: string, childId: string): void;
   nodeRemoved(nodeId: string, descendantIds: string[]): void;
   nodeFocused(nodeId: string): void;
+  treeSizeWarning(nodeCount: number): void;
+  treeSizeSuggestion(nodeCount: number): void;
 }

@@ -23,6 +23,8 @@ export class BrowsingTree {
   nodes: Map<string, TreeNode>;
   focusedNodeId: string;
   #probe: BrowsingTreeProbe | null;
+  #warningFired = false;
+  #suggestionFired = false;
 
   constructor(rootUrl: string, probe?: BrowsingTreeProbe) {
     this.#probe = probe ?? null;
@@ -66,6 +68,7 @@ export class BrowsingTree {
     parent.childIds.push(child.id);
     this.nodes.set(child.id, child);
     this.#probe?.childAdded(parentId, child.id);
+    this.#checkTreeSize();
     return child;
   }
 
@@ -193,5 +196,17 @@ export class BrowsingTree {
       .filter((id) => id !== nodeId)
       .map((id) => this.nodes.get(id)!)
       .filter(Boolean);
+  }
+
+  #checkTreeSize(): void {
+    const count = this.nodes.size;
+    if (!this.#suggestionFired && count > 200) {
+      this.#suggestionFired = true;
+      this.#probe?.treeSizeSuggestion(count);
+    }
+    if (!this.#warningFired && count > 100) {
+      this.#warningFired = true;
+      this.#probe?.treeSizeWarning(count);
+    }
   }
 }

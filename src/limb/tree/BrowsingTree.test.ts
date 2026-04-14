@@ -21,6 +21,12 @@ function createFakeProbe(): BrowsingTreeProbe & {
     nodeFocused(nodeId: string) {
       calls.push({ method: 'nodeFocused', args: [nodeId] });
     },
+    treeSizeWarning(nodeCount: number) {
+      calls.push({ method: 'treeSizeWarning', args: [nodeCount] });
+    },
+    treeSizeSuggestion(nodeCount: number) {
+      calls.push({ method: 'treeSizeSuggestion', args: [nodeCount] });
+    },
   };
 }
 
@@ -433,6 +439,68 @@ describe('BrowsingTree', () => {
       tree.focusNode(child.id);
       tree.removeNode(child.id);
       expect(tree.nodes.has(tree.focusedNodeId)).toBe(true);
+    });
+  });
+
+  describe('tree size warnings', () => {
+    function addNodes(tree: BrowsingTree, count: number): void {
+      for (let i = 0; i < count; i++) {
+        tree.addChild(tree.rootId, `https://node-${i}.com`);
+      }
+    }
+
+    it('does not fire warning at 100 nodes or below', () => {
+      addNodes(tree, 99); // 99 children + 1 root = 100 nodes
+      const warnings = probe.calls.filter(
+        (c) => c.method === 'treeSizeWarning'
+      );
+      expect(warnings).toHaveLength(0);
+    });
+
+    it('fires treeSizeWarning probe when tree exceeds 100 nodes', () => {
+      addNodes(tree, 100); // 100 children + 1 root = 101 nodes
+      const warnings = probe.calls.filter(
+        (c) => c.method === 'treeSizeWarning'
+      );
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].args[0]).toBe(101);
+    });
+
+    it('fires treeSizeSuggestion probe when tree exceeds 200 nodes', () => {
+      addNodes(tree, 200); // 200 children + 1 root = 201 nodes
+      const suggestions = probe.calls.filter(
+        (c) => c.method === 'treeSizeSuggestion'
+      );
+      expect(suggestions).toHaveLength(1);
+      expect(suggestions[0].args[0]).toBe(201);
+    });
+
+    it('fires warning only once per session', () => {
+      addNodes(tree, 105); // will exceed 100 at the 100th child
+      const warnings = probe.calls.filter(
+        (c) => c.method === 'treeSizeWarning'
+      );
+      expect(warnings).toHaveLength(1);
+    });
+
+    it('fires suggestion only once per session', () => {
+      addNodes(tree, 205); // will exceed 200 at the 200th child
+      const suggestions = probe.calls.filter(
+        (c) => c.method === 'treeSizeSuggestion'
+      );
+      expect(suggestions).toHaveLength(1);
+    });
+
+    it('fires both warning and suggestion at correct thresholds', () => {
+      addNodes(tree, 200); // 201 total
+      const warnings = probe.calls.filter(
+        (c) => c.method === 'treeSizeWarning'
+      );
+      const suggestions = probe.calls.filter(
+        (c) => c.method === 'treeSizeSuggestion'
+      );
+      expect(warnings).toHaveLength(1);
+      expect(suggestions).toHaveLength(1);
     });
   });
 
