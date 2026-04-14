@@ -36,11 +36,13 @@ ZoomState (task-007) provides zoom level and coordinate transforms. BrowsingTree
    - Apply hysteresis: maintain previous tier state, use enter/exit thresholds.
 2. Track previous frame's tier per node for hysteresis calculation.
 3. Enforce invariants:
-   - Focused node is always Live or Focused tier.
+   - Focused node is always Live or Focused tier (overrides other rules).
    - Every visible node has a tier (no undefined state).
+   - Tier transitions are monotonic: a non-focused node changes at most one tier per LOD computation cycle (e.g., Culled → Favicon, not Culled → Live in one frame). The focused node is exempt — it jumps directly to Live/Focused.
 4. Integrate with LimbTreeView: call LOD computation each frame, use tiers to decide what to paint.
 5. Write tests for:
    - Tier assignment at each threshold boundary.
    - Hysteresis prevents thrashing at boundaries.
    - Focused node never drops below Live.
+   - Monotonic transitions: non-focused node steps through one tier at a time across frames.
    - Culling margin works correctly.
