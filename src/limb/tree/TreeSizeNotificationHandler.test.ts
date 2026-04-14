@@ -25,7 +25,7 @@ function createFakeNotificationPort(): NotificationPort & {
 describe('TreeSizeNotificationHandler', () => {
   it('shows warning notification with correct message on treeSizeWarning', () => {
     const port = createFakeNotificationPort();
-    const handler = new TreeSizeNotificationHandler(port);
+    const handler = new TreeSizeNotificationHandler(port, () => {});
     handler.onTreeSizeWarning(101);
     expect(port.notifications).toHaveLength(1);
     expect(port.notifications[0].message).toBe(
@@ -35,7 +35,7 @@ describe('TreeSizeNotificationHandler', () => {
 
   it('shows suggestion notification with correct message on treeSizeSuggestion', () => {
     const port = createFakeNotificationPort();
-    const handler = new TreeSizeNotificationHandler(port);
+    const handler = new TreeSizeNotificationHandler(port, () => {});
     handler.onTreeSizeSuggestion(201);
     expect(port.notifications).toHaveLength(1);
     expect(port.notifications[0].message).toBe(
@@ -45,16 +45,29 @@ describe('TreeSizeNotificationHandler', () => {
 
   it('includes a "Show branches" action on treeSizeSuggestion', () => {
     const port = createFakeNotificationPort();
-    const handler = new TreeSizeNotificationHandler(port);
+    const onShowBranches = () => {};
+    const handler = new TreeSizeNotificationHandler(port, onShowBranches);
     handler.onTreeSizeSuggestion(201);
     expect(port.notifications[0].actions).toBeDefined();
     expect(port.notifications[0].actions).toHaveLength(1);
     expect(port.notifications[0].actions![0].label).toBe('Show branches');
   });
 
+  it('invokes injected onShowBranches callback when "Show branches" action is triggered', () => {
+    const port = createFakeNotificationPort();
+    let called = false;
+    const onShowBranches = () => {
+      called = true;
+    };
+    const handler = new TreeSizeNotificationHandler(port, onShowBranches);
+    handler.onTreeSizeSuggestion(201);
+    port.notifications[0].actions![0].callback();
+    expect(called).toBe(true);
+  });
+
   it('does not include actions on treeSizeWarning', () => {
     const port = createFakeNotificationPort();
-    const handler = new TreeSizeNotificationHandler(port);
+    const handler = new TreeSizeNotificationHandler(port, () => {});
     handler.onTreeSizeWarning(101);
     expect(port.notifications[0].actions).toBeUndefined();
   });

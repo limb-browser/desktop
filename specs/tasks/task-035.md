@@ -4,7 +4,7 @@ spec_ref: "performance.md S5.2"
 depends_on:
   - task-003
 progress: complete
-review: "specs/reviews/review-TASK_035-R1.md"
+review: "specs/reviews/review-TASK_035-R3.md"
 coverage_sections: []
 commits: []
 ---
