@@ -90,7 +90,7 @@ When `level < 0.9`, click-and-drag pans the viewport (adjusts `focusPoint`). Thi
 
 ### S4.1 Zoom Animation
 
-When clicking a node to focus it, the zoom animates from current `level` to `1.0` over 300ms with ease-out timing. During animation, LOD tiers update each frame.
+When clicking a node to focus it, the zoom animates from current `level` to `1.0` over 350ms with ease-out timing (see interaction-feel.md S1.3 for the exact easing curve). During animation, LOD tiers update each frame.
 
 ### S4.2 Layout Animation
 

@@ -28,7 +28,7 @@ The canvas renders tree nodes (task-006) and zoom works (task-007). Focus sync e
    - Find which node (if any) was clicked by checking if the click point is within any node's bounding rectangle.
 2. When a node is clicked and `zoomLevel < 0.9`:
    - Call `BrowsingTree.focusNode(clickedNodeId)`.
-   - Animate zoom from current level to 1.0 over 300ms using ease-out timing `cubic-bezier(0.25, 0.1, 0.25, 1.0)`.
+   - Animate zoom from current level to 1.0 over 350ms using ease-out timing `cubic-bezier(0.25, 0.1, 0.25, 1.0)` (per interaction-feel.md S1.3).
    - Animate `focusPoint` to the clicked node's position.
 3. Use `requestAnimationFrame` for the animation loop. Update LOD tiers each frame during animation.
 4. If user clicks while an animation is running, cancel the current animation and start a new one.
