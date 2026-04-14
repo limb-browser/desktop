@@ -52,7 +52,7 @@ function makeNode(overrides: Partial<StoredNode> & { id: string }): StoredNode {
   };
 }
 
-describe('TreeStorage', () => {
+describe('InMemoryTreeStorage', () => {
   let storage: InMemoryTreeStorage;
   let probe: ReturnType<typeof createFakeProbe>;
 
@@ -164,6 +164,16 @@ describe('TreeStorage', () => {
         method: 'branchLoaded',
         args: ['r', 1],
       });
+    });
+
+    it('rejects nodes whose branchRootId does not match the parameter', async () => {
+      const node = makeNode({
+        id: 'child-1',
+        branchRootId: 'wrong-root',
+      });
+      await expect(
+        storage.saveBranch('correct-root', [node])
+      ).rejects.toThrow('branchRootId');
     });
 
     it('fires branchLoaded probe with 0 nodes for non-existent branch', async () => {

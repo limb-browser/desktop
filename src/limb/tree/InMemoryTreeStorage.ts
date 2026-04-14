@@ -28,6 +28,14 @@ export class InMemoryTreeStorage implements TreeStoragePort {
   }
 
   async saveBranch(branchRootId: string, nodes: StoredNode[]): Promise<void> {
+    for (const node of nodes) {
+      if (node.branchRootId !== branchRootId) {
+        throw new Error(
+          `Node "${node.id}" has branchRootId "${node.branchRootId}" but saveBranch was called with "${branchRootId}"`
+        );
+      }
+    }
+
     // Remove existing nodes for this branch before saving
     for (const [id, node] of this.#nodes) {
       if (node.branchRootId === branchRootId) {
@@ -173,5 +181,9 @@ export class InMemoryTreeStorage implements TreeStoragePort {
       total += screenshot.data.byteLength;
     }
     return total;
+  }
+
+  async close(): Promise<void> {
+    // No-op for in-memory implementation
   }
 }

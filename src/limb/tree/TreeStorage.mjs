@@ -110,10 +110,11 @@ export class TreeStorage {
           )
         `);
 
-        await db.execute(`
-          INSERT OR REPLACE INTO limb_meta (key, value)
-          VALUES ('schema_version', '${SCHEMA_VERSION}')
-        `);
+        await db.execute(
+          `INSERT OR REPLACE INTO limb_meta (key, value)
+          VALUES ('schema_version', :schemaVersion)`,
+          { schemaVersion: String(SCHEMA_VERSION) }
+        );
       }
     });
 
@@ -126,6 +127,16 @@ export class TreeStorage {
    * @param {Array<object>} nodes - Array of StoredNode objects
    */
   async saveBranch(branchRootId, nodes) {
+    for (const node of nodes) {
+      if (node.branchRootId !== branchRootId) {
+        throw new Error(
+          "Node \"" + node.id + "\" has branchRootId \"" +
+          node.branchRootId + "\" but saveBranch was called with \"" +
+          branchRootId + "\""
+        );
+      }
+    }
+
     const db = await this.#getDb();
 
     await db.executeTransaction(async () => {
@@ -314,12 +325,14 @@ export class TreeStorage {
 
     const db = await this.#getDb();
 
-    for (const nodeId of nodeIds) {
-      await db.execute(
-        "DELETE FROM limb_screenshots WHERE node_id = :nodeId",
-        { nodeId }
-      );
-    }
+    await db.executeTransaction(async () => {
+      for (const nodeId of nodeIds) {
+        await db.execute(
+          "DELETE FROM limb_screenshots WHERE node_id = :nodeId",
+          { nodeId }
+        );
+      }
+    });
 
     this.#probe?.screenshotsDeleted(nodeIds);
   }
