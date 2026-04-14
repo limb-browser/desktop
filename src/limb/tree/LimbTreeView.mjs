@@ -75,3 +75,8 @@ export class LimbTreeView {
     return this.#initialized;
   }
 }
+
+// Expose on window for browser-init.js initialization
+if (typeof window !== "undefined") {
+  window.LimbTreeView = LimbTreeView;
+}
