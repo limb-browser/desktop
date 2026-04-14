@@ -505,7 +505,7 @@ class nsZenWindowSync {
     if (!aOriginalItem || !aTargetItem) {
       return;
     }
-    const { gBrowser, gZenFolders } = aWindow;
+    const { gBrowser } = aWindow;
     if (flags & SYNC_FLAG_ICON) {
       aTargetItem.zenStaticIcon = aOriginalItem.zenStaticIcon;
       if (gBrowser.isTab(aOriginalItem)) {
@@ -513,9 +513,6 @@ class nsZenWindowSync {
           aTargetItem,
           aOriginalItem.getAttribute("image") || gBrowser.getIcon(aOriginalItem)
         );
-      } else if (aOriginalItem.isZenFolder) {
-        // Icons are a zen-only feature for tab groups.
-        gZenFolders.setFolderUserIcon(aTargetItem, aOriginalItem.iconURL);
       }
     }
     if (flags & SYNC_FLAG_LABEL) {
@@ -1545,9 +1542,7 @@ class nsZenWindowSync {
         return; // Do not proceed with creation.
       }
 
-      const newGroup = isFolder
-        ? win.gZenFolders.createFolder([], {})
-        : win.gBrowser.addTabGroup([]);
+      const newGroup = win.gBrowser.addTabGroup([]);
       newGroup.id = tabGroup.id;
       newGroup.alreadySynced = true;
       this.#syncItemWithOriginal(
@@ -1593,45 +1588,12 @@ class nsZenWindowSync {
     return Promise.resolve();
   }
 
-  on_ZenTabRemovedFromSplit(aEvent) {
-    const tab = aEvent.target;
-    const window = tab.ownerGlobal;
-    this.#runOnAllWindows(window, win => {
-      const targetTab = this.getItemFromWindow(win, tab.id);
-      if (targetTab && win.gZenViewSplitter) {
-        win.gZenViewSplitter.removeTabFromGroup(targetTab);
-      }
-    });
+  on_ZenTabRemovedFromSplit(_aEvent) {
+    // Split view removed — no-op
   }
 
-  on_ZenSplitViewTabsSplit(aEvent) {
-    const tabGroup = aEvent.target;
-    const window = tabGroup.ownerGlobal;
-    const tabs = tabGroup.tabs;
-    this.#runOnAllWindows(window, win => {
-      const otherWindowTabs = tabs
-        .map(tab => this.getItemFromWindow(win, tab.id))
-        .filter(Boolean);
-      if (otherWindowTabs.length && win.gZenViewSplitter) {
-        const group = win.gZenViewSplitter.splitTabs(
-          otherWindowTabs,
-          undefined,
-          -1,
-          {
-            groupFetchId: tabGroup.id,
-          }
-        );
-        if (group) {
-          let otherTabGroup = group.tabs[0].group;
-          otherTabGroup.id = tabGroup.id;
-          this.#syncItemWithOriginal(
-            aEvent.target,
-            otherTabGroup,
-            win,
-            SYNC_FLAG_MOVE
-          );
-        }
-      }
+  on_ZenSplitViewTabsSplit(_aEvent) {
+    // Split view removed — no-op
     });
 
     return new Promise(resolve => {

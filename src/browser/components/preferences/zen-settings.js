@@ -29,7 +29,13 @@ var gZenMarketplaceManager = {
     }
 
     if (!window.gZenMods) {
-      window.gZenMods = nsZenMultiWindowFeature.currentBrowser.gZenMods;
+      try {
+        window.gZenMods = nsZenMultiWindowFeature.currentBrowser.gZenMods;
+      } catch (e) {}
+    }
+
+    if (!window.gZenMods) {
+      return; // Mods module removed
     }
 
     header.appendChild(this._initDisableAll());
@@ -733,8 +739,6 @@ var gZenWorkspacesSettings = {
 
     toggleZenCycleByAttrWarning.observe(); // call it once on initial load
 
-    Services.prefs.addObserver("zen.glance.enabled", tabsUnloaderPrefListener);
-    Services.prefs.addObserver("zen.glance.activation-method", tabsUnloaderPrefListener);
     Services.prefs.addObserver("zen.window-sync.sync-only-pinned-tabs", tabsUnloaderPrefListener);
     Services.prefs.addObserver(
       "zen.tabs.ctrl-tab.ignore-essential-tabs",
@@ -742,8 +746,6 @@ var gZenWorkspacesSettings = {
     );
     Services.prefs.addObserver("browser.ctrlTab.sortByRecentlyUsed", toggleZenCycleByAttrWarning);
     window.addEventListener("unload", () => {
-      Services.prefs.removeObserver("zen.glance.enabled", tabsUnloaderPrefListener);
-      Services.prefs.removeObserver("zen.glance.activation-method", tabsUnloaderPrefListener);
       Services.prefs.removeObserver(
         "zen.window-sync.sync-only-pinned-tabs",
         tabsUnloaderPrefListener
@@ -779,8 +781,6 @@ const zenMissingKeyboardShortcutL10n = {
   key_wrCaptureCmd: "zen-key-wr-capture-cmd",
   key_wrToggleCaptureSequenceCmd: "zen-key-wr-toggle-capture-sequence-cmd",
   key_undoCloseWindow: "zen-key-undo-close-window",
-
-  "zen-glance-expand": "zen-glance-expand",
 
   key_selectTab1: "zen-key-select-tab-1",
   key_selectTab2: "zen-key-select-tab-2",
@@ -1147,16 +1147,6 @@ Preferences.addAll([
     id: "zen.pinned-tab-manager.close-shortcut-behavior",
     type: "string",
     default: "switch",
-  },
-  {
-    id: "zen.glance.activation-method",
-    type: "string",
-    default: "ctrl",
-  },
-  {
-    id: "zen.glance.enabled",
-    type: "bool",
-    default: true,
   },
   {
     id: "zen.urlbar.behavior",

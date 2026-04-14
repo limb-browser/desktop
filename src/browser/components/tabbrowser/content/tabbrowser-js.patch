@@ -6,7 +6,7 @@ index d88bc0e5570c8fd428a84fdf5af0f6bab1e2a636..aed843d26eaf56d66883f95c373d4010
       * @type {MozBrowser[]}
       */
      get splitViewBrowsers() {
-+      return gZenViewSplitter.splitViewBrowsers;
++      return [];
        const browsers = [];
        if (this.#activeSplitView) {
          for (const tab of this.#activeSplitView.tabs) {
@@ -102,19 +102,15 @@ index d88bc0e5570c8fd428a84fdf5af0f6bab1e2a636..aed843d26eaf56d66883f95c373d4010
        }
  
        this.showTab(aTab);
-+      const handled = gZenFolders.handleTabPin(aTab);
-+      if (!handled) {
-+        this.ungroupTab(aTab);
++      this.ungroupTab(aTab);
        this.#handleTabMove(aTab, () => {
          let periphery = document.getElementById(
            "pinned-tabs-container-periphery"
          );
          // If periphery is null, append to end
--        this.pinnedTabsContainer.insertBefore(aTab, periphery);
 +        this.tabContainer.tabDragAndDrop.handle_drop_transition(this.tabs[this.pinnedTabCount - 1], aTab, [aTab], false);
 +        this.pinnedTabsContainer.insertBefore(aTab, this.pinnedTabsContainer.lastChild)
        });
-+      }
  
        aTab.setAttribute("pinned", "true");
        this._updateTabBarForPinnedTabs();
@@ -122,10 +118,7 @@ index d88bc0e5570c8fd428a84fdf5af0f6bab1e2a636..aed843d26eaf56d66883f95c373d4010
        }
  
        this.#handleTabMove(aTab, () => {
-+        const handled = gZenFolders.handleTabUnpin(aTab);
-+        if (!handled) {
-+          this.tabContainer.tabDragAndDrop.handle_drop_transition(this.tabs[this.pinnedTabCount + 1 /* empty + extra */], aTab, [aTab], true);
-+        }
++        this.tabContainer.tabDragAndDrop.handle_drop_transition(this.tabs[this.pinnedTabCount + 1 /* empty + extra */], aTab, [aTab], true);
 +
          // we remove this attribute first, so that allTabs represents
          // the moving of a tab from the pinned tabs container
@@ -133,9 +126,7 @@ index d88bc0e5570c8fd428a84fdf5af0f6bab1e2a636..aed843d26eaf56d66883f95c373d4010
          aTab.removeAttribute("pinned");
 -        this.tabContainer.arrowScrollbox.prepend(aTab);
 +        aTab.removeAttribute("zen-essential");
-+        if (!handled) {
-+          this.tabContainer.arrowScrollbox.prepend(aTab);
-+        }
++        this.tabContainer.arrowScrollbox.prepend(aTab);
        });
  
        aTab.style.marginInlineStart = "";
@@ -328,9 +319,6 @@ index d88bc0e5570c8fd428a84fdf5af0f6bab1e2a636..aed843d26eaf56d66883f95c373d4010
 +      if (typeof window.gZenVerticalTabsManager !== "undefined") {
 +        gZenVerticalTabsManager.animateItemOpen(t);
 +      }
-+      if (typeof window.gZenCompactModeManager !== "undefined" && !skipLoad && insertTab) {
-+        gZenCompactModeManager._onTabOpen(t, inBackground);
-+      }
        // Additionally send pinned tab events
        if (pinned) {
          this.#notifyPinnedStatus(t);
@@ -462,7 +450,7 @@ index d88bc0e5570c8fd428a84fdf5af0f6bab1e2a636..aed843d26eaf56d66883f95c373d4010
        if (ownerTab) {
          tab.owner = ownerTab;
        }
-+      if ((!tab.pinned && tabGroup?.isZenFolder && !Services.prefs.getBoolPref('zen.folders.owned-tabs-in-folder')) || (tabGroup && tabGroup.hasAttribute("split-view-group"))) {
++      if (tabGroup && tabGroup.hasAttribute("split-view-group")) {
 +        tabGroup = null;
 +      }
  
@@ -507,7 +495,7 @@ index d88bc0e5570c8fd428a84fdf5af0f6bab1e2a636..aed843d26eaf56d66883f95c373d4010
        }
        /** @type {MozTabbrowserTab|undefined} */
 -      let itemAfter = allItems.at(index);
-+      let itemAfter = gZenGlanceManager.getTabOrGlanceParent(allItems.at(index));
++      let itemAfter = allItems.at(index);
  
        if (pinned && !itemAfter?.pinned) {
          itemAfter = null;
@@ -566,9 +554,6 @@ index d88bc0e5570c8fd428a84fdf5af0f6bab1e2a636..aed843d26eaf56d66883f95c373d4010
        // state).
        let tabWidth = window.windowUtils.getBoundsWithoutFlushing(aTab).width;
        let isLastTab = this.#isLastTabInWindow(aTab);
-+      if (gZenGlanceManager.manageTabClose(aTab)) {
-+        return;
-+      }
        if (
          !this._beginRemoveTab(aTab, {
            closeWindowFastpath: true,
@@ -785,7 +770,7 @@ index d88bc0e5570c8fd428a84fdf5af0f6bab1e2a636..aed843d26eaf56d66883f95c373d4010
          () => {
 -          let neighbor = this.tabs[tabIndex];
 -          if (forceUngrouped && neighbor?.group) {
-+          let neighbor = gZenGlanceManager.getTabOrGlanceParent(this.tabs[tabIndex]);
++          let neighbor = this.tabs[tabIndex];
 +          if ((forceUngrouped && neighbor?.group) || neighbor?.group?.hasAttribute("split-view-group")) {
              neighbor = neighbor.group;
            }
@@ -821,7 +806,6 @@ index d88bc0e5570c8fd428a84fdf5af0f6bab1e2a636..aed843d26eaf56d66883f95c373d4010
        }
  
        // Don't allow mixing pinned and unpinned tabs.
-+      targetElement = gZenGlanceManager.getTabOrGlanceParent(targetElement);
 +      if (targetElement?.classList.contains('tab-group-label-container')) {
 +        targetElement = targetElement.parentElement;
 +      }
@@ -850,10 +834,7 @@ index d88bc0e5570c8fd428a84fdf5af0f6bab1e2a636..aed843d26eaf56d66883f95c373d4010
          }
          moveBefore = true;
        }
-+      if (!gZenFolders.canDropElement(element, targetElement)) {
-+        element = element.group;
-+      }
-+      if (!element.hasAttribute('zen-essential') && targetElement?.hasAttribute('zen-essential')) { 
++      if (!element.hasAttribute('zen-essential') && targetElement?.hasAttribute('zen-essential')) {
 +        targetElement = null;
 +        moveBefore = false;
 +      }
@@ -932,9 +913,6 @@ index d88bc0e5570c8fd428a84fdf5af0f6bab1e2a636..aed843d26eaf56d66883f95c373d4010
  
        moveActionCallback();
  
-+      gZenViewSplitter._maybeRemoveFakeBrowser(false);
-+      gZenViewSplitter._canDrop = false;
-+
        // Clear tabs cache after moving nodes because the order of tabs may have
        // changed.
        this.tabContainer._invalidateCachedTabs();

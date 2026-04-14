@@ -212,8 +212,7 @@ index 17a56b0e5a7f1fcdf04904586572c7f719e57904..778a4e49fad39a160d1000733a9e27b0
        let selectedTab = this.selectedItem;
 +      if (!selectedTab) return;
        this.#ensureTabIsVisible(selectedTab, aInstant);
- 
-+      gZenCompactModeManager.flashSidebarIfNecessary(aInstant);
+
        selectedTab._notselectedsinceload = false;
      }
  

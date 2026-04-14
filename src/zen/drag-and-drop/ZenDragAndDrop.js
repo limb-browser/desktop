@@ -131,7 +131,6 @@
     startTabDrag(event, tab, ...args) {
       this.ZenDragAndDropService.onDragStart(1);
       this.#isOutOfWindow = false;
-      gZenCompactModeManager._isTabBeingDragged = true;
       super.startTabDrag(event, tab, ...args);
       const dt = event.dataTransfer;
       if (isTabGroupLabel(tab)) {
@@ -654,13 +653,8 @@
       // can change the workspace after a short delay.
       const splitter = document.getElementById("zen-sidebar-splitter");
       let rect = window.windowUtils.getBoundsWithoutFlushing(gNavToolbox);
-      if (!(
-        gZenCompactModeManager.preference &&
-        gZenCompactModeManager.canHideSidebar
-      )) {
-        rect.width +=
-          window.windowUtils.getBoundsWithoutFlushing(splitter).width;
-      }
+      rect.width +=
+        window.windowUtils.getBoundsWithoutFlushing(splitter).width;
       const { clientX } = event;
       const isNearLeftEdge =
         clientX >= rect.left - padding && clientX <= rect.left + padding;
@@ -880,7 +874,6 @@
         clientY >= winHeight - allowedMargin;
       if (isOutOfWindow && !this.#isOutOfWindow) {
         this.#isOutOfWindow = true;
-        gZenViewSplitter.onBrowserDragEndToSplit(event, true);
         this.#maybeClearVerticalPinnedGridDragOver();
         this.clearSpaceSwitchTimer();
         this.clearDragOverVisuals();
@@ -913,7 +906,6 @@
 
     handle_drop(event) {
       this.clearSpaceSwitchTimer();
-      gZenFolders.highlightGroupOnDragOver(null);
       super.handle_drop(event);
       this.#maybeClearVerticalPinnedGridDragOver();
       this.#handle_dropSwitchSpace(event);
@@ -936,43 +928,14 @@
               tab.setAttribute("zen-workspace-id", activeWorkspace);
             }
             gBrowser.selectedTab = draggedTab;
-          } else if (isTabGroupLabel(draggedTab)) {
-            draggedTab = draggedTab.group;
-            gZenFolders.changeFolderToSpace(draggedTab, activeWorkspace, {
-              hasDndSwitch: true,
-            });
           }
         }
       }
       gZenWorkspaces.updateTabsContainers();
     }
 
-    #handle_dropCreateSplit(event) {
-      if (!this.#dragOverSplit.canDrop) {
-        return;
-      }
-
-      const dragData = this.#dragOverSplit.data;
-      const dt = event.dataTransfer;
-      const draggedTab = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
-
-      if (!dragData || !draggedTab) {
-        return;
-      }
-
-      this._dontAnimateTabMove = true;
-      const droppedOnTab = dragData.dropElement;
-      const dropSide = dragData.dropSide;
-
-      // Clear any visuals and timer
-      this._clearDragOverSplit();
-
-      const isLeft = dropSide === "left";
-      gZenViewSplitter.splitTabs(
-        isLeft ? [draggedTab, droppedOnTab] : [droppedOnTab, draggedTab],
-        "vsep",
-        isLeft ? 0 : 1
-      );
+    #handle_dropCreateSplit(_event) {
+      // Split view removed — no-op
     }
 
     handle_drop_transition(dropElement, draggedTab, movingTabs, dropBefore) {
@@ -1115,9 +1078,6 @@
       if (currentEssenialContainer?.essentialsPromo) {
         currentEssenialContainer.essentialsPromo.remove();
       }
-      // We also call it here to ensure we clear any highlight if the drop happened
-      // outside of a valid drop target.
-      ownerGlobal.gZenFolders.highlightGroupOnDragOver(null);
       this.ZenDragAndDropService.onDragEnd();
       super.handle_dragend(event);
       thisFromGlobal.clearDragOverVisuals();
@@ -1140,10 +1100,6 @@
       if (thisFromGlobal._tempDragImageParent) {
         thisFromGlobal._tempDragImageParent.remove();
         delete thisFromGlobal._tempDragImageParent;
-      }
-      delete ownerGlobal.gZenCompactModeManager._isTabBeingDragged;
-      if (dt.dropEffect !== "move") {
-        ownerGlobal.gZenCompactModeManager._clearAllHoverStates();
       }
     }
 
@@ -1278,11 +1234,7 @@
       }
       let possibleFolderElement = dropElement.parentElement;
       let isZenFolder = possibleFolderElement?.isZenFolder;
-      let canHightlightGroup =
-        gZenFolders.highlightGroupOnDragOver(
-          possibleFolderElement,
-          movingTabs
-        ) || !isZenFolder;
+      let canHightlightGroup = !isZenFolder;
       let rect = window.windowUtils.getBoundsWithoutFlushing(dropElement);
       const overlapPercent = (event.clientY - rect.top) / rect.height;
       // We wan't to leave a small threshold (20% for example) so we can drag tabs below and above

@@ -53,10 +53,7 @@
 
       // Add fullscreen listener to update the theme when going in and out of fullscreen
       const eventsForSeparation = [
-        "ZenViewSplitter:SplitViewDeactivated",
-        "ZenViewSplitter:SplitViewActivated",
         "fullscreen",
-        "ZenCompactMode:Toggled",
       ];
       const separationHandler = this.updateElementSeparation.bind(this);
       for (let eventName of eventsForSeparation) {
@@ -136,10 +133,6 @@
       let separation = this.elementSeparation;
       if (
         document.documentElement.hasAttribute("inFullscreen") &&
-        window.gZenCompactModeManager?.preference &&
-        !document
-          .getElementById("tabbrowser-tabbox")
-          ?.hasAttribute("zen-split-view") &&
         Services.prefs.getBoolPref("zen.view.borderless-fullscreen", true)
       ) {
         separation = 0;

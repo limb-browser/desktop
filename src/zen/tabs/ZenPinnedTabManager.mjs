@@ -315,43 +315,8 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
         case "switch":
           if (behavior.includes("unload")) {
             for (const tab of pinnedTabs) {
-              if (tab.hasAttribute("glance-id")) {
-                // We have a glance tab inside the tab we are trying to unload,
-                // before we used to just ignore it but now we need to fully close
-                // it as well.
-                gZenGlanceManager.manageTabClose(tab.glanceTab);
-                await new Promise(resolve => {
-                  let hasRan = false;
-                  const onGlanceClose = () => {
-                    hasRan = true;
-                    resolve();
-                  };
-                  window.addEventListener("GlanceClose", onGlanceClose, {
-                    once: true,
-                  });
-                  // Set a timeout to resolve the promise if the event doesn't fire.
-                  // We do this to prevent any future issues where glance woudnt close such as
-                  // glance requering to ask for permit unload.
-                  setTimeout(() => {
-                    if (!hasRan) {
-                      console.warn(
-                        "GlanceClose event did not fire within 3 seconds"
-                      );
-                      resolve();
-                    }
-                  }, 3000);
-                });
-                return;
               }
-              const isSpltView = tab.group?.hasAttribute("split-view-group");
-              const group = isSpltView ? tab.group.group : tab.group;
-              if (!folderToUnload && tab.hasAttribute("folder-active")) {
-                await gZenFolders.animateUnload(group, tab);
-              }
-            }
-            if (folderToUnload) {
-              await gZenFolders.animateUnloadAll(folderToUnload);
-            }
+
             const allAreUnloaded = pinnedTabs.every(
               tab =>
                 tab.hasAttribute("pending") &&
@@ -966,9 +931,6 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
       gZenWorkspaces.activeWorkspaceIndicator?.removeAttribute("open");
     }
 
-    if (draggedTab?._dragData?.movingTabs) {
-      gZenFolders.ungroupTabsFromActiveGroups(draggedTab._dragData.movingTabs);
-    }
 
     let shouldAddDragOverElement = false;
 

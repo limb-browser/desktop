@@ -11,30 +11,6 @@ document.addEventListener(
       // eslint-disable-next-line complexity
       .addEventListener("command", event => {
         switch (event.target.id) {
-          case "cmd_zenCompactModeToggle":
-            gZenCompactModeManager.toggle();
-            break;
-          case "cmd_toggleCompactModeIgnoreHover":
-            gZenCompactModeManager.toggle(true);
-            break;
-          case "cmd_zenCompactModeShowSidebar":
-            gZenCompactModeManager.toggleSidebar();
-            break;
-          case "cmd_zenSplitViewGrid":
-            gZenViewSplitter.toggleShortcut("grid");
-            break;
-          case "cmd_zenSplitViewVertical":
-            gZenViewSplitter.toggleShortcut("vsep");
-            break;
-          case "cmd_zenSplitViewHorizontal":
-            gZenViewSplitter.toggleShortcut("hsep");
-            break;
-          case "cmd_zenSplitViewUnsplit":
-            gZenViewSplitter.toggleShortcut("unsplit");
-            break;
-          case "cmd_zenSplitViewContextMenu":
-            gZenViewSplitter.contextSplitTabs();
-            break;
           case "cmd_zenCopyCurrentURLMarkdown":
             gZenCommonActions.copyCurrentURLAsMarkdownToClipboard();
             break;
@@ -56,14 +32,6 @@ document.addEventListener(
           case "cmd_zenToggleTabsOnRight":
             gZenVerticalTabsManager.toggleTabsOnRight();
             break;
-          case "cmd_zenSplitViewLinkInNewTab":
-            gZenViewSplitter.splitLinkInNewTab();
-            break;
-          case "cmd_zenNewEmptySplit":
-            setTimeout(() => {
-              gZenViewSplitter.createEmptySplit();
-            }, 0);
-            break;
           case "cmd_zenReplacePinnedUrlWithCurrent":
             gZenPinnedTabManager.replacePinnedUrlWithCurrent();
             break;
@@ -72,11 +40,6 @@ document.addEventListener(
             break;
           case "cmd_contextZenRemoveFromEssentials":
             gZenPinnedTabManager.removeEssentials();
-            break;
-          case "cmd_zenOpenFolderCreation":
-            gZenFolders.createFolder([], {
-              renameFolder: true,
-            });
             break;
           case "cmd_zenTogglePinTab": {
             const currentTab = gBrowser.selectedTab;
@@ -92,13 +55,6 @@ document.addEventListener(
           case "cmd_zenNewNavigatorUnsynced":
             OpenBrowserWindow({ zenSyncedWindow: false });
             break;
-          case "cmd_zenNewLiveFolder": {
-            const { ZenLiveFoldersManager } = ChromeUtils.importESModule(
-              "resource:///modules/zen/ZenLiveFoldersManager.sys.mjs"
-            );
-            ZenLiveFoldersManager.handleEvent(event);
-            break;
-          }
           case "cmd_zenDuplicateTab": {
             const selectedTabs = gBrowser.selectedTabs;
             let insertAt = selectedTabs.at(-1)._tPos + 1;
@@ -108,7 +64,6 @@ document.addEventListener(
             break;
           }
           default:
-            gZenGlanceManager.handleMainCommandSet(event);
             break;
         }
       });

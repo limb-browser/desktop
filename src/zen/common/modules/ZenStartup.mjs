@@ -2,10 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import checkForZenUpdates, {
-  createWindowUpdateAnimation,
-} from "chrome://browser/content/ZenUpdates.mjs";
-
 class ZenStartup {
   #watermarkIgnoreElements = ["zen-toast-container"];
   #hasInitializedLayout = false;
@@ -53,7 +49,6 @@ class ZenStartup {
 
       setTimeout(() => {
         gZenUIManager.init();
-        this.#checkForWelcomePage();
       }, 0);
     } catch (e) {
       console.error("ZenThemeModifier: Error initializing browser layout", e);
@@ -78,8 +73,7 @@ class ZenStartup {
     await delayedStartupPromise;
     await SessionStore.promiseAllWindowsRestored;
     delete gZenUIManager.promiseInitialized;
-    gZenCompactModeManager.init();
-    // Fix for https://github.com/zen-browser/desktop/issues/7605, specially in compact mode
+    // Fix for https://github.com/zen-browser/desktop/issues/7605
     if (gURLBar.hasAttribute("breakout-extend")) {
       gURLBar.focus();
     }
@@ -151,35 +145,6 @@ class ZenStartup {
     }
   }
 
-  #checkForWelcomePage() {
-    const kWelcomeScreenSeenPref = "zen.welcome-screen.seen";
-    if (Services.env.get("MOZ_HEADLESS")) {
-      Services.prefs.setBoolPref(kWelcomeScreenSeenPref, true);
-      return;
-    }
-    if (!Services.prefs.getBoolPref(kWelcomeScreenSeenPref, false)) {
-      Services.prefs.setBoolPref(kWelcomeScreenSeenPref, true);
-      Services.prefs.setStringPref(
-        "zen.updates.last-build-id",
-        Services.appinfo.appBuildID
-      );
-      Services.prefs.setStringPref(
-        "zen.updates.last-version",
-        Services.appinfo.version
-      );
-      Services.scriptloader.loadSubScript(
-        "chrome://browser/content/zen-components/ZenWelcome.mjs",
-        window
-      );
-    } else {
-      this.#createUpdateAnimation();
-    }
-  }
-
-  async #createUpdateAnimation() {
-    checkForZenUpdates();
-    return await createWindowUpdateAnimation();
-  }
 }
 
 window.gZenStartup = new ZenStartup();

@@ -26,29 +26,15 @@ class nsHasPolyfill {
         if (selected?.tagName?.toLowerCase() === "menu") {
           return null;
         }
-        if (selected) {
-          gZenCompactModeManager.log(
-            `Selector "${selector}" exists for: `,
-            element
-          );
-        }
         return selected;
       });
       const { exists: shouldExist = true } = descendantSelectors;
       if (exists === shouldExist) {
         if (!element.hasAttribute(stateAttribute)) {
-          gZenCompactModeManager._setElementExpandAttribute(
-            element,
-            true,
-            stateAttribute
-          );
+          element.setAttribute(stateAttribute, "true");
         }
       } else if (element.hasAttribute(stateAttribute)) {
-        gZenCompactModeManager._setElementExpandAttribute(
-          element,
-          false,
-          stateAttribute
-        );
+        element.removeAttribute(stateAttribute);
       }
     };
 

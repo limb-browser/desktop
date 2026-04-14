@@ -45,15 +45,6 @@ window.gZenUIManager = {
       return document.getElementById("zen-toast-container");
     });
 
-    new ResizeObserver(
-      gZenCommonActions.throttle(
-        gZenCompactModeManager.getAndApplySidebarWidth.bind(
-          gZenCompactModeManager
-        ),
-        Services.prefs.getIntPref("zen.view.sidebar-height-throttle", 500)
-      )
-    ).observe(gNavToolbox);
-
     this._hasLoadedDOM = true;
     this.updateTabsToolbar();
 
@@ -65,7 +56,6 @@ window.gZenUIManager = {
 
     gZenMediaController.init();
     gZenVerticalTabsManager.init();
-    gZenLiveFoldersUI.init();
 
     this._initCreateNewPopup();
     this._debloatContextMenus();
@@ -374,11 +364,7 @@ window.gZenUIManager = {
         continue;
       }
       document.removeEventListener("mousemove", this.__removeHasPopupAttribute);
-      gZenCompactModeManager._setElementExpandAttribute(
-        el,
-        true,
-        "has-popup-menu"
-      );
+      el.setAttribute("has-popup-menu", "true");
       this.__currentPopup = showEvent.target;
       this.__currentPopupTrackElement = el;
       break;
@@ -391,18 +377,10 @@ window.gZenUIManager = {
     }
     const element = this.__currentPopupTrackElement;
     if (document.getElementById("main-window").matches(":hover")) {
-      gZenCompactModeManager._setElementExpandAttribute(
-        element,
-        false,
-        "has-popup-menu"
-      );
+      element.removeAttribute("has-popup-menu");
     } else {
       this.__removeHasPopupAttribute = () =>
-        gZenCompactModeManager._setElementExpandAttribute(
-          element,
-          false,
-          "has-popup-menu"
-        );
+        element.removeAttribute("has-popup-menu");
       document.addEventListener("mousemove", this.__removeHasPopupAttribute, {
         once: true,
       });
@@ -951,7 +929,6 @@ window.gZenVerticalTabsManager = {
     this._toolbarOriginalParent =
       document.getElementById("nav-bar").parentElement;
 
-    gZenCompactModeManager.addEventListener(updateEvent);
     this.initRightSideOrderContextMenu();
 
     window.addEventListener(
@@ -1249,8 +1226,6 @@ window.gZenVerticalTabsManager = {
       }
 
       const topButtons = document.getElementById("zen-sidebar-top-buttons");
-      const isCompactMode =
-        gZenCompactModeManager.preference && !forCustomizableMode;
       const isVerticalTabs = this._prefsVerticalTabs || forCustomizableMode;
       const isSidebarExpanded = this._prefsSidebarExpanded || !isVerticalTabs;
       const isRightSide = this._prefsRightSide && isVerticalTabs;
@@ -1310,8 +1285,7 @@ window.gZenVerticalTabsManager = {
       let shouldHide = false;
       if (
         ((!isRightSide && this.isWindowsStyledButtons) ||
-          (isRightSide && !this.isWindowsStyledButtons) ||
-          (isCompactMode && isSingleToolbar && this.isWindowsStyledButtons)) &&
+          (isRightSide && !this.isWindowsStyledButtons)) &&
         isSingleToolbar
       ) {
         appContentNavbarWrapper.setAttribute("should-hide", true);
@@ -1321,16 +1295,13 @@ window.gZenVerticalTabsManager = {
       }
 
       // Check if the sidebar is in hover mode
-      if (
-        !this.navigatorToolbox.hasAttribute("zen-right-side") &&
-        !isCompactMode
-      ) {
+      if (!this.navigatorToolbox.hasAttribute("zen-right-side")) {
         this.navigatorToolbox.prepend(topButtons);
       }
 
       let windowButtons = this.actualWindowButtons;
       let doNotChangeWindowButtons =
-        !isCompactMode && isRightSide && this.isWindowsStyledButtons;
+        isRightSide && this.isWindowsStyledButtons;
       const navBar = document.getElementById("nav-bar");
 
       if (isSingleToolbar) {
@@ -1358,13 +1329,8 @@ window.gZenVerticalTabsManager = {
         if (this.isWindowsStyledButtons && !doNotChangeWindowButtons) {
           appContentNavbarContaienr.append(windowButtons);
         }
-        if (isCompactMode) {
-          titlebar.moveBefore(navBar, titlebar.firstChild);
-          titlebar.moveBefore(topButtons, titlebar.firstChild);
-        } else {
-          titlebar.parentNode.moveBefore(topButtons, titlebar);
-          titlebar.parentNode.moveBefore(navBar, titlebar);
-        }
+        titlebar.parentNode.moveBefore(topButtons, titlebar);
+        titlebar.parentNode.moveBefore(navBar, titlebar);
         document.documentElement.setAttribute("zen-single-toolbar", true);
         this._hasSetSingleToolbar = true;
       } else if (this._hasSetSingleToolbar) {
@@ -1391,47 +1357,24 @@ window.gZenVerticalTabsManager = {
         }
       }
 
-      if (isCompactMode) {
-        titlebar.prepend(topButtons);
-      } else if (isSidebarExpanded) {
+      if (isSidebarExpanded) {
         titlebar.before(topButtons);
       } else {
         titlebar.prepend(topButtons);
       }
 
-      // Case: single toolbar, not compact mode, not right side and macos styled buttons
+      // Case: single toolbar, not right side and macos styled buttons
       if (
         !doNotChangeWindowButtons &&
         isSingleToolbar &&
-        !isCompactMode &&
         !isRightSide &&
         !this.isWindowsStyledButtons
       ) {
         topButtons.prepend(windowButtons);
       }
 
-      const canHideTabBarPref = Services.prefs.getBoolPref(
-        "zen.view.compact.hide-tabbar"
-      );
-      const captionsShouldStayOnSidebar =
-        !canHideTabBarPref &&
-        ((!this.isWindowsStyledButtons && !isRightSide) ||
-          (this.isWindowsStyledButtons && isRightSide));
-      if (
-        (!isSingleToolbar && isCompactMode && !captionsShouldStayOnSidebar) ||
-        !isSidebarExpanded
-      ) {
+      if (!isSidebarExpanded) {
         navBar.prepend(topButtons);
-      }
-
-      // Case: single toolbar, compact mode, right side and windows styled buttons
-      if (
-        isSingleToolbar &&
-        isCompactMode &&
-        isRightSide &&
-        this.isWindowsStyledButtons
-      ) {
-        topButtons.prepend(windowButtons);
       }
 
       if (doNotChangeWindowButtons) {
@@ -1440,7 +1383,7 @@ window.gZenVerticalTabsManager = {
         } else {
           topButtons.appendChild(windowButtons);
         }
-      } else if (!isSingleToolbar && !isCompactMode) {
+      } else if (!isSingleToolbar) {
         if (this.isWindowsStyledButtons) {
           if (isRightSide) {
             appContentNavbarContaienr.append(windowButtons);
@@ -1455,16 +1398,6 @@ window.gZenVerticalTabsManager = {
           } else {
             topButtons.prepend(windowButtons);
           }
-        }
-      } else if (!isSingleToolbar && isCompactMode) {
-        if (captionsShouldStayOnSidebar) {
-          topButtons.prepend(windowButtons);
-        } else {
-          navBar.appendChild(windowButtons);
-        }
-      } else if (isSingleToolbar && isCompactMode) {
-        if (!isRightSide && !this.isWindowsStyledButtons) {
-          topButtons.prepend(windowButtons);
         }
       }
 
@@ -1487,16 +1420,11 @@ window.gZenVerticalTabsManager = {
         );
       }
 
-      gZenCompactModeManager.updateCompactModeContext(isSingleToolbar);
-
       // Always move the splitter next to the sidebar
       const splitter = document.getElementById("zen-sidebar-splitter");
       splitter.addEventListener("dragover", gBrowser.tabContainer);
       this.navigatorToolbox.after(splitter);
       window.dispatchEvent(new Event("resize"));
-      if (!isCompactMode) {
-        gZenCompactModeManager.getAndApplySidebarWidth();
-      }
       gZenUIManager.updateTabsToolbar();
       this.rebuildURLBarMenus();
       appContentNavbarWrapper.style.transition = "";
@@ -1527,11 +1455,7 @@ window.gZenVerticalTabsManager = {
       "zen.view.sidebar-expanded.max-width"
     );
     const toolbox = gNavToolbox;
-    if (!this._prefsCompactMode) {
-      toolbox.style.maxWidth = `${maxWidth}px`;
-    } else {
-      toolbox.style.removeProperty("maxWidth");
-    }
+    toolbox.style.maxWidth = `${maxWidth}px`;
   },
 
   get expandButton() {
@@ -1646,7 +1570,6 @@ window.gZenVerticalTabsManager = {
       this._tabEdited = null;
       return;
     }
-    gZenFolders.cancelPopupTimer();
     event.stopPropagation?.();
     document.documentElement.setAttribute("zen-renaming-tab", "true");
     const label = isTab

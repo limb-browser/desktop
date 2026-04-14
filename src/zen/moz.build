@@ -9,9 +9,6 @@ EXTRA_PP_COMPONENTS += [
 DIRS += [
     "common",
     "drag-and-drop",
-    "glance",
-    "live-folders",
-    "mods",
     "tests",
     "urlbar",
     "toolkit",
