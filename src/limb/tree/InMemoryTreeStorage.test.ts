@@ -405,7 +405,10 @@ describe('InMemoryTreeStorage', () => {
 
     it('is a no-op for non-existent node IDs', async () => {
       await storage.deleteScreenshots(['nonexistent']);
-      // Should not throw
+      expect(probe.calls).toContainEqual({
+        method: 'screenshotsDeleted',
+        args: [['nonexistent']],
+      });
     });
 
     it('fires screenshotsDeleted probe', async () => {

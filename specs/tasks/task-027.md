@@ -4,7 +4,7 @@ spec_ref: "persistence.md S1.2 S4"
 depends_on:
   - task-003
 progress: complete
-review: "specs/reviews/review-TASK_027-R1.md"
+review: "specs/reviews/review-TASK_027-R4.md"
 coverage_sections: []
 commits: []
 ---
