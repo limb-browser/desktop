@@ -39,14 +39,10 @@
     if (
       !element ||
       element.closest(".zen-current-workspace-indicator") ||
-      element.hasAttribute("split-view-group") ||
       element.classList.contains("zen-drop-target") ||
       isEssentialsPromo(element)
     ) {
       return element;
-    }
-    if (element.group?.hasAttribute("split-view-group")) {
-      return element.group;
     }
     if (isTab(element)) {
       return element;
@@ -175,7 +171,7 @@
           if (tabClone.hasAttribute("visuallyselected")) {
             tabClone.style.transform = "translate(-50%, -50%)";
           }
-        } else if (AppConstants.platform !== "macosx" && !tab.isZenFolder) {
+        } else if (AppConstants.platform !== "macosx") {
           // On windows and linux, we still don't add some extra opaqueness
           // for the tab to be more visible. This is a hacky workaround.
           // TODO: Make windows and linux DnD use nsZenDragAndDrop::mDragImageOpacity
@@ -198,16 +194,6 @@
             0,
             Math.floor(tabLabelParentWidth / 6)
           );
-        } else if (
-          gBrowser.isTabGroup(tabClone) &&
-          tabClone.hasAttribute("split-view-group")
-        ) {
-          let tabs = tab.tabs;
-          for (let j = 0; j < tabs.length; j++) {
-            const tabInGroup = tabs[j];
-            const tabInGroupClone = tabInGroup.cloneNode(true);
-            tabClone.appendChild(tabInGroupClone);
-          }
         }
       }
       this.#maybeCreateDragImageDot(movingTabs, wrapper);
@@ -741,8 +727,6 @@
         !dropElement ||
         !isTab(dropElement) ||
         dropElement.hasAttribute("zen-essential") ||
-        dropElement.hasAttribute("zen-glance-tab") ||
-        dropElement?.group?.hasAttribute("split-view-group") ||
         movingTabsSet.size > 1
       ) {
         this._clearDragOverSplit();
@@ -751,10 +735,7 @@
 
       if (
         movingTabsSet.has(dropElement) ||
-        !isTab(draggedTab) ||
-        draggedTab?.group?.hasAttribute("split-view-group") ||
-        draggedTab.hasAttribute("zen-live-folder-item-id") ||
-        dropElement.hasAttribute("zen-live-folder-item-id")
+        !isTab(draggedTab)
       ) {
         this._clearDragOverSplit();
         return;
@@ -942,11 +923,7 @@
       if (isTabGroupLabel(dropElement)) {
         dropElement = dropElement.group;
       }
-      if (
-        isTabGroupLabel(draggedTab) ||
-        (isTab(draggedTab) &&
-          draggedTab.group?.hasAttribute("split-view-group"))
-      ) {
+      if (isTabGroupLabel(draggedTab)) {
         draggedTab = draggedTab.group;
       }
       for (let item of this._tabbrowserTabs.ariaFocusableItems) {
@@ -1142,24 +1119,7 @@
       gZenPinnedTabManager.removeTabContainersDragoverClass();
     }
 
-    #canDropIntoFolder(dropElement, draggedTab) {
-      let folder = dropElement?.classList.contains("tab-group-label-container")
-        ? dropElement.parentElement
-        : dropElement?.group;
-      if (!folder?.isZenFolder) {
-        return true;
-      }
-      if (folder.isLiveFolder) {
-        const liveFolderItemId = draggedTab.getAttribute(
-          "zen-live-folder-item-id"
-        );
-        if (
-          !liveFolderItemId ||
-          !liveFolderItemId.startsWith(`${folder.id}:`)
-        ) {
-          return false;
-        }
-      }
+    #canDropIntoFolder(_dropElement, _draggedTab) {
       return true;
     }
 
@@ -1179,10 +1139,6 @@
       let showIndicatorUnderNewTabButton = false;
       let dropBefore = false;
       let dropElementFromEvent = event.target.closest(dropZoneSelector);
-      if (!dropElement && dropElementFromEvent?.isZenFolder) {
-        // If we're dragging over a folder, we want to show the indicator on the folder itself, not the label.
-        dropElementFromEvent = dropElementFromEvent.labelElement;
-      }
       dropElement = dropElementFromEvent || dropElement;
       if (!dropElementFromEvent) {
         let hoveringPeriphery = !!event.target.closest(
@@ -1232,49 +1188,12 @@
           dropBefore = true;
         }
       }
-      let possibleFolderElement = dropElement.parentElement;
-      let isZenFolder = possibleFolderElement?.isZenFolder;
-      let canHightlightGroup = !isZenFolder;
       let rect = window.windowUtils.getBoundsWithoutFlushing(dropElement);
       const overlapPercent = (event.clientY - rect.top) / rect.height;
-      // We wan't to leave a small threshold (20% for example) so we can drag tabs below and above
-      // a folder label without dragging into the folder.
-      let threshold =
-        Services.prefs.getIntPref(
-          "zen.tabs.folder-dragover-threshold-percent"
-        ) / 100;
-      let dropIntoFolder =
-        isZenFolder &&
-        (overlapPercent < threshold ||
-          (overlapPercent > 1 - threshold &&
-            (possibleFolderElement.collapsed ||
-              possibleFolderElement.childGroupsAndTabs.length < 2)));
-      if (
-        canHightlightGroup &&
-        !dropIntoFolder &&
-        !this.#canDropIntoFolder(dropElement, draggedTab)
-      ) {
-        this.clearDragOverVisuals();
-        dropElement = null;
-        return [dropElement, dropBefore];
-      }
-      if (
-        isTabGroupLabel(draggedTab) &&
-        draggedTab.group?.isZenFolder &&
-        (((isTab(dropElement) ||
-          dropElement.hasAttribute("split-view-group")) &&
-          (!dropElement.pinned || dropElement.hasAttribute("zen-essential"))) ||
-          showIndicatorUnderNewTabButton)
-      ) {
-        dropElement = null;
-        this.clearDragOverVisuals();
-        return [dropElement, dropBefore];
-      }
+      let threshold;
       if (
         isTab(dropElement) ||
-        dropIntoFolder ||
-        showIndicatorUnderNewTabButton ||
-        dropElement.hasAttribute("split-view-group")
+        showIndicatorUnderNewTabButton
       ) {
         if (showIndicatorUnderNewTabButton) {
           rect = window.windowUtils.getBoundsWithoutFlushing(
@@ -1309,12 +1228,8 @@
         indicator.style.top = top;
         indicator.style.removeProperty("left");
         this.#removeDragOverBackground();
-        if (!isTab(dropElement) && dropElement?.parentElement?.isZenFolder) {
-          dropElement = dropElement.parentElement;
-        }
       } else if (
-        dropElement.classList.contains("zen-drop-target") &&
-        canHightlightGroup
+        dropElement.classList.contains("zen-drop-target")
       ) {
         shouldPlayHapticFeedback =
           this.#applyDragOverBackground(dropElement) &&

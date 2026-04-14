@@ -19,16 +19,12 @@ z-index: 1;
   transition-delay: 0.2s;
   overflow: clip;
 
-%include ../../compact-mode/windows-captions-fix-active.inc.css
-
   &:not([zen-has-hover='true']):not([has-popup-menu]):not([zen-compact-mode-active]) {
     height: var(--zen-element-separation);
     opacity: 0;
     & #zen-appcontent-navbar-container {
       pointer-events: none;
     }
-
-%include ../../compact-mode/windows-captions-fix-default.inc.css
   }
 
   @media -moz-pref('zen.view.experimental-no-window-controls') {

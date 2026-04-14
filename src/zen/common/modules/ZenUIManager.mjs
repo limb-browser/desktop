@@ -129,28 +129,6 @@ window.gZenUIManager = {
   },
 
   _addNewCustomizableButtonsIfNeeded() {
-    const kPref = "zen.ui.migration.compact-mode-button-added";
-    let navbarPlacements = CustomizableUI.getWidgetIdsInArea(
-      "zen-sidebar-top-buttons"
-    );
-    try {
-      if (
-        !navbarPlacements.length &&
-        !Services.prefs.getBoolPref(kPref, false)
-      ) {
-        CustomizableUI.addWidgetToArea(
-          "zen-toggle-compact-mode",
-          "zen-sidebar-top-buttons",
-          0
-        );
-        gZenVerticalTabsManager._topButtonsSeparatorElement.before(
-          document.getElementById("zen-toggle-compact-mode")
-        );
-      }
-    } catch (e) {
-      console.error("Error adding compact mode button to sidebar:", e);
-    }
-    Services.prefs.setBoolPref(kPref, true);
   },
 
   _initBookmarkCollapseListener() {
@@ -999,8 +977,7 @@ window.gZenVerticalTabsManager = {
       // We do want to do some animations during testing with profiling enabled
       // so we can capture and improve them.
       (gZenUIManager.testingEnabled && !gZenUIManager.profilingEnabled) ||
-      !gZenStartup.isReady ||
-      aItem.group?.hasAttribute("split-view-group")
+      !gZenStartup.isReady
     ) {
       return;
     }
@@ -1065,7 +1042,6 @@ window.gZenVerticalTabsManager = {
   animateItemClose(aItem) {
     if (
       aItem.hasAttribute("zen-essential") ||
-      aItem.group?.hasAttribute("split-view-group") ||
       !gZenUIManager.motion ||
       gReduceMotion
     ) {

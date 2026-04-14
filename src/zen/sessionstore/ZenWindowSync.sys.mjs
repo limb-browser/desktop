@@ -581,10 +581,6 @@ class nsZenWindowSync {
     const isGroup = gBrowser.isTabGroup(aOriginalItem);
     const isTab = !isGroup;
 
-    if (aOriginalItem.hasAttribute("zen-glance-tab")) {
-      return;
-    }
-
     if (isTab) {
       if (originalIsEssential !== targetIsEssential) {
         if (originalIsEssential) {
@@ -1086,15 +1082,12 @@ class nsZenWindowSync {
       aPreviousTab?._zenContentsVisible &&
       !activeTabs.includes(aPreviousTab)
     ) {
-      let tabsToSwap = aPreviousTab.group?.hasAttribute("split-view-group")
-        ? aPreviousTab.group.tabs
-        : [aPreviousTab];
+      let tabsToSwap = [aPreviousTab];
       for (const tab of tabsToSwap) {
         const otherTabToShow = this.#getActiveTabFromOtherWindows(
           aWindow,
           tab.id,
-          t =>
-            t?.splitView ? t.group.tabs.some(st => st.selected) : t?.selected
+          t => t?.selected
         );
         if (otherTabToShow) {
           otherTabToShow._zenContentsVisible = true;
@@ -1526,11 +1519,6 @@ class nsZenWindowSync {
       return;
     }
     const window = tabGroup.ownerGlobal;
-    const isFolder = tabGroup.isZenFolder;
-    const isSplitView = tabGroup.hasAttribute("split-view-group");
-    if (isSplitView) {
-      return; // Split view groups are synced via ZenSplitViewTabsSplit event.
-    }
     // Tab groups already have an ID upon creation.
     this.#runOnAllWindows(window, win => {
       // Check if a group with this ID already exists in the target window.
@@ -1560,11 +1548,7 @@ class nsZenWindowSync {
     this.#runOnAllWindows(window, win => {
       const targetGroup = this.getItemFromWindow(win, tabGroup.id);
       if (targetGroup) {
-        if (targetGroup.isZenFolder) {
-          targetGroup.delete();
-        } else {
-          win.gBrowser.removeTabGroup(targetGroup, { isUserTriggered: true });
-        }
+        win.gBrowser.removeTabGroup(targetGroup, { isUserTriggered: true });
       }
     });
   }

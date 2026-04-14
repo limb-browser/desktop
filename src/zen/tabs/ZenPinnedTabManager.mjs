@@ -269,14 +269,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
       const tabs = Array.isArray(selectedTab) ? selectedTab : [selectedTab];
       const pinnedTabs = [
         ...new Set(
-          tabs
-            .flatMap(tab => {
-              if (tab.group?.hasAttribute("split-view-group")) {
-                return tab.group.tabs;
-              }
-              return tab;
-            })
-            .filter(tab => tab?.pinned)
+          tabs.filter(tab => tab?.pinned)
         ),
       ];
 
@@ -692,12 +685,6 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
         currentEssenialContainer.essentialsPromo.remove();
       }
 
-      movingTabs = movingTabs.filter(tab =>
-        gBrowser.isTabGroupLabel(tab) && tab.group?.isZenFolder
-          ? !tabsTarget && !essentialTabsTarget
-          : true
-      );
-
       // TODO: Solve the issue of adding a tab between two groups
       // Remove group labels from the moving tabs and replace it
       // with the sub tabs
@@ -720,8 +707,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
         // Check for essentials container
         if (essentialTabsTarget) {
           if (
-            !tab.hasAttribute("zen-essential") &&
-            !tab?.group?.hasAttribute("split-view-group")
+            !tab.hasAttribute("zen-essential")
           ) {
             moved = true;
             isVertical = false;
@@ -755,9 +741,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
 
         // If the tab was moved, adjust its position relative to the target tab
         if (hasActuallyMoved) {
-          const targetTab = event.target.closest(".tabbrowser-tab");
-          const targetFolder = event.target.closest("zen-folder");
-          let targetElem = targetTab || targetFolder?.labelElement;
+          let targetElem = event.target.closest(".tabbrowser-tab");
           if (targetElem?.group?.activeGroups?.length > 0) {
             const activeGroup = targetElem.group.activeGroups.at(-1);
             targetElem = activeGroup.labelElement;
@@ -848,11 +832,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
       }
       return;
     }
-    if (tab.group?.hasAttribute("split-view-group")) {
-      tab.setAttribute("had-zen-pinned-changed", "true");
-    } else {
-      tab.setAttribute("zen-pinned-changed", "true");
-    }
+    tab.setAttribute("zen-pinned-changed", "true");
     tab.style.setProperty(
       "--zen-original-tab-icon",
       `url(${tab._zenPinnedInitialState.image})`
@@ -898,10 +878,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
       return;
     }
     let isVertical = this.expandedSidebarMode;
-    if (
-      gBrowser.isTabGroupLabel(draggedTab) &&
-      !draggedTab?.group?.hasAttribute("split-view-group")
-    ) {
+    if (gBrowser.isTabGroupLabel(draggedTab)) {
       // If the target is a tab group label, we don't want to apply the dragover class
       this.removeTabContainersDragoverClass();
       return;
@@ -915,12 +892,8 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     const tabsTarget = event.target.closest(
       ".zen-workspace-normal-tabs-section"
     );
-    const folderTarget = event.target.closest("zen-folder");
     let targetTab = event.target.closest(".tabbrowser-tab");
     targetTab = targetTab?.group || targetTab;
-    draggedTab = draggedTab?.group?.hasAttribute("split-view-group")
-      ? draggedTab.group
-      : draggedTab;
     const isHoveringIndicator = !!event.target.closest(
       ".zen-current-workspace-indicator"
     );

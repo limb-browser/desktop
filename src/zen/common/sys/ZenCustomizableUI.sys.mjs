@@ -18,7 +18,7 @@ export const ZenCustomizableUI = new (class {
       "zen-sidebar-top-buttons",
       {
         type: this.TYPE_TOOLBAR,
-        defaultPlacements: ["zen-toggle-compact-mode"],
+        defaultPlacements: [],
         defaultCollapsed: null,
         overflowable: true,
       },
@@ -73,13 +73,6 @@ export const ZenCustomizableUI = new (class {
         addon-webext-overflowtarget="overflowed-extensions-list"
         mode="icons">
         <hbox id="zen-sidebar-top-buttons-customization-target" class="customization-target" flex="1">
-          <toolbaritem id="zen-toggle-compact-mode" removable="true" data-l10n-id="zen-toggle-compact-mode-button">
-            <toolbarbutton
-              class="toolbarbutton-1"
-              command="cmd_toggleCompactModeIgnoreHover"
-              data-l10n-id="zen-toggle-compact-mode-button"
-              flex="1" />
-          </toolbaritem>
           <html:div id="zen-sidebar-top-buttons-separator" skipintoolbarset="true" overflows="false"></html:div>
         </hbox>
       </toolbar>

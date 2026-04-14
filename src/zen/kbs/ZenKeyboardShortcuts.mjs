@@ -126,15 +126,11 @@ const ZEN_MAIN_KEYSET_ID = "mainKeyset";
 const ZEN_DEVTOOLS_KEYSET_ID = "devtoolsKeyset";
 window.ZEN_KEYSET_ID = "zenKeyset";
 
-const ZEN_COMPACT_MODE_SHORTCUTS_GROUP = "zen-compact-mode";
 const ZEN_WORKSPACE_SHORTCUTS_GROUP = "zen-workspace";
 const ZEN_OTHER_SHORTCUTS_GROUP = "zen-other";
-const ZEN_SPLIT_VIEW_SHORTCUTS_GROUP = "zen-split-view";
 const FIREFOX_SHORTCUTS_GROUP = "zen-kbs-invalid";
 window.VALID_SHORTCUT_GROUPS = [
-  ZEN_COMPACT_MODE_SHORTCUTS_GROUP,
   ZEN_WORKSPACE_SHORTCUTS_GROUP,
-  ZEN_SPLIT_VIEW_SHORTCUTS_GROUP,
   ZEN_OTHER_SHORTCUTS_GROUP,
   ...Object.keys(defaultKeyboardGroups),
   "other",
@@ -686,30 +682,6 @@ class nsZenKeyboardShortcutsLoader {
       newShortcutList.push(parsed);
     }
 
-    // Compact mode's keyset
-    newShortcutList.push(
-      new KeyShortcut(
-        "zen-compact-mode-toggle",
-        "S",
-        "",
-        ZEN_COMPACT_MODE_SHORTCUTS_GROUP,
-        nsKeyShortcutModifiers.fromObject({ accel: true }),
-        "cmd_toggleCompactModeIgnoreHover",
-        "zen-compact-mode-shortcut-toggle"
-      )
-    );
-    newShortcutList.push(
-      new KeyShortcut(
-        "zen-compact-mode-show-sidebar",
-        "S",
-        "",
-        ZEN_COMPACT_MODE_SHORTCUTS_GROUP,
-        nsKeyShortcutModifiers.fromObject({ accel: true, alt: true }),
-        "cmd_zenCompactModeShowSidebar",
-        "zen-compact-mode-shortcut-show-sidebar"
-      )
-    );
-
     // Workspace shortcuts
     for (let i = 10; i > 0; i--) {
       newShortcutList.push(
@@ -746,52 +718,6 @@ class nsZenKeyboardShortcutsLoader {
         nsKeyShortcutModifiers.fromObject({ alt: true, accel: true }),
         "cmd_zenWorkspaceBackward",
         "zen-workspace-shortcut-backward"
-      )
-    );
-
-    // Split view
-    newShortcutList.push(
-      new KeyShortcut(
-        "zen-split-view-grid",
-        "G",
-        "",
-        ZEN_SPLIT_VIEW_SHORTCUTS_GROUP,
-        nsKeyShortcutModifiers.fromObject({ accel: true, alt: true }),
-        "cmd_zenSplitViewGrid",
-        "zen-split-view-shortcut-grid"
-      )
-    );
-    newShortcutList.push(
-      new KeyShortcut(
-        "zen-split-view-vertical",
-        "V",
-        "",
-        ZEN_SPLIT_VIEW_SHORTCUTS_GROUP,
-        nsKeyShortcutModifiers.fromObject({ accel: true, alt: true }),
-        "cmd_zenSplitViewVertical",
-        "zen-split-view-shortcut-vertical"
-      )
-    );
-    newShortcutList.push(
-      new KeyShortcut(
-        "zen-split-view-horizontal",
-        "H",
-        "",
-        ZEN_SPLIT_VIEW_SHORTCUTS_GROUP,
-        nsKeyShortcutModifiers.fromObject({ accel: true, alt: true }),
-        "cmd_zenSplitViewHorizontal",
-        "zen-split-view-shortcut-horizontal"
-      )
-    );
-    newShortcutList.push(
-      new KeyShortcut(
-        "zen-split-view-unsplit",
-        "U",
-        "",
-        ZEN_SPLIT_VIEW_SHORTCUTS_GROUP,
-        nsKeyShortcutModifiers.fromObject({ accel: true, alt: true }),
-        "cmd_zenSplitViewUnsplit",
-        "zen-split-view-shortcut-unsplit"
       )
     );
 
@@ -1038,14 +964,8 @@ class nsZenKeyboardShortcutsVersioner {
 
           // Map old shortcut IDs to new <command> IDs
           const commandMap = {
-            "zen-compact-mode-toggle": "cmd_zenCompactModeToggle",
-            "zen-compact-mode-show-sidebar": "cmd_zenCompactModeShowSidebar",
             "zen-workspace-forward": "cmd_zenWorkspaceForward",
             "zen-workspace-backward": "cmd_zenWorkspaceBackward",
-            "zen-split-view-grid": "cmd_zenSplitViewGrid",
-            "zen-split-view-vertical": "cmd_zenSplitViewVertical",
-            "zen-split-view-horizontal": "cmd_zenSplitViewHorizontal",
-            "zen-split-view-unsplit": "cmd_zenSplitViewUnsplit",
             "zen-copy-url": "cmd_zenCopyCurrentURL",
             "zen-copy-url-markdown": "cmd_zenCopyCurrentURLMarkdown",
             "zen-pinned-tab-reset-shortcut": "cmd_zenPinnedTabReset",
@@ -1080,33 +1000,6 @@ class nsZenKeyboardShortcutsVersioner {
         )
       );
 
-      // 2) Add shortcut to expand Glance into a full tab: Default Accel+O
-      data.push(
-        new KeyShortcut(
-          "zen-glance-expand",
-          "O",
-          "",
-          ZEN_OTHER_SHORTCUTS_GROUP,
-          nsKeyShortcutModifiers.fromObject({ accel: true }),
-          "cmd_zenGlanceExpand",
-          ""
-        )
-      );
-    }
-
-    if (version < 11) {
-      // Migrate from version 10 to 11
-      data.push(
-        new KeyShortcut(
-          "zen-new-empty-split-view",
-          "*",
-          "",
-          ZEN_SPLIT_VIEW_SHORTCUTS_GROUP,
-          nsKeyShortcutModifiers.fromObject({ accel: true, shift: true }),
-          "cmd_zenNewEmptySplit",
-          "zen-new-empty-split-view-shortcut"
-        )
-      );
     }
 
     if (version < 12) {
@@ -1125,10 +1018,6 @@ class nsZenKeyboardShortcutsVersioner {
         }
       }
 
-      // Also remove zen-compact-mode-show-toolbar
-      data = data.filter(
-        shortcut => shortcut.getID() != "zen-compact-mode-show-toolbar"
-      );
     }
 
     if (version < 13) {
@@ -1161,36 +1050,11 @@ class nsZenKeyboardShortcutsVersioner {
           "zen-new-unsynced-window-shortcut"
         )
       );
-      // Also, change the default for new empty split from + to * on mac
-      // and disable the "Restore closed window" shortcut by default due to conflicts
-      let emptySplitFound = false,
-        undoCloseWindowFound = false;
+      // Disable the "Restore closed window" shortcut by default due to conflicts
       for (let shortcut of data) {
-        if (
-          shortcut.getID() == "zen-new-empty-split-view" &&
-          AppConstants.platform == "macosx"
-        ) {
-          if (shortcut.getKeyName() == "+") {
-            shortcut.setNewBinding("*");
-          }
-          emptySplitFound = true;
-        } else if (shortcut.getID() == "key_undoCloseWindow") {
+        if (shortcut.getID() == "key_undoCloseWindow") {
           shortcut.shouldBeEmpty = true;
           shortcut.setDisabled(true);
-          undoCloseWindowFound = true;
-        }
-        if (emptySplitFound && undoCloseWindowFound) {
-          break;
-        }
-      }
-    }
-
-    if (version < 16) {
-      // Migrate from version 14 to 16.
-      // We move the action for "toggle compact mode" to "cmd_toggleCompactModeIgnoreHover"
-      for (let shortcut of data) {
-        if (shortcut.getID() == "zen-compact-mode-toggle") {
-          shortcut._setAction("cmd_toggleCompactModeIgnoreHover");
           break;
         }
       }
