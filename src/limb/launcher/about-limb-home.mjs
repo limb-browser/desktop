@@ -40,7 +40,7 @@ function createBranchCard(branch) {
 
   const nameEl = document.createElement("div");
   nameEl.className = "branch-card-name";
-  nameEl.textContent = branch.title || branch.url || "Untitled";
+  nameEl.textContent = branch.title || "Untitled";
 
   const metaEl = document.createElement("div");
   metaEl.className = "branch-card-meta";
