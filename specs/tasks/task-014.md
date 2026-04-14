@@ -15,7 +15,7 @@ commits: []
 
 > Clicking a node in the tree view (when `level < 0.9`) sets it as `focusedNodeId` and animates zoom to `level = 1.0` centered on that node.
 >
-> Zoom animation: from current `level` to `1.0` over 300ms with ease-out timing. During animation, LOD tiers update each frame.
+> Zoom animation: from current `level` to `1.0` over 350ms with ease-out timing (see interaction-feel.md S1.3 for the exact easing curve). During animation, LOD tiers update each frame.
 
 ## Current State
 
