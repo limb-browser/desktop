@@ -6,9 +6,11 @@ import type { NotificationPort } from '../ports/NotificationPort';
 
 export class TreeSizeNotificationHandler {
   #notificationPort: NotificationPort;
+  #onShowBranches: () => void;
 
-  constructor(notificationPort: NotificationPort) {
+  constructor(notificationPort: NotificationPort, onShowBranches: () => void) {
     this.#notificationPort = notificationPort;
+    this.#onShowBranches = onShowBranches;
   }
 
   onTreeSizeWarning(_nodeCount: number): void {
@@ -20,7 +22,7 @@ export class TreeSizeNotificationHandler {
   onTreeSizeSuggestion(_nodeCount: number): void {
     this.#notificationPort.showNotification(
       'Your tree has 200+ pages. Close some branches to free memory.',
-      [{ label: 'Show branches', callback: () => {} }]
+      [{ label: 'Show branches', callback: this.#onShowBranches }]
     );
   }
 }
