@@ -3,7 +3,7 @@ title: "Remove remaining conflicting Zen modules and clean up"
 spec_ref: "patch-strategy.md S3.1 S3.3 S3.4"
 depends_on:
   - task-001
-progress: ready-for-review
+progress: needs-revision
 review: ""
 coverage_sections: []
 commits: []
