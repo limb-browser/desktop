@@ -5,9 +5,11 @@
 # Usage: worker.sh <task-file> <worktree-path>
 set -uo pipefail
 
-TASK_FILE="$1"
 WORKTREE="$2"
-TASK_NAME=$(basename "$TASK_FILE" .md)
+TASK_NAME=$(basename "$1" .md)
+# Use the worktree-local copy of the task file, not the main repo's.
+# The Claude agent modifies this copy; get_status() must read the same file.
+TASK_FILE="$WORKTREE/specs/tasks/$TASK_NAME.md"
 
 cd "$WORKTREE"
 
