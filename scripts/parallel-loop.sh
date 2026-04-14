@@ -260,27 +260,36 @@ for f in "$REPO_ROOT"/specs/tasks/task-*.md; do
 done
 
 ITERATION=0
+LAST_PM_SHA=""
+LAST_CHRONICLER_LINES=0
 while true; do
   ITERATION=$((ITERATION + 1))
   log "--- Orchestrator cycle $ITERATION (${#ACTIVE_WORKERS[@]} active workers) ---"
 
   # 1. SERIAL: Project manager (creates/updates tasks on main)
-  log ">>> Project Manager"
-  emit pm.start iteration=$ITERATION
-  pm_start=$(date '+%s')
+  #    Skip if HEAD hasn't changed since last PM run -- no new merges to react to.
+  current_sha=$(git rev-parse HEAD 2>/dev/null)
+  if [ "$current_sha" = "$LAST_PM_SHA" ]; then
+    log "    PM skipped — no changes since last run"
+  else
+    log ">>> Project Manager"
+    emit pm.start iteration=$ITERATION
+    pm_start=$(date '+%s')
 
-  claude --model opus[1m] --dangerously-skip-permissions \
-    < specs/prompts/project-manager.md 2>/dev/null
+    claude --model opus[1m] --dangerously-skip-permissions \
+      < specs/prompts/project-manager.md 2>/dev/null
 
-  pm_end=$(date '+%s')
-  pm_duration=$((pm_end - pm_start))
-  tasks_total=$(ls specs/tasks/task-*.md 2>/dev/null | wc -l)
-  tasks_complete=0
-  for _tf in specs/tasks/task-*.md; do
-    [ -f "$_tf" ] && [ "$(get_progress "$_tf")" = "complete" ] && tasks_complete=$((tasks_complete + 1))
-  done
-  emit pm.done iteration=$ITERATION duration_s=$pm_duration tasks_total=$tasks_total tasks_complete=$tasks_complete
-  log "<<< Project Manager done (${pm_duration}s, $tasks_total tasks)"
+    pm_end=$(date '+%s')
+    pm_duration=$((pm_end - pm_start))
+    tasks_total=$(ls specs/tasks/task-*.md 2>/dev/null | wc -l)
+    tasks_complete=0
+    for _tf in specs/tasks/task-*.md; do
+      [ -f "$_tf" ] && [ "$(get_progress "$_tf")" = "complete" ] && tasks_complete=$((tasks_complete + 1))
+    done
+    emit pm.done iteration=$ITERATION duration_s=$pm_duration tasks_total=$tasks_total tasks_complete=$tasks_complete
+    log "<<< Project Manager done (${pm_duration}s, $tasks_total tasks)"
+    LAST_PM_SHA=$(git rev-parse HEAD 2>/dev/null)
+  fi
 
   # 1b. Propagate latest scripts to active worktrees
   for task_name in "${!ACTIVE_WORKERS[@]}"; do
@@ -310,14 +319,20 @@ while true; do
     done
   fi
 
-  # 4. Chronicler (every 3rd cycle)
+  # 4. Chronicler (every 3rd cycle, only if new events since last run)
   if [ $((ITERATION % 3)) -eq 0 ] && [ -f logs/events.jsonl ]; then
-    log ">>> Chronicler"
-    emit chronicler.start iteration=$ITERATION
-    claude --model sonnet --dangerously-skip-permissions \
-      < specs/prompts/chronicler.md 2>/dev/null
-    emit chronicler.done iteration=$ITERATION
-    log "<<< Chronicler done"
+    current_lines=$(wc -l < logs/events.jsonl 2>/dev/null || echo 0)
+    if [ "$current_lines" -gt "$LAST_CHRONICLER_LINES" ]; then
+      log ">>> Chronicler"
+      emit chronicler.start iteration=$ITERATION
+      claude --model sonnet --dangerously-skip-permissions \
+        < specs/prompts/chronicler.md 2>/dev/null
+      emit chronicler.done iteration=$ITERATION
+      log "<<< Chronicler done"
+      LAST_CHRONICLER_LINES=$(wc -l < logs/events.jsonl 2>/dev/null || echo 0)
+    else
+      log "    Chronicler skipped — no new events"
+    fi
   fi
 
   # 5. Status report
