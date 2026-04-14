@@ -4,7 +4,7 @@ spec_ref: "patch-strategy.md S3.1 S3.3 S3.4"
 depends_on:
   - task-001
 progress: needs-revision
-review: "specs/reviews/review-TASK_002-R1.md"
+review: "specs/reviews/review-TASK_002-R2.md"
 coverage_sections: []
 commits: []
 ---
