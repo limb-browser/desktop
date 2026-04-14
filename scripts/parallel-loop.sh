@@ -82,10 +82,29 @@ spawn_worker() {
   local task_name
   task_name=$(basename "$task_file" .md)
   local worktree="$WORKTREE_BASE/$task_name"
+  local branch="worker/$task_name"
 
-  git branch -D "worker/$task_name" 2>/dev/null
+  # Clean up any stale worktrees holding this branch (e.g. leftover Claude agent worktrees)
+  local stale_wt
+  stale_wt=$(git worktree list --porcelain | awk -v b="$branch" '
+    /^worktree / { wt=$2 }
+    /^branch / && $2 == "refs/heads/" b { print wt }
+  ')
+  if [ -n "$stale_wt" ]; then
+    log "    Cleaning stale worktree for $branch at $stale_wt"
+    git worktree remove "$stale_wt" --force 2>/dev/null
+  fi
 
-  if ! git worktree add "$worktree" -b "worker/$task_name" HEAD 2>/dev/null; then
+  # Also remove our own stale worktree directory if it exists
+  if [ -d "$worktree" ]; then
+    log "    Cleaning stale worktree directory $worktree"
+    git worktree remove "$worktree" --force 2>/dev/null
+    rm -rf "$worktree" 2>/dev/null
+  fi
+
+  git branch -D "$branch" 2>/dev/null
+
+  if ! git worktree add "$worktree" -b "$branch" HEAD 2>/dev/null; then
     log "!!! Failed to create worktree for $task_name"
     return 1
   fi
