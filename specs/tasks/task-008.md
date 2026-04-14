@@ -4,8 +4,8 @@ spec_ref: "tab-bridge.md S1"
 depends_on:
   - task-003
   - task-002
-progress: ready-for-review
-review: ""
+progress: complete
+review: "specs/reviews/review-TASK_008-R1.md"
 coverage_sections: []
 commits: []
 ---
