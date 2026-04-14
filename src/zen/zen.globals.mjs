@@ -11,8 +11,6 @@ export default [
   "gZenOperatingSystemCommonUtils",
   "gZenCommonActions",
 
-  "gZenCompactModeManager",
-
   "gZenWindowSync",
 
   "gZenUIManager",
@@ -28,14 +26,9 @@ export default [
 
   "gZenEmojiPicker",
   "gZenSessionStore",
-  "gZenFolders",
   "gZenMediaController",
-  "gZenGlanceManager",
-  "gZenLiveFoldersUI",
 
   "gZenThemePicker",
-
-  "gZenViewSplitter",
 
   "Ci",
   "Cu",

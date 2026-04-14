@@ -8,8 +8,6 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
-  ZenLiveFoldersManager:
-    "resource:///modules/zen/ZenLiveFoldersManager.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   SessionStore: "resource:///modules/sessionstore/SessionStore.sys.mjs",
   SessionStartup: "resource:///modules/sessionstore/SessionStartup.sys.mjs",
@@ -54,8 +52,7 @@ const REGENERATION_DEBOUNCE_RATE_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
  * Class representing the sidebar object stored in the session file.
- * This object holds all the data related to tabs, groups, folders
- * and split view state.
+ * This object holds all the data related to tabs and groups.
  */
 class nsZenSidebarObject {
   #sidebar = {};
@@ -80,7 +77,7 @@ export class nsZenSessionManager {
    */
   #file = null;
   /**
-   * The sidebar object holding tabs, groups, folders and split view data.
+   * The sidebar object holding tabs and groups data.
    *
    * @type {nsZenSidebarObject}
    */
@@ -420,8 +417,7 @@ export class nsZenSessionManager {
       this.#sidebar = sidebar;
     }
     // Restore all windows with the same sidebar object, this will
-    // guarantee that all tabs, groups, folders and split view data
-    // are properly synced across all windows.
+    // guarantee that all tabs and groups are properly synced across all windows.
     if (!this._shouldRunMigration) {
       this.log(
         `Restoring Zen session data into ${initialState.windows?.length || 0} windows`
@@ -597,7 +593,6 @@ export class nsZenSessionManager {
     } else {
       this.#file._save();
     }
-    lazy.ZenLiveFoldersManager.saveState(soon);
     this.#debounceRegeneration();
     this.log(`Saving Zen session data with ${sidebar.tabs?.length || 0} tabs`);
   }
@@ -752,8 +747,6 @@ export class nsZenSessionManager {
     sidebarData.tabs = this.#collectUsedTabsFromWindows(aStateWindows);
 
     let firstWindow = aStateWindows[0];
-    sidebarData.folders = firstWindow.folders;
-    sidebarData.splitViewData = firstWindow.splitViewData;
     sidebarData.groups = firstWindow.groups;
     sidebarData.spaces = firstWindow.spaces;
   }
@@ -781,13 +774,7 @@ export class nsZenSessionManager {
       }
       aWindowData.tabs = [...pinnedTabs, ...unpinedWindowTabs];
 
-      // We restore ALL the split view data in the sidebar, if the group doesn't exist in the window,
-      // it should be a no-op anyways.
-      aWindowData.splitViewData = [
-        ...(sidebar.splitViewData || []),
-        ...(aWindowData.splitViewData || []),
-      ];
-      // Same thing with groups, we restore all the groups from the sidebar, if they don't have any
+      // We restore all the groups from the sidebar, if they don't have any
       // existing tabs in the window, they should be a no-op.
       aWindowData.groups = [
         ...(sidebar.groups || []),
@@ -795,17 +782,13 @@ export class nsZenSessionManager {
       ];
     } else {
       aWindowData.tabs = sidebar.tabs || [];
-      aWindowData.splitViewData = sidebar.splitViewData;
       aWindowData.groups = sidebar.groups;
     }
 
-    // Folders are always pinned, so we dont need to check for the pinned state here.
-    aWindowData.folders = sidebar.folders;
     aWindowData.spaces = sidebar.spaces;
     this.log("Restored sidebar data into window", {
       tabs: aWindowData.tabs?.length || 0,
       groups: aWindowData.groups?.length || 0,
-      folders: aWindowData.folders?.length || 0,
       spaces: aWindowData.spaces?.length || 0,
     });
   }

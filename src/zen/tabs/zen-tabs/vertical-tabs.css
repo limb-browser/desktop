@@ -323,10 +323,6 @@
       }
     }
 
-    :root[zen-sidebar-expanded="true"] &:not([zen-glance-tab]) {
-      margin-inline-start: var(--zen-folder-indent) !important;
-    }
-
     &[zen-empty-tab] {
       display: none;
     }
@@ -370,81 +366,6 @@
       }
     }
 
-    /* --- Glance Tab Styles (Nested .tabbrowser-tab) --- */
-    & .tabbrowser-tab {
-      pointer-events: none;
-      margin: 0 0 0 4px !important;
-      --toolbarbutton-inner-padding: 0;
-      --border-radius-medium: 8px;
-      width: var(--size-item-medium);
-      height: var(--size-item-medium);
-      --tab-min-height: 24px;
-      --tab-min-width: 24px;
-
-      & .tab-background {
-        background: var(--zen-toolbar-element-bg) !important;
-        margin-block: 0 !important;
-        margin-inline: 0 !important;
-        box-shadow: none !important;
-        border-radius: calc(var(--border-radius-medium) - 2px);
-      }
-
-      & .tab-content {
-        padding: 0 5px;
-      }
-
-      & label,
-      & .tab-close-button,
-      & .tab-reset-button,
-      & .tab-reset-pin-button {
-        display: none !important;
-      }
-
-      /* Style glance tab icon */
-      & .tab-icon-image {
-        --toolbarbutton-inner-padding: 0 !important;
-        width: 14px;
-        height: 14px;
-      }
-
-      & .tab-audio-button {
-        display: none !important;
-      }
-
-      &[soundplaying]:not([muted]) .tab-icon-stack::after {
-        content: "";
-        position: absolute;
-        width: 110%;
-        height: 110%;
-      background: url("chrome://browser/content/zen-images/note-indicator.svg") no-repeat;
-        top: -70%;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 0;
-        pointer-events: none;
-        transition: opacity 0.8s ease;
-        opacity: 1;
-      }
-    }
-
-    /* --- Essentials Glance Tab Specifics (Floating) --- */
-    /* Additional styles for glance tabs in "essential" mode */
-    &[zen-essential="true"] .tabbrowser-tab {
-      position: absolute;
-      top: 0;
-      right: 0;
-
-      --tab-collapsed-width: 34px;
-      --tab-min-height: 16px;
-      width: var(--tab-collapsed-width) !important;
-      z-index: 1;
-      pointer-events: none;
-
-      & .tab-background {
-        background: light-dark(rgb(249, 249, 249), rgb(63, 63, 63)) !important;
-        border: 2px solid light-dark(rgba(0, 0, 0, 0.4), rgba(255, 255, 255, 0.4));
-      }
-    }
   }
 }
 
@@ -1170,8 +1091,7 @@
   }
 }
 
-.tabbrowser-tab[zen-essential="true"],
-#zen-welcome-initial-essentials-browser-sidebar-essentials .tabbrowser-tab {
+.tabbrowser-tab[zen-essential="true"] {
   --toolbarbutton-inner-padding: 0;
   max-width: unset;
   width: 100% !important;

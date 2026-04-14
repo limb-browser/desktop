@@ -39,14 +39,10 @@
     if (
       !element ||
       element.closest(".zen-current-workspace-indicator") ||
-      element.hasAttribute("split-view-group") ||
       element.classList.contains("zen-drop-target") ||
       isEssentialsPromo(element)
     ) {
       return element;
-    }
-    if (element.group?.hasAttribute("split-view-group")) {
-      return element.group;
     }
     if (isTab(element)) {
       return element;
@@ -69,8 +65,6 @@
     #changeSpaceTimer = null;
     #isAnimatingTabMove = false;
 
-    #dragOverSplit = {};
-
     constructor(tabbrowserTabs) {
       super(tabbrowserTabs);
 
@@ -81,24 +75,6 @@
         Ci.nsIZenDragAndDrop
       );
 
-      XPCOMUtils.defineLazyPreferenceGetter(
-        this,
-        "_dndSplitEnabled",
-        "zen.splitView.enable-drag-over-split",
-        true
-      );
-      XPCOMUtils.defineLazyPreferenceGetter(
-        this,
-        "_dndSplitThreshold",
-        "zen.splitView.drag-over-split-threshold",
-        25
-      );
-      XPCOMUtils.defineLazyPreferenceGetter(
-        this,
-        "_dndSplitDelay",
-        "zen.splitView.drag-over-split-delayMC",
-        300
-      );
       XPCOMUtils.defineLazyPreferenceGetter(
         this,
         "_dndSwitchSpaceDelay",
@@ -131,7 +107,6 @@
     startTabDrag(event, tab, ...args) {
       this.ZenDragAndDropService.onDragStart(1);
       this.#isOutOfWindow = false;
-      gZenCompactModeManager._isTabBeingDragged = true;
       super.startTabDrag(event, tab, ...args);
       const dt = event.dataTransfer;
       if (isTabGroupLabel(tab)) {
@@ -176,7 +151,7 @@
           if (tabClone.hasAttribute("visuallyselected")) {
             tabClone.style.transform = "translate(-50%, -50%)";
           }
-        } else if (AppConstants.platform !== "macosx" && !tab.isZenFolder) {
+        } else if (AppConstants.platform !== "macosx") {
           // On windows and linux, we still don't add some extra opaqueness
           // for the tab to be more visible. This is a hacky workaround.
           // TODO: Make windows and linux DnD use nsZenDragAndDrop::mDragImageOpacity
@@ -199,16 +174,6 @@
             0,
             Math.floor(tabLabelParentWidth / 6)
           );
-        } else if (
-          gBrowser.isTabGroup(tabClone) &&
-          tabClone.hasAttribute("split-view-group")
-        ) {
-          let tabs = tab.tabs;
-          for (let j = 0; j < tabs.length; j++) {
-            const tabInGroup = tabs[j];
-            const tabInGroupClone = tabInGroup.cloneNode(true);
-            tabClone.appendChild(tabInGroupClone);
-          }
         }
       }
       this.#maybeCreateDragImageDot(movingTabs, wrapper);
@@ -643,7 +608,6 @@
         return;
       }
       this.#handle_sidebarDragOver(event);
-      this.#handle_tabDragOverToSplit(event);
     }
 
     #shouldSwitchSpace(event) {
@@ -654,13 +618,8 @@
       // can change the workspace after a short delay.
       const splitter = document.getElementById("zen-sidebar-splitter");
       let rect = window.windowUtils.getBoundsWithoutFlushing(gNavToolbox);
-      if (!(
-        gZenCompactModeManager.preference &&
-        gZenCompactModeManager.canHideSidebar
-      )) {
-        rect.width +=
-          window.windowUtils.getBoundsWithoutFlushing(splitter).width;
-      }
+      rect.width +=
+        window.windowUtils.getBoundsWithoutFlushing(splitter).width;
       const { clientX } = event;
       const isNearLeftEdge =
         clientX >= rect.left - padding && clientX <= rect.left + padding;
@@ -727,125 +686,6 @@
       }
     }
 
-    #handle_tabDragOverToSplit(event) {
-      if (!this._dndSplitEnabled) {
-        return;
-      }
-
-      const dt = event.dataTransfer;
-      const draggedTab = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
-      if (!isTab(draggedTab)) {
-        return;
-      }
-
-      const dragData = draggedTab._dragData;
-      const movingTabsSet = dragData.movingTabsSet;
-      const dropElement = event.target.closest(".tabbrowser-tab");
-
-      // TODO: After Cheff adds split view support for essentials, don't forget to remove the check
-      if (
-        !dropElement ||
-        !isTab(dropElement) ||
-        dropElement.hasAttribute("zen-essential") ||
-        dropElement.hasAttribute("zen-glance-tab") ||
-        dropElement?.group?.hasAttribute("split-view-group") ||
-        movingTabsSet.size > 1
-      ) {
-        this._clearDragOverSplit();
-        return;
-      }
-
-      if (
-        movingTabsSet.has(dropElement) ||
-        !isTab(draggedTab) ||
-        draggedTab?.group?.hasAttribute("split-view-group") ||
-        draggedTab.hasAttribute("zen-live-folder-item-id") ||
-        dropElement.hasAttribute("zen-live-folder-item-id")
-      ) {
-        this._clearDragOverSplit();
-        return;
-      }
-
-      const rect = window.windowUtils.getBoundsWithoutFlushing(dropElement);
-      const { clientX, clientY } = event;
-      const targetX = rect.x;
-      const targetTop = rect.top;
-      const targetWidth = rect.width;
-      const targetHeight = rect.height;
-
-      const edgeZoneThreshold = this._dndSplitThreshold / 100;
-
-      const overlapRatioY = (clientY - targetTop) / targetHeight;
-      if (
-        overlapRatioY < edgeZoneThreshold ||
-        overlapRatioY > 1 - edgeZoneThreshold
-      ) {
-        this._clearDragOverSplit();
-        return;
-      }
-
-      const isLeft = clientX < targetX + targetWidth / 2;
-      const dropSide = isLeft ? "left" : "right";
-
-      // If the drop side or element changes, clear dragOverSplit
-      if (
-        this.#dragOverSplit.data?.dropElement !== dropElement ||
-        this.#dragOverSplit.data?.dropSide !== dropSide
-      ) {
-        this._clearDragOverSplit();
-      }
-
-      if (
-        this.#dragOverSplit.timer &&
-        this.#dragOverSplit.data?.dropElement === dropElement &&
-        this.#dragOverSplit.data?.dropSide === dropSide
-      ) {
-        // Timer already running for the same target and side, do nothing
-        return;
-      }
-
-      this.#dragOverSplit.data = {
-        dropElement,
-        dropSide,
-      };
-      this.#dragOverSplit.timer = setTimeout(() => {
-        this.#createFakeTabSplit(dropElement, dropSide);
-      }, this._dndSplitDelay);
-    }
-
-    #createFakeTabSplit(dropElement, dropSide) {
-      // Remove drop indicator
-      this.clearDragOverVisuals({ clearSplitDropIndicator: false });
-
-      // Remove any existing fake tab
-      if (this.#dragOverSplit.fakeTab) {
-        this.#dragOverSplit.fakeTab.remove();
-      }
-
-      const element = document.createXULElement("zen-split-fake-tab");
-      const firstChild = dropElement.firstChild;
-      if (dropSide === "left") {
-        firstChild.before(element);
-      } else {
-        firstChild.after(element);
-      }
-
-      this.#dragOverSplit.fakeTab = element;
-      this.#dragOverSplit.canDrop = true;
-    }
-
-    _clearDragOverSplit() {
-      if (this.#dragOverSplit.timer) {
-        clearTimeout(this.#dragOverSplit.timer);
-      }
-      this.#dragOverSplit.fakeTab?.remove();
-
-      this.#dragOverSplit.timer = null;
-      this.#dragOverSplit.fakeTab = null;
-      this.#dragOverSplit.data = null;
-      this.#dragOverSplit.canDrop = null;
-    }
-
     handle_windowDragEnter(event) {
       if (!this.#isMovingTab() || !this.#isOutOfWindow) {
         return;
@@ -880,7 +720,6 @@
         clientY >= winHeight - allowedMargin;
       if (isOutOfWindow && !this.#isOutOfWindow) {
         this.#isOutOfWindow = true;
-        gZenViewSplitter.onBrowserDragEndToSplit(event, true);
         this.#maybeClearVerticalPinnedGridDragOver();
         this.clearSpaceSwitchTimer();
         this.clearDragOverVisuals();
@@ -913,12 +752,9 @@
 
     handle_drop(event) {
       this.clearSpaceSwitchTimer();
-      gZenFolders.highlightGroupOnDragOver(null);
       super.handle_drop(event);
       this.#maybeClearVerticalPinnedGridDragOver();
       this.#handle_dropSwitchSpace(event);
-      this.#handle_dropCreateSplit(event);
-      this._clearDragOverSplit();
     }
 
     #handle_dropSwitchSpace(event) {
@@ -936,54 +772,17 @@
               tab.setAttribute("zen-workspace-id", activeWorkspace);
             }
             gBrowser.selectedTab = draggedTab;
-          } else if (isTabGroupLabel(draggedTab)) {
-            draggedTab = draggedTab.group;
-            gZenFolders.changeFolderToSpace(draggedTab, activeWorkspace, {
-              hasDndSwitch: true,
-            });
           }
         }
       }
       gZenWorkspaces.updateTabsContainers();
     }
 
-    #handle_dropCreateSplit(event) {
-      if (!this.#dragOverSplit.canDrop) {
-        return;
-      }
-
-      const dragData = this.#dragOverSplit.data;
-      const dt = event.dataTransfer;
-      const draggedTab = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
-
-      if (!dragData || !draggedTab) {
-        return;
-      }
-
-      this._dontAnimateTabMove = true;
-      const droppedOnTab = dragData.dropElement;
-      const dropSide = dragData.dropSide;
-
-      // Clear any visuals and timer
-      this._clearDragOverSplit();
-
-      const isLeft = dropSide === "left";
-      gZenViewSplitter.splitTabs(
-        isLeft ? [draggedTab, droppedOnTab] : [droppedOnTab, draggedTab],
-        "vsep",
-        isLeft ? 0 : 1
-      );
-    }
-
     handle_drop_transition(dropElement, draggedTab, movingTabs, dropBefore) {
       if (isTabGroupLabel(dropElement)) {
         dropElement = dropElement.group;
       }
-      if (
-        isTabGroupLabel(draggedTab) ||
-        (isTab(draggedTab) &&
-          draggedTab.group?.hasAttribute("split-view-group"))
-      ) {
+      if (isTabGroupLabel(draggedTab)) {
         draggedTab = draggedTab.group;
       }
       for (let item of this._tabbrowserTabs.ariaFocusableItems) {
@@ -1115,14 +914,10 @@
       if (currentEssenialContainer?.essentialsPromo) {
         currentEssenialContainer.essentialsPromo.remove();
       }
-      // We also call it here to ensure we clear any highlight if the drop happened
-      // outside of a valid drop target.
-      ownerGlobal.gZenFolders.highlightGroupOnDragOver(null);
       this.ZenDragAndDropService.onDragEnd();
       super.handle_dragend(event);
       thisFromGlobal.clearDragOverVisuals();
       ownerGlobal.gZenPinnedTabManager.removeTabContainersDragoverClass();
-      thisFromGlobal._clearDragOverSplit();
       this.#maybeClearVerticalPinnedGridDragOver();
       thisFromGlobal.originalDragImageArgs = [];
       window.removeEventListener(
@@ -1140,10 +935,6 @@
       if (thisFromGlobal._tempDragImageParent) {
         thisFromGlobal._tempDragImageParent.remove();
         delete thisFromGlobal._tempDragImageParent;
-      }
-      delete ownerGlobal.gZenCompactModeManager._isTabBeingDragged;
-      if (dt.dropEffect !== "move") {
-        ownerGlobal.gZenCompactModeManager._clearAllHoverStates();
       }
     }
 
@@ -1178,33 +969,9 @@
       }
     }
 
-    clearDragOverVisuals({ clearSplitDropIndicator = true } = {}) {
+    clearDragOverVisuals() {
       this.#removeDragOverBackground();
-      if (clearSplitDropIndicator) {
-        this._clearDragOverSplit();
-      }
       gZenPinnedTabManager.removeTabContainersDragoverClass();
-    }
-
-    #canDropIntoFolder(dropElement, draggedTab) {
-      let folder = dropElement?.classList.contains("tab-group-label-container")
-        ? dropElement.parentElement
-        : dropElement?.group;
-      if (!folder?.isZenFolder) {
-        return true;
-      }
-      if (folder.isLiveFolder) {
-        const liveFolderItemId = draggedTab.getAttribute(
-          "zen-live-folder-item-id"
-        );
-        if (
-          !liveFolderItemId ||
-          !liveFolderItemId.startsWith(`${folder.id}:`)
-        ) {
-          return false;
-        }
-      }
-      return true;
     }
 
     _moveTogetherSelectedTabs() {
@@ -1213,20 +980,12 @@
 
     // eslint-disable-next-line complexity
     #applyDragoverIndicator(event, dropElement, movingTabs, draggedTab) {
-      // Doesn't show indicator when dragOverSplit
-      if (this.#dragOverSplit.canDrop) {
-        return;
-      }
       const separation = 4;
       const dropZoneSelector = ":is(.zen-drop-target)";
       let shouldPlayHapticFeedback = false;
       let showIndicatorUnderNewTabButton = false;
       let dropBefore = false;
       let dropElementFromEvent = event.target.closest(dropZoneSelector);
-      if (!dropElement && dropElementFromEvent?.isZenFolder) {
-        // If we're dragging over a folder, we want to show the indicator on the folder itself, not the label.
-        dropElementFromEvent = dropElementFromEvent.labelElement;
-      }
       dropElement = dropElementFromEvent || dropElement;
       if (!dropElementFromEvent) {
         let hoveringPeriphery = !!event.target.closest(
@@ -1276,53 +1035,12 @@
           dropBefore = true;
         }
       }
-      let possibleFolderElement = dropElement.parentElement;
-      let isZenFolder = possibleFolderElement?.isZenFolder;
-      let canHightlightGroup =
-        gZenFolders.highlightGroupOnDragOver(
-          possibleFolderElement,
-          movingTabs
-        ) || !isZenFolder;
       let rect = window.windowUtils.getBoundsWithoutFlushing(dropElement);
       const overlapPercent = (event.clientY - rect.top) / rect.height;
-      // We wan't to leave a small threshold (20% for example) so we can drag tabs below and above
-      // a folder label without dragging into the folder.
-      let threshold =
-        Services.prefs.getIntPref(
-          "zen.tabs.folder-dragover-threshold-percent"
-        ) / 100;
-      let dropIntoFolder =
-        isZenFolder &&
-        (overlapPercent < threshold ||
-          (overlapPercent > 1 - threshold &&
-            (possibleFolderElement.collapsed ||
-              possibleFolderElement.childGroupsAndTabs.length < 2)));
-      if (
-        canHightlightGroup &&
-        !dropIntoFolder &&
-        !this.#canDropIntoFolder(dropElement, draggedTab)
-      ) {
-        this.clearDragOverVisuals();
-        dropElement = null;
-        return [dropElement, dropBefore];
-      }
-      if (
-        isTabGroupLabel(draggedTab) &&
-        draggedTab.group?.isZenFolder &&
-        (((isTab(dropElement) ||
-          dropElement.hasAttribute("split-view-group")) &&
-          (!dropElement.pinned || dropElement.hasAttribute("zen-essential"))) ||
-          showIndicatorUnderNewTabButton)
-      ) {
-        dropElement = null;
-        this.clearDragOverVisuals();
-        return [dropElement, dropBefore];
-      }
+      let threshold;
       if (
         isTab(dropElement) ||
-        dropIntoFolder ||
-        showIndicatorUnderNewTabButton ||
-        dropElement.hasAttribute("split-view-group")
+        showIndicatorUnderNewTabButton
       ) {
         if (showIndicatorUnderNewTabButton) {
           rect = window.windowUtils.getBoundsWithoutFlushing(
@@ -1357,12 +1075,8 @@
         indicator.style.top = top;
         indicator.style.removeProperty("left");
         this.#removeDragOverBackground();
-        if (!isTab(dropElement) && dropElement?.parentElement?.isZenFolder) {
-          dropElement = dropElement.parentElement;
-        }
       } else if (
-        dropElement.classList.contains("zen-drop-target") &&
-        canHightlightGroup
+        dropElement.classList.contains("zen-drop-target")
       ) {
         shouldPlayHapticFeedback =
           this.#applyDragOverBackground(dropElement) &&

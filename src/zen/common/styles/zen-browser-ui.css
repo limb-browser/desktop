@@ -245,7 +245,6 @@
   }
 }
 
-.zen-split-view-splitter[orient="vertical"],
 #zen-sidebar-splitter {
   position: absolute;
   top: 0;
@@ -256,14 +255,6 @@
   border: none;
   cursor: ew-resize;
   z-index: 3;
-
-  &:is(.zen-split-view-splitter[orient="vertical"]) {
-    /* Bit of a hacky solution, but it works */
-    width: var(--zen-split-row-gap);
-    margin-left: calc(var(--zen-element-separation) * -1 - 1px);
-    height: unset;
-    cursor: ew-resize;
-  }
 
   &::before {
     height: 50px;
@@ -277,26 +268,6 @@
     opacity: 0;
     transition: opacity 0.1s ease-in-out;
     pointer-events: none;
-  }
-
-  &:hover::before {
-    opacity: 1;
-  }
-}
-.zen-split-view-splitter[orient="horizontal"] {
-  &::before {
-    height: 2px;
-    width: 50px;
-    background: var(--button-background-color-primary);
-    border-radius: 2px;
-    content: "";
-    position: absolute;
-    top: 40%;
-    left: 50%;
-    opacity: 0;
-    transition: opacity 0.1s ease-in-out;
-    pointer-events: none;
-    transform: translateX(-50%);
   }
 
   &:hover::before {

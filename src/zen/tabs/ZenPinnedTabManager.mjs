@@ -199,8 +199,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
   _setResetPinSublabel(tab, accelHeld) {
     let label = tab.querySelector(".zen-tab-sublabel");
     const getLabel = b => (b ? "zen-default-pinned-cmd" : "zen-default-pinned");
-    // We might not want to change the sublabel if it was already customized by,
-    // for example, live folders, so only change it if it's currently the default one.
+    // Only change the sublabel if it's currently the default one.
     if (
       document.l10n.getAttributes(label).args.tabSubtitle !=
       getLabel(!accelHeld)
@@ -269,14 +268,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
       const tabs = Array.isArray(selectedTab) ? selectedTab : [selectedTab];
       const pinnedTabs = [
         ...new Set(
-          tabs
-            .flatMap(tab => {
-              if (tab.group?.hasAttribute("split-view-group")) {
-                return tab.group.tabs;
-              }
-              return tab;
-            })
-            .filter(tab => tab?.pinned)
+          tabs.filter(tab => tab?.pinned)
         ),
       ];
 
@@ -315,43 +307,8 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
         case "switch":
           if (behavior.includes("unload")) {
             for (const tab of pinnedTabs) {
-              if (tab.hasAttribute("glance-id")) {
-                // We have a glance tab inside the tab we are trying to unload,
-                // before we used to just ignore it but now we need to fully close
-                // it as well.
-                gZenGlanceManager.manageTabClose(tab.glanceTab);
-                await new Promise(resolve => {
-                  let hasRan = false;
-                  const onGlanceClose = () => {
-                    hasRan = true;
-                    resolve();
-                  };
-                  window.addEventListener("GlanceClose", onGlanceClose, {
-                    once: true,
-                  });
-                  // Set a timeout to resolve the promise if the event doesn't fire.
-                  // We do this to prevent any future issues where glance woudnt close such as
-                  // glance requering to ask for permit unload.
-                  setTimeout(() => {
-                    if (!hasRan) {
-                      console.warn(
-                        "GlanceClose event did not fire within 3 seconds"
-                      );
-                      resolve();
-                    }
-                  }, 3000);
-                });
-                return;
               }
-              const isSpltView = tab.group?.hasAttribute("split-view-group");
-              const group = isSpltView ? tab.group.group : tab.group;
-              if (!folderToUnload && tab.hasAttribute("folder-active")) {
-                await gZenFolders.animateUnload(group, tab);
-              }
-            }
-            if (folderToUnload) {
-              await gZenFolders.animateUnloadAll(folderToUnload);
-            }
+
             const allAreUnloaded = pinnedTabs.every(
               tab =>
                 tab.hasAttribute("pending") &&
@@ -727,12 +684,6 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
         currentEssenialContainer.essentialsPromo.remove();
       }
 
-      movingTabs = movingTabs.filter(tab =>
-        gBrowser.isTabGroupLabel(tab) && tab.group?.isZenFolder
-          ? !tabsTarget && !essentialTabsTarget
-          : true
-      );
-
       // TODO: Solve the issue of adding a tab between two groups
       // Remove group labels from the moving tabs and replace it
       // with the sub tabs
@@ -755,8 +706,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
         // Check for essentials container
         if (essentialTabsTarget) {
           if (
-            !tab.hasAttribute("zen-essential") &&
-            !tab?.group?.hasAttribute("split-view-group")
+            !tab.hasAttribute("zen-essential")
           ) {
             moved = true;
             isVertical = false;
@@ -790,9 +740,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
 
         // If the tab was moved, adjust its position relative to the target tab
         if (hasActuallyMoved) {
-          const targetTab = event.target.closest(".tabbrowser-tab");
-          const targetFolder = event.target.closest("zen-folder");
-          let targetElem = targetTab || targetFolder?.labelElement;
+          let targetElem = event.target.closest(".tabbrowser-tab");
           if (targetElem?.group?.activeGroups?.length > 0) {
             const activeGroup = targetElem.group.activeGroups.at(-1);
             targetElem = activeGroup.labelElement;
@@ -883,11 +831,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
       }
       return;
     }
-    if (tab.group?.hasAttribute("split-view-group")) {
-      tab.setAttribute("had-zen-pinned-changed", "true");
-    } else {
-      tab.setAttribute("zen-pinned-changed", "true");
-    }
+    tab.setAttribute("zen-pinned-changed", "true");
     tab.style.setProperty(
       "--zen-original-tab-icon",
       `url(${tab._zenPinnedInitialState.image})`
@@ -933,10 +877,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
       return;
     }
     let isVertical = this.expandedSidebarMode;
-    if (
-      gBrowser.isTabGroupLabel(draggedTab) &&
-      !draggedTab?.group?.hasAttribute("split-view-group")
-    ) {
+    if (gBrowser.isTabGroupLabel(draggedTab)) {
       // If the target is a tab group label, we don't want to apply the dragover class
       this.removeTabContainersDragoverClass();
       return;
@@ -950,12 +891,8 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     const tabsTarget = event.target.closest(
       ".zen-workspace-normal-tabs-section"
     );
-    const folderTarget = event.target.closest("zen-folder");
     let targetTab = event.target.closest(".tabbrowser-tab");
     targetTab = targetTab?.group || targetTab;
-    draggedTab = draggedTab?.group?.hasAttribute("split-view-group")
-      ? draggedTab.group
-      : draggedTab;
     const isHoveringIndicator = !!event.target.closest(
       ".zen-current-workspace-indicator"
     );
@@ -966,9 +903,6 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
       gZenWorkspaces.activeWorkspaceIndicator?.removeAttribute("open");
     }
 
-    if (draggedTab?._dragData?.movingTabs) {
-      gZenFolders.ungroupTabsFromActiveGroups(draggedTab._dragData.movingTabs);
-    }
 
     let shouldAddDragOverElement = false;
 

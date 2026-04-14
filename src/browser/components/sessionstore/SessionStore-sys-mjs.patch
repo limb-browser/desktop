@@ -182,8 +182,6 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
        tabState.pinned = false;
 +      tabState.zenEssential = false;
 +      tabState.zenSyncId = null;
-+      tabState.zenIsGlance = false;
-+      tabState.zenGlanceId = null;
 +      tabState.zenHasStaticLabel = false;
 
        if (inBackground === false) {
@@ -235,7 +233,6 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
      let winData = this._windows[aWindow.__SSi];
      let tabsData = (winData.tabs = []);
  
-+    winData.splitViewData = aWindow.gZenViewSplitter?.storeDataForSessionStore();
      // update the internal state data for this window
      for (let tab of tabs) {
        if (tab == aWindow.FirefoxViewHandler.tab) {
@@ -243,7 +240,6 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
        tabsData.push(tabData);
      }
  
-+    winData.folders = aWindow.gZenFolders?.storeDataForSessionStore() || [];
      // update tab group state for this window
      winData.groups = [];
      for (let tabGroup of aWindow.gBrowser.tabGroups) {
@@ -281,9 +277,7 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
 +    if (winData.isZenUnsynced) {
 +      aWindow.document.documentElement.setAttribute("zen-unsynced-window", "true");
 +    }
-+    aWindow.gZenFolders?.restoreDataFromSessionStore(winData.folders);
-+    aWindow.gZenViewSplitter?.restoreDataFromSessionStore(winData.splitViewData);
- 
+
      // Move the originally open tabs to the end.
      if (initialTabs) {
 @@ -6638,6 +6679,25 @@ var SessionStoreInternal = {

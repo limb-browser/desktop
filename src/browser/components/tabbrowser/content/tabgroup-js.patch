@@ -133,9 +133,6 @@ index 3ca119e8dc72fac652c98505211864483d98add2..b65307ee8df896488a4c51e3a25bf9ad
      }
  
      set collapsed(val) {
-+      if (this.hasAttribute("split-view-group")) {
-+        return;
-+      }
        if (!!val == this.collapsed) {
          return;
        }

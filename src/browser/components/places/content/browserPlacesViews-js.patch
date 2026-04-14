@@ -19,7 +19,6 @@ index 384d599c58cefbf80f5a50489fc401df0c8de8a5..aa85972946c3ff7866fbea86b0372432
            "scheme",
            PlacesUIUtils.guessUrlSchemeForUI(aPlacesNode.uri)
          );
-+        element.addEventListener("command", (e) => window.gZenGlanceManager.openGlanceForBookmark(e));
        } else if (PlacesUtils.containerTypes.includes(type)) {
          element = document.createXULElement("menu");
          element.setAttribute("container", "true");
@@ -71,8 +70,6 @@ index 384d599c58cefbf80f5a50489fc401df0c8de8a5..aa85972946c3ff7866fbea86b0372432
            "scheme",
            PlacesUIUtils.guessUrlSchemeForUI(aChild.uri)
          );
-+
-+        button.addEventListener("command", gZenGlanceManager.openGlanceForBookmark.bind(gZenGlanceManager));
        }
      }
  
@@ -80,8 +77,6 @@ index 384d599c58cefbf80f5a50489fc401df0c8de8a5..aa85972946c3ff7866fbea86b0372432
          PlacesUIUtils.guessUrlSchemeForUI(placesNode.uri)
        );
        element.setAttribute("label", PlacesUIUtils.getBestTitle(placesNode));
--
-+      element.addEventListener("command", gZenGlanceManager.openGlanceForBookmark.bind(gZenGlanceManager));
        let icon = placesNode.icon;
        if (icon) {
          element.setAttribute("image", icon);

@@ -6,9 +6,6 @@ index ced2bfd88de2d16e2c028ca3f4d9d27516363575..69b45c7dad9d294e4290de4ce878d184
     * @returns {MozTabbrowserTab|vbox}
     */
    const elementToMove = element => {
-+    if (element.group?.hasAttribute("split-view-group")) {
-+      return element.group;
-+    }
      if (isTab(element) || isSplitViewWrapper(element)) {
        return element;
      }
@@ -16,9 +13,6 @@ index ced2bfd88de2d16e2c028ca3f4d9d27516363575..69b45c7dad9d294e4290de4ce878d184
        }
  
        let draggedTab = event.dataTransfer.mozGetDataAt(TAB_DROP_TYPE, 0);
-+      if (draggedTab && dropEffect === "move") {
-+        gZenViewSplitter.onBrowserDragEndToSplit(event);
-+      }
        if (
          (dropEffect == "move" || dropEffect == "copy") &&
          document == draggedTab.ownerDocument &&
@@ -26,7 +20,6 @@ index ced2bfd88de2d16e2c028ca3f4d9d27516363575..69b45c7dad9d294e4290de4ce878d184
            !draggedTab.group.collapsed
          ) {
            draggedTab.group.collapsed = true;
-+          gZenFolders.animateGroupMove(draggedTab.group);
          }
  
          if (dropEffect == "move") {
@@ -137,7 +130,6 @@ index ced2bfd88de2d16e2c028ca3f4d9d27516363575..69b45c7dad9d294e4290de4ce878d184
  
            let nextItem = this._tabbrowserTabs.dragAndDropElements[newIndex];
            let tabGroup = isTab(nextItem) && nextItem.group;
-+          if (gZenViewSplitter.handleTabDrop(event, urls, replace, inBackground)) return;
            gBrowser.loadTabs(urls, {
              inBackground,
              replace,
@@ -146,16 +138,6 @@ index ced2bfd88de2d16e2c028ca3f4d9d27516363575..69b45c7dad9d294e4290de4ce878d184
        }
        this._resetTabsAfterDrop(draggedTab.ownerDocument);
 -
-+      if (!dt.mozUserCancelled && dt.dropEffect == "none" && !this._isCustomizing) {
-+        const moved = gZenViewSplitter.moveTabToSplitView(event, draggedTab);
-+        if (moved) {
-+          delete draggedTab._dragData;
-+          return;
-+        }
-+      } else if (dt.mozUserCancelled) {
-+        gZenViewSplitter.onBrowserDragEndToSplit(event, true);
-+        if (gZenViewSplitter._lastOpenedTab) gZenViewSplitter._lastOpenedTab._visuallySelected = false;
-+      }
        if (
          dt.mozUserCancelled ||
          dt.dropEffect != "none" ||
@@ -179,9 +161,6 @@ index ced2bfd88de2d16e2c028ca3f4d9d27516363575..69b45c7dad9d294e4290de4ce878d184
            return null;
          }
        }
-+      if (target?.group?.hasAttribute("split-view-group")) {
-+        target = target.group.labelElement;
-+      }
        return target;
      }
  
@@ -191,7 +170,6 @@ index ced2bfd88de2d16e2c028ca3f4d9d27516363575..69b45c7dad9d294e4290de4ce878d184
        ) {
 -        draggedTab.group.collapsed = false;
 +        draggedTab.group.collapsed = draggedTab.group.hasAttribute("has-active");
-+        gZenFolders.animateGroupMove(draggedTab.group, true);
        }
      }
  

@@ -8,7 +8,6 @@ index 1289549cf33ce6efb620c877bd1ba1c24475d2b0..4c34c923f4b129dd9ea79414d978c643
      return {
 +      pinned: tabGroup.pinned,
 +      essential: tabGroup.essential,
-+      splitView: tabGroup.hasAttribute("split-view-group"),
        id: tabGroup.id,
        name: tabGroup.label,
        color: tabGroup.color,

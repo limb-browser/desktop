@@ -65,9 +65,6 @@ const EVENTS = [
   "TabHide",
   "TabShow",
 
-  "ZenTabRemovedFromSplit",
-  "ZenSplitViewTabsSplit",
-
   ...INSTANT_EVENTS,
   ...UNSYNCED_WINDOW_EVENTS,
 ];
@@ -505,7 +502,7 @@ class nsZenWindowSync {
     if (!aOriginalItem || !aTargetItem) {
       return;
     }
-    const { gBrowser, gZenFolders } = aWindow;
+    const { gBrowser } = aWindow;
     if (flags & SYNC_FLAG_ICON) {
       aTargetItem.zenStaticIcon = aOriginalItem.zenStaticIcon;
       if (gBrowser.isTab(aOriginalItem)) {
@@ -513,9 +510,6 @@ class nsZenWindowSync {
           aTargetItem,
           aOriginalItem.getAttribute("image") || gBrowser.getIcon(aOriginalItem)
         );
-      } else if (aOriginalItem.isZenFolder) {
-        // Icons are a zen-only feature for tab groups.
-        gZenFolders.setFolderUserIcon(aTargetItem, aOriginalItem.iconURL);
       }
     }
     if (flags & SYNC_FLAG_LABEL) {
@@ -536,35 +530,6 @@ class nsZenWindowSync {
       );
       this.#syncItemPosition(aOriginalItem, aTargetItem, aWindow);
     }
-    if (aOriginalItem.hasAttribute("zen-live-folder-item-id")) {
-      this.#maybeSyncAttributeChange(
-        aOriginalItem,
-        aTargetItem,
-        "zen-live-folder-item-id"
-      );
-      this.#maybeSyncAttributeChange(
-        aOriginalItem,
-        aTargetItem,
-        "zen-show-sublabel"
-      );
-      this.#syncTabSubtitle(aWindow, aOriginalItem, aTargetItem);
-    } else if (aTargetItem.hasAttribute("zen-live-folder-item-id")) {
-      aTargetItem.removeAttribute("zen-live-folder-item-id");
-      if (aTargetItem.hasAttribute("zen-show-sublabel")) {
-        this.#syncTabSubtitle(aWindow, aOriginalItem, aTargetItem);
-        aTargetItem.removeAttribute("zen-show-sublabel");
-      }
-    }
-  }
-
-  #syncTabSubtitle(aWindow, aOriginalItem, aTargetItem) {
-    const subLabel = aOriginalItem.getAttribute("zen-show-sublabel");
-    const targetLabel = aTargetItem.querySelector(".zen-tab-sublabel");
-    if (targetLabel) {
-      aWindow.document.l10n.setArgs(targetLabel, {
-        tabSubtitle: subLabel || "zen-default-pinned",
-      });
-    }
   }
 
   /**
@@ -583,10 +548,6 @@ class nsZenWindowSync {
 
     const isGroup = gBrowser.isTabGroup(aOriginalItem);
     const isTab = !isGroup;
-
-    if (aOriginalItem.hasAttribute("zen-glance-tab")) {
-      return;
-    }
 
     if (isTab) {
       if (originalIsEssential !== targetIsEssential) {
@@ -1083,21 +1044,17 @@ class nsZenWindowSync {
     let activeTabs = activeBrowsers.map(browser =>
       aWindow.gBrowser.getTabForBrowser(browser)
     );
-    // Ignore previous tabs that are still "active". These scenarios could happen for example,
-    // when selecting on a split view tab that was already active.
+    // Ignore previous tabs that are still "active".
     if (
       aPreviousTab?._zenContentsVisible &&
       !activeTabs.includes(aPreviousTab)
     ) {
-      let tabsToSwap = aPreviousTab.group?.hasAttribute("split-view-group")
-        ? aPreviousTab.group.tabs
-        : [aPreviousTab];
+      let tabsToSwap = [aPreviousTab];
       for (const tab of tabsToSwap) {
         const otherTabToShow = this.#getActiveTabFromOtherWindows(
           aWindow,
           tab.id,
-          t =>
-            t?.splitView ? t.group.tabs.some(st => st.selected) : t?.selected
+          t => t?.selected
         );
         if (otherTabToShow) {
           otherTabToShow._zenContentsVisible = true;
@@ -1320,9 +1277,6 @@ class nsZenWindowSync {
         SYNC_FLAG_ICON | SYNC_FLAG_LABEL | SYNC_FLAG_MOVE
       );
     });
-    if (ignoreExistingId && tab?.splitView) {
-      this.on_ZenSplitViewTabsSplit({ target: tab.group });
-    }
   }
 
   on_ZenTabIconChanged(aEvent) {
@@ -1529,11 +1483,6 @@ class nsZenWindowSync {
       return;
     }
     const window = tabGroup.ownerGlobal;
-    const isFolder = tabGroup.isZenFolder;
-    const isSplitView = tabGroup.hasAttribute("split-view-group");
-    if (isSplitView) {
-      return; // Split view groups are synced via ZenSplitViewTabsSplit event.
-    }
     // Tab groups already have an ID upon creation.
     this.#runOnAllWindows(window, win => {
       // Check if a group with this ID already exists in the target window.
@@ -1545,9 +1494,7 @@ class nsZenWindowSync {
         return; // Do not proceed with creation.
       }
 
-      const newGroup = isFolder
-        ? win.gZenFolders.createFolder([], {})
-        : win.gBrowser.addTabGroup([]);
+      const newGroup = win.gBrowser.addTabGroup([]);
       newGroup.id = tabGroup.id;
       newGroup.alreadySynced = true;
       this.#syncItemWithOriginal(
@@ -1565,11 +1512,7 @@ class nsZenWindowSync {
     this.#runOnAllWindows(window, win => {
       const targetGroup = this.getItemFromWindow(win, tabGroup.id);
       if (targetGroup) {
-        if (targetGroup.isZenFolder) {
-          targetGroup.delete();
-        } else {
-          win.gBrowser.removeTabGroup(targetGroup, { isUserTriggered: true });
-        }
+        win.gBrowser.removeTabGroup(targetGroup, { isUserTriggered: true });
       }
     });
   }
@@ -1587,59 +1530,10 @@ class nsZenWindowSync {
 
   on_TabUngrouped() {
     // No need to sync anything when a tab is ungrouped, since on_TabMove will take
-    // care of moving the tab to the correct position. We still need to listen to this
-    // in order to throw sync events for other components such as live folders to
-    // update their state, but we don't need to do anything here.
+    // care of moving the tab to the correct position.
     return Promise.resolve();
   }
 
-  on_ZenTabRemovedFromSplit(aEvent) {
-    const tab = aEvent.target;
-    const window = tab.ownerGlobal;
-    this.#runOnAllWindows(window, win => {
-      const targetTab = this.getItemFromWindow(win, tab.id);
-      if (targetTab && win.gZenViewSplitter) {
-        win.gZenViewSplitter.removeTabFromGroup(targetTab);
-      }
-    });
-  }
-
-  on_ZenSplitViewTabsSplit(aEvent) {
-    const tabGroup = aEvent.target;
-    const window = tabGroup.ownerGlobal;
-    const tabs = tabGroup.tabs;
-    this.#runOnAllWindows(window, win => {
-      const otherWindowTabs = tabs
-        .map(tab => this.getItemFromWindow(win, tab.id))
-        .filter(Boolean);
-      if (otherWindowTabs.length && win.gZenViewSplitter) {
-        const group = win.gZenViewSplitter.splitTabs(
-          otherWindowTabs,
-          undefined,
-          -1,
-          {
-            groupFetchId: tabGroup.id,
-          }
-        );
-        if (group) {
-          let otherTabGroup = group.tabs[0].group;
-          otherTabGroup.id = tabGroup.id;
-          this.#syncItemWithOriginal(
-            aEvent.target,
-            otherTabGroup,
-            win,
-            SYNC_FLAG_MOVE
-          );
-        }
-      }
-    });
-
-    return new Promise(resolve => {
-      lazy.setTimeout(() => {
-        this.#onTabSwitchOrWindowFocus(window, null).finally(resolve);
-      }, 0);
-    });
-  }
 }
 
 // eslint-disable-next-line mozilla/valid-lazy

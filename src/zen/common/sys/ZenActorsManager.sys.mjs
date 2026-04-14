@@ -18,46 +18,7 @@ let JSPROCESSACTORS = {};
  * Detailed documentation of these options is in dom/docs/ipc/jsactors.rst,
  * available at https://firefox-source-docs.mozilla.org/dom/ipc/jsactors.html
  */
-let JSWINDOWACTORS = {
-  ZenModsMarketplace: {
-    parent: {
-      esModuleURI: "resource:///actors/ZenModsMarketplaceParent.sys.mjs",
-    },
-    child: {
-      esModuleURI: "resource:///actors/ZenModsMarketplaceChild.sys.mjs",
-      events: {
-        DOMContentLoaded: {},
-      },
-    },
-    matches: [
-      ...Services.prefs.getStringPref("zen.injections.match-urls").split(","),
-      "about:preferences",
-    ],
-  },
-  ZenGlance: {
-    parent: {
-      esModuleURI: "resource:///actors/ZenGlanceParent.sys.mjs",
-    },
-    child: {
-      esModuleURI: "resource:///actors/ZenGlanceChild.sys.mjs",
-      events: {
-        DOMContentLoaded: {},
-        mousedown: {
-          capture: true,
-        },
-        keydown: {
-          capture: true,
-        },
-        click: {
-          capture: true,
-        },
-      },
-    },
-    allFrames: true,
-    remoteTypes: ["web", "file"],
-    enablePreference: "zen.glance.enabled",
-  },
-};
+let JSWINDOWACTORS = {};
 
 export let gZenActorsManager = {
   init() {

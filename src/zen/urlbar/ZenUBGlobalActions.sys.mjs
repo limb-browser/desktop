@@ -19,24 +19,9 @@ function isNotEmptyTab(window) {
 
 const globalActionsTemplate = [
   {
-    label: "Toggle Compact Mode",
-    command: "cmd_zenCompactModeToggle",
-    icon: "chrome://browser/skin/zen-icons/sidebar.svg",
-  },
-  {
     label: "Open Theme Picker",
     command: "cmd_zenOpenZenThemePicker",
     icon: "chrome://browser/skin/zen-icons/edit-theme.svg",
-  },
-  {
-    label: "New Split View",
-    command: "cmd_zenNewEmptySplit",
-    icon: "chrome://browser/skin/zen-icons/split.svg",
-  },
-  {
-    label: "New Folder",
-    command: "cmd_zenOpenFolderCreation",
-    icon: "chrome://browser/skin/zen-icons/folder.svg",
   },
   {
     label: "Copy Current URL",

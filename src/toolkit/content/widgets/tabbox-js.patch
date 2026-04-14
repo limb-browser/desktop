@@ -31,7 +31,7 @@ index 24196c658309b1d3c049939f57a13c22d422a153..0cf49a0dc18b34a5be2fad8d2b124c7c
        this._inAsyncOperation = false;
        if (oldPanel != this._selectedPanel) {
 -        oldPanel?.classList.remove("deck-selected");
-+        if (!(window.gZenGlanceManager && gZenGlanceManager.shouldShowDeckSelected(this._selectedPanel, oldPanel))) oldPanel?.classList.remove("deck-selected");
++        oldPanel?.classList.remove("deck-selected");
          this._selectedPanel?.classList.add("deck-selected");
        }
        this.setAttribute("selectedIndex", val);
@@ -47,7 +47,6 @@ index 24196c658309b1d3c049939f57a13c22d422a153..0cf49a0dc18b34a5be2fad8d2b124c7c
       * @param {MozTab|null} [val]
       */
      set selectedItem(val) {
-+      val = window.gZenGlanceManager?.getTabOrGlanceChild(val) || val;
        if (val && !val.selected) {
          // The selectedIndex setter ignores invalid values
          // such as -1 if |val| isn't one of our child nodes.
@@ -56,7 +55,7 @@ index 24196c658309b1d3c049939f57a13c22d422a153..0cf49a0dc18b34a5be2fad8d2b124c7c
            return null;
          }
 -        if (filter(tab)) {
-+        if (filter(tab) && !tab.hasAttribute("zen-glance-tab") && !tab.hasAttribute("zen-empty-tab")) {
++        if (filter(tab) && !tab.hasAttribute("zen-empty-tab")) {
            return tab;
          }
        }
@@ -64,12 +63,11 @@ index 24196c658309b1d3c049939f57a13c22d422a153..0cf49a0dc18b34a5be2fad8d2b124c7c
       * @param {boolean} [aWrap]
       */
      advanceSelectedTab(aDir, aWrap) {
-+      if (window?.gZenGlanceManager?._animating) return;
        let { ariaFocusedItem } = this;
        let startTab = ariaFocusedItem;
        if (!ariaFocusedItem || !this.allTabs.includes(ariaFocusedItem)) {
 -        startTab = this.selectedItem;
-+        startTab = gZenGlanceManager.getFocusedTab(aDir) || this.selectedItem;
++        startTab = this.selectedItem;
        }
        let newTab = null;
  
