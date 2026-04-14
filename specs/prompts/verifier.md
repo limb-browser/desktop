@@ -39,6 +39,9 @@ Flaws include:
 - **Test naming accuracy:** Test file names and `describe` blocks must name the actual SUT. If tests instantiate `InMemoryFoo`, the describe should say `InMemoryFoo`, not `Foo`.
 - **Boundary precision:** When specs use "exceeds", "above", or "over", the implementation must use strict `>`. When specs use "below" or "under", it must use strict `<`. Only `>=` / `<=` for "at least", "at most", "reaches". Compare the exact spec wording against the comparison operator in code.
 - **UI completeness:** If a task specifies user-visible behavior (notifications, dialogs, buttons, visual indicators), verify that adapters or handlers exist to produce that behavior — not just domain probes. A probe that fires with no subscriber is missing required behavior.
+- **TS/MJS logic duplication:** When a task produces both `.ts` modules and `.mjs` browser scripts, check whether the same algorithm is implemented twice. If the `.mjs` re-implements logic that also exists in a `.ts` module: (1) verify the two implementations produce identical results for the same inputs — the `.mjs` version often has fewer cases handled, (2) verify tests cover the code path that actually runs in the browser (the `.mjs` version), not just the unused `.ts` version. A tested `.ts` function bypassed by `.mjs` re-implementation is dead code with false coverage.
+- **Test-production path alignment:** Verify that tested functions are actually called in the production code path. Run `scripts/check-dead-exports.sh`. An export consumed only by test files means the tested code never executes in the real application.
+- **Shared type completeness:** When a TS interface defines a data shape consumed by `.mjs` code, verify every field the `.mjs` reads is declared in the interface and populated by the code constructing the object. Field access on an undeclared property will silently yield `undefined`.
 
 ## Workflow
 
@@ -48,7 +51,7 @@ Flaws include:
 4. Read the task's referenced spec sections.
 5. Read all code files the task added or modified (check git diff).
 6. Run `npx vitest run` -- failures are automatic findings.
-7. Run `scripts/check-sql-interpolation.sh` and `scripts/check-port-completeness.sh` -- failures are automatic findings.
+7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, and `scripts/check-dead-exports.sh` -- failures are automatic findings.
 8. Apply verification targets systematically.
 9. Write findings to `specs/reviews/review-TASK_NNN-RN.md`:
    ```markdown
