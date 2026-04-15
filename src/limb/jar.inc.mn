@@ -40,6 +40,7 @@
         content/browser/limb/tree/SpatialIndex.mjs                      (../../limb/tree/SpatialIndex.mjs)
         content/browser/limb/tree/TabBridge.mjs                         (../../limb/tree/TabBridge.mjs)
         content/browser/limb/tree/TabCommandRouter.mjs                  (../../limb/tree/TabCommandRouter.mjs)
+        content/browser/limb/tree/TabPreloader.mjs                      (../../limb/tree/TabPreloader.mjs)
         content/browser/limb/tree/TabPositioner.mjs                     (../../limb/tree/TabPositioner.mjs)
         content/browser/limb/tree/testTreeData.mjs                      (../../limb/tree/testTreeData.mjs)
         content/browser/limb/tree/TreeNavigator.mjs                     (../../limb/tree/TreeNavigator.mjs)

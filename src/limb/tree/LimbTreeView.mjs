@@ -35,6 +35,7 @@ import { NewChildZoomHandler } from "./NewChildZoomHandler.mjs";
 import { ZoomMomentum } from "./ZoomMomentum.mjs";
 import { PanMomentum } from "./PanMomentum.mjs";
 import { AnimationCoordinator } from "./AnimationCoordinator.mjs";
+import { TabPreloader } from "./TabPreloader.mjs";
 
 // Zoom level change per 100px of wheel deltaY
 const ZOOM_SENSITIVITY = 0.05;
@@ -170,6 +171,12 @@ export class LimbTreeView {
   #tabBridge = null;
   /** @type {number} */
   #maxLiveTabs = 8;
+  /** @type {TabPreloader | null} */
+  #tabPreloader = null;
+  /** @type {{ suspendTab(tab: any): Promise<void>, restoreTab(tab: any): Promise<void> } | null} */
+  #tabPort = null;
+  /** @type {string | null} */
+  #previousPreloadNodeId = null;
 
   // Animation state for pan-only viewport transitions (centerOnNode)
   /** @type {{ startFocus: { x: number, y: number }, endFocus: { x: number, y: number }, startLevel: number, endLevel: number, duration: number } | null} */
@@ -315,6 +322,22 @@ export class LimbTreeView {
    */
   setMaxLiveTabs(maxLiveTabs) {
     this.#maxLiveTabs = maxLiveTabs;
+  }
+
+  /**
+   * Set the TabPreloader for proactive tab warming.
+   * @param {TabPreloader} tabPreloader
+   */
+  setTabPreloader(tabPreloader) {
+    this.#tabPreloader = tabPreloader;
+  }
+
+  /**
+   * Set the TabPort for preload restore/suspend operations.
+   * @param {{ suspendTab(tab: any): Promise<void>, restoreTab(tab: any): Promise<void> }} tabPort
+   */
+  setTabPort(tabPort) {
+    this.#tabPort = tabPort;
   }
 
   /**
@@ -891,6 +914,26 @@ export class LimbTreeView {
         );
       }
 
+      // Evaluate tab preloading after tier computation
+      if (this.#tabPreloader && this.#tiers) {
+        const nodeScreenWidth = BASE_NODE_WIDTH * zoom.zoomScale;
+        const prevId = this.#previousPreloadNodeId;
+        const newId = this.#tabPreloader.evaluate(this.#tiers, nodeScreenWidth);
+        this.#previousPreloadNodeId = newId;
+
+        if (prevId && prevId !== newId && this.#tabBridge && this.#tabPort) {
+          const tier = this.#tiers.get(prevId);
+          if (tier !== 'live' && tier !== 'focused') {
+            const tab = this.#tabBridge.getTabForNode(prevId);
+            if (tab) this.#tabPort.suspendTab(tab);
+          }
+        }
+        if (newId && newId !== prevId && this.#tabBridge && this.#tabPort) {
+          const tab = this.#tabBridge.getTabForNode(newId);
+          if (tab) this.#tabPort.restoreTab(tab);
+        }
+      }
+
       const frame = this.#renderer.computeFrame(
         renderPositions,
         renderParentMap,
@@ -1356,6 +1399,9 @@ export class LimbTreeView {
     this.#contentDeck = null;
     this.#tabBridge = null;
     this.#maxLiveTabs = 8;
+    this.#tabPreloader = null;
+    this.#tabPort = null;
+    this.#previousPreloadNodeId = null;
     this.#lastFrameNodes = [];
     this.#animation = null;
     this.#animationLastTime = 0;
