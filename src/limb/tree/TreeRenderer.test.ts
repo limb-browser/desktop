@@ -383,4 +383,77 @@ describe('TreeRenderer', () => {
       expect(frame.edges).toHaveLength(1);
     });
   });
+
+  describe('focus ring', () => {
+    it('returns focus ring rect for the focused visible node', () => {
+      const renderer = createRenderer();
+      const positions = new Map<string, NodePosition>([
+        ['root', { x: 0, y: 0 }],
+        ['child', { x: 1, y: 1 }],
+      ]);
+      const parentMap = new Map([['child', 'root']]);
+      const t = simpleTransform();
+
+      const frame = renderer.computeFrame(
+        positions,
+        parentMap,
+        t.toScreen,
+        t.zoomScale,
+        t.viewportWidth,
+        t.viewportHeight,
+        'child',
+      );
+
+      expect(frame.focusRing).not.toBeNull();
+      expect(frame.focusRing!.nodeId).toBe('child');
+      // Should match the child's node rect
+      const childNode = frame.nodes.find((n) => n.nodeId === 'child')!;
+      expect(frame.focusRing!.x).toBe(childNode.x);
+      expect(frame.focusRing!.y).toBe(childNode.y);
+      expect(frame.focusRing!.width).toBe(childNode.width);
+      expect(frame.focusRing!.height).toBe(childNode.height);
+    });
+
+    it('returns null focus ring when focused node is off-screen', () => {
+      const renderer = createRenderer();
+      const positions = new Map<string, NodePosition>([
+        ['root', { x: 0, y: 0 }],
+        ['child', { x: 100, y: 0 }],
+      ]);
+      const parentMap = new Map([['child', 'root']]);
+      const t = simpleTransform();
+
+      const frame = renderer.computeFrame(
+        positions,
+        parentMap,
+        t.toScreen,
+        t.zoomScale,
+        t.viewportWidth,
+        t.viewportHeight,
+        'child',
+      );
+
+      expect(frame.focusRing).toBeNull();
+    });
+
+    it('returns null focus ring when no focused node specified', () => {
+      const renderer = createRenderer();
+      const positions = new Map<string, NodePosition>([
+        ['root', { x: 0, y: 0 }],
+      ]);
+      const parentMap = new Map<string, string>();
+      const t = simpleTransform();
+
+      const frame = renderer.computeFrame(
+        positions,
+        parentMap,
+        t.toScreen,
+        t.zoomScale,
+        t.viewportWidth,
+        t.viewportHeight,
+      );
+
+      expect(frame.focusRing).toBeNull();
+    });
+  });
 });

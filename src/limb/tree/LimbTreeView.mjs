@@ -21,6 +21,8 @@ import { ZoomState } from "./ZoomState.mjs";
 import { TreeRenderer } from "./TreeRenderer.mjs";
 import { LODComputer } from "./LODComputer.mjs";
 import { PanInteraction } from "./PanInteraction.mjs";
+import { NodeLabelComputer } from "./NodeLabelComputer.mjs";
+import { HoverInteraction } from "./HoverInteraction.mjs";
 
 // Zoom level change per 100px of wheel deltaY
 const ZOOM_SENSITIVITY = 0.05;
@@ -39,6 +41,18 @@ const TIER_COLORS = {
   "focused": "#2a3a3a",
 };
 
+// Focus ring accent color and width
+const FOCUS_RING_COLOR = "#5588ff";
+const FOCUS_RING_WIDTH = 2;
+
+// Hover visual offset (pixels upward)
+const HOVER_OFFSET_Y = 2;
+
+// Ease-out for hover interpolation: t => 1 - (1 - t)^2
+function easeOut(t) {
+  return 1 - (1 - t) * (1 - t);
+}
+
 export class LimbTreeView {
   /** @type {HTMLCanvasElement | null} */
   #canvas = null;
@@ -55,6 +69,10 @@ export class LimbTreeView {
   #lodComputer = null;
   /** @type {PanInteraction | null} */
   #panInteraction = null;
+  /** @type {NodeLabelComputer | null} */
+  #labelComputer = null;
+  /** @type {HoverInteraction | null} */
+  #hoverInteraction = null;
 
   /** @type {Map<string, { x: number, y: number }> | null} */
   #positions = null;
@@ -64,6 +82,10 @@ export class LimbTreeView {
   #focusedNodeId = null;
   /** @type {Map<string, string> | null} */
   #tiers = null;
+  /** @type {Map<string, string>} nodeId -> title */
+  #titles = new Map();
+  /** @type {number} */
+  #lastFrameTime = 0;
 
   /** @type {((e: WheelEvent) => void) | null} */
   #wheelHandler = null;
@@ -96,6 +118,8 @@ export class LimbTreeView {
     this.#renderer = new TreeRenderer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT);
     this.#lodComputer = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, lodProbe);
     this.#panInteraction = new PanInteraction(this.#zoom);
+    this.#labelComputer = new NodeLabelComputer();
+    this.#hoverInteraction = new HoverInteraction();
 
     this.#resizeHandler = () => this.#resize();
     this.#wheelHandler = (e) => this.#onWheel(e);
@@ -137,11 +161,15 @@ export class LimbTreeView {
    * @param {Map<string, string>} parentMap - childId -> parentId mapping
    * @param {{ width: number, height: number }} treeExtent - Bounding extent of the tree
    * @param {string} [focusedNodeId] - ID of the currently focused node (for LOD computation)
+   * @param {Map<string, string>} [titles] - nodeId -> title mapping for labels
    */
-  setTreeData(positions, parentMap, treeExtent, focusedNodeId) {
+  setTreeData(positions, parentMap, treeExtent, focusedNodeId, titles) {
     this.#positions = positions;
     this.#parentMap = parentMap;
     this.#focusedNodeId = focusedNodeId ?? null;
+    if (titles) {
+      this.#titles = titles;
+    }
     if (this.#zoom) {
       this.#zoom.treeExtent = { ...treeExtent };
     }
@@ -186,6 +214,12 @@ export class LimbTreeView {
     if (this.#panInteraction.onMouseMove(e.clientX, e.clientY)) {
       this.#updateCursor();
       this.#paint();
+      return;
+    }
+    // Track hover position when not dragging
+    if (this.#hoverInteraction) {
+      this.#hoverInteraction.setMousePosition(e.clientX, e.clientY);
+      this.#paint();
     }
   }
 
@@ -206,6 +240,9 @@ export class LimbTreeView {
     const ctx = this.#ctx;
     const w = this.#canvas.width;
     const h = this.#canvas.height;
+    const now = performance.now();
+    const deltaMs = this.#lastFrameTime > 0 ? now - this.#lastFrameTime : 0;
+    this.#lastFrameTime = now;
 
     ctx.clearRect(0, 0, w, h);
 
@@ -232,7 +269,15 @@ export class LimbTreeView {
         zoom.zoomScale,
         w,
         h,
+        this.#focusedNodeId,
       );
+
+      // Compute hover state
+      let hoverProgress = new Map();
+      if (this.#hoverInteraction && zoom.level < 0.9) {
+        const hoverState = this.#hoverInteraction.update(frame.nodes, deltaMs);
+        hoverProgress = hoverState.hoverProgress;
+      }
 
       // Paint edges as cubic Bezier curves
       ctx.strokeStyle = "#666";
@@ -256,13 +301,64 @@ export class LimbTreeView {
         const tier = this.#tiers?.get(node.nodeId);
         if (tier === "culled") continue;
 
+        // Compute hover offset
+        const rawProgress = hoverProgress.get(node.nodeId) ?? 0;
+        const progress = easeOut(rawProgress);
+        const offsetY = -HOVER_OFFSET_Y * progress;
+
         ctx.fillStyle = TIER_COLORS[tier] ?? "#2a2a2a";
         ctx.strokeStyle = tier === "focused" ? "#88f" : "#444";
         const r = Math.min(cornerRadius, node.width / 2, node.height / 2);
         ctx.beginPath();
-        ctx.roundRect(node.x, node.y, node.width, node.height, r);
+        ctx.roundRect(node.x, node.y + offsetY, node.width, node.height, r);
         ctx.fill();
         ctx.stroke();
+      }
+
+      // Paint focus ring
+      if (frame.focusRing) {
+        const rawProgress = hoverProgress.get(frame.focusRing.nodeId) ?? 0;
+        const progress = easeOut(rawProgress);
+        const offsetY = -HOVER_OFFSET_Y * progress;
+        ctx.strokeStyle = FOCUS_RING_COLOR;
+        ctx.lineWidth = FOCUS_RING_WIDTH;
+        const r = Math.min(cornerRadius, frame.focusRing.width / 2, frame.focusRing.height / 2);
+        ctx.beginPath();
+        ctx.roundRect(
+          frame.focusRing.x,
+          frame.focusRing.y + offsetY,
+          frame.focusRing.width,
+          frame.focusRing.height,
+          r,
+        );
+        ctx.stroke();
+      }
+
+      // Paint labels
+      if (this.#labelComputer) {
+        /** @type {(text: string, fontSize: number) => number} */
+        const measureText = (text, fontSize) => {
+          ctx.font = `${fontSize}px system-ui, sans-serif`;
+          return ctx.measureText(text).width;
+        };
+        const labels = this.#labelComputer.computeLabels(
+          frame.nodes,
+          this.#titles,
+          measureText,
+        );
+        ctx.textAlign = "center";
+        for (const label of labels) {
+          const rawProgress = hoverProgress.get(label.nodeId) ?? 0;
+          const progress = easeOut(rawProgress);
+          // Opacity: from 70% default to 100% on hover
+          const opacity = label.opacity + (1 - label.opacity) * progress;
+          const offsetY = -HOVER_OFFSET_Y * progress;
+          ctx.globalAlpha = opacity;
+          ctx.fillStyle = "#ccc";
+          ctx.font = `${label.fontSize}px system-ui, sans-serif`;
+          ctx.fillText(label.text, label.x, label.y + offsetY);
+        }
+        ctx.globalAlpha = 1;
       }
     }
 
@@ -302,10 +398,14 @@ export class LimbTreeView {
     this.#renderer = null;
     this.#lodComputer = null;
     this.#panInteraction = null;
+    this.#labelComputer = null;
+    this.#hoverInteraction = null;
     this.#positions = null;
     this.#parentMap = null;
     this.#focusedNodeId = null;
     this.#tiers = null;
+    this.#titles = new Map();
+    this.#lastFrameTime = 0;
     this.#resizeHandler = null;
     this.#wheelHandler = null;
     this.#mousedownHandler = null;

@@ -5,7 +5,7 @@
 /**
  * @typedef {{ nodeId: string, x: number, y: number, width: number, height: number }} NodeRect
  * @typedef {{ parentId: string, childId: string, startX: number, startY: number, endX: number, endY: number }} EdgePath
- * @typedef {{ nodes: NodeRect[], edges: EdgePath[] }} RenderFrame
+ * @typedef {{ nodes: NodeRect[], edges: EdgePath[], focusRing: NodeRect | null }} RenderFrame
  */
 
 /**
@@ -39,9 +39,10 @@ export class TreeRenderer {
    * @param {number} zoomScale - Pixels per logical unit
    * @param {number} viewportWidth - Screen width in pixels
    * @param {number} viewportHeight - Screen height in pixels
+   * @param {string} [focusedNodeId] - ID of the currently focused node (for focus ring)
    * @returns {RenderFrame}
    */
-  computeFrame(positions, parentMap, toScreen, zoomScale, viewportWidth, viewportHeight) {
+  computeFrame(positions, parentMap, toScreen, zoomScale, viewportWidth, viewportHeight, focusedNodeId) {
     const screenWidth = this.baseNodeWidth * zoomScale;
     const screenHeight = this.baseNodeHeight * zoomScale;
     const halfW = screenWidth / 2;
@@ -99,6 +100,14 @@ export class TreeRenderer {
       });
     }
 
-    return { nodes, edges };
+    let focusRing = null;
+    if (focusedNodeId) {
+      const focusNode = nodes.find((n) => n.nodeId === focusedNodeId);
+      if (focusNode) {
+        focusRing = { ...focusNode };
+      }
+    }
+
+    return { nodes, edges, focusRing };
   }
 }

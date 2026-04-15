@@ -3,7 +3,7 @@ title: "Implement node labels, focus ring, and hover feedback"
 spec_ref: "tree-rendering.md S2.3 S2.4; interaction-feel.md S3"
 depends_on:
   - task-006
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []
