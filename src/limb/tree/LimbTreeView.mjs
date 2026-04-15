@@ -32,6 +32,7 @@ import { computeFoldNodeFrame, formatFoldLabel } from "./FoldNodeRenderer.mjs";
 import { TabPositioner } from "./TabPositioner.mjs";
 import { ZoomOutAndBackAnimator } from "./ZoomOutAndBackAnimator.mjs";
 import { NewChildZoomHandler } from "./NewChildZoomHandler.mjs";
+import { ZoomMomentum } from "./ZoomMomentum.mjs";
 
 // Zoom level change per 100px of wheel deltaY
 const ZOOM_SENSITIVITY = 0.05;
@@ -117,6 +118,10 @@ export class LimbTreeView {
   #zoomOutAndBackAnimator = null;
   /** @type {NewChildZoomHandler | null} */
   #newChildZoomHandler = null;
+  /** @type {ZoomMomentum | null} */
+  #zoomMomentum = null;
+  /** @type {number | null} */
+  #momentumReleaseTimer = null;
   /** @type {FrameScheduler | null} */
   #frameScheduler = null;
 
@@ -185,7 +190,7 @@ export class LimbTreeView {
    * @param {HTMLCanvasElement} canvas
    * @param {{ zoomChanged(level: number, zoomScale: number): void }} [probe]
    * @param {{ tierChanged(nodeId: string, previousTier: string, newTier: string): void }} [lodProbe]
-   * @param {{ onNodeClicked?: (nodeId: string) => void, onFoldToggled?: (foldId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe, performanceProbe?: import('../ports/PerformanceProbe').PerformanceProbe, revealAnimationProbe?: import('../ports/RevealAnimationProbe').RevealAnimationProbe, zoomOutAndBackProbe?: import('../ports/ZoomOutAndBackProbe').ZoomOutAndBackProbe }} [options]
+   * @param {{ onNodeClicked?: (nodeId: string) => void, onFoldToggled?: (foldId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe, performanceProbe?: import('../ports/PerformanceProbe').PerformanceProbe, revealAnimationProbe?: import('../ports/RevealAnimationProbe').RevealAnimationProbe, zoomOutAndBackProbe?: import('../ports/ZoomOutAndBackProbe').ZoomOutAndBackProbe, zoomMomentumProbe?: import('../ports/ZoomMomentumProbe').ZoomMomentumProbe }} [options]
    */
   init(canvas, probe, lodProbe, options) {
     this.#canvas = canvas;
@@ -208,6 +213,7 @@ export class LimbTreeView {
     this.#revealAnimator = new RevealAnimator(options?.revealAnimationProbe);
     this.#zoomOutAndBackAnimator = new ZoomOutAndBackAnimator(options?.zoomOutAndBackProbe);
     this.#newChildZoomHandler = new NewChildZoomHandler(this.#zoomOutAndBackAnimator);
+    this.#zoomMomentum = new ZoomMomentum(options?.zoomMomentumProbe);
     this.#onNodeClicked = options?.onNodeClicked ?? null;
     this.#onFoldToggled = options?.onFoldToggled ?? null;
     this.#frameScheduler = new FrameScheduler(
@@ -324,6 +330,7 @@ export class LimbTreeView {
     const pos = this.#positions.get(nodeId);
     if (!pos) return;
 
+    this.#zoomMomentum?.cancel();
     this.#zoomAnimator.start(
       this.#zoom.level,
       targetLevel,
@@ -370,8 +377,9 @@ export class LimbTreeView {
     if (result === "centered") {
       this.centerOnNode(childId);
     } else if (result === "animated") {
-      // Cancel any in-progress zoom or pan animation
+      // Cancel any in-progress zoom, pan, or momentum animation
       this.#zoomAnimator?.cancel();
+      this.#zoomMomentum?.cancel();
       this.#animation = null;
       this.#startAnimationLoop();
     }
@@ -425,6 +433,13 @@ export class LimbTreeView {
 
     const deltaLevel = -(e.deltaY / 100) * ZOOM_SENSITIVITY;
     this.#zoom.zoomAtCursor(deltaLevel, e.clientX, e.clientY);
+
+    // Feed scroll event to momentum tracker
+    if (this.#zoomMomentum) {
+      this.#zoomMomentum.onScroll(deltaLevel, performance.now());
+      this.#scheduleMomentumRelease();
+    }
+
     this.#updateCursor();
     this.#frameScheduler?.markDirty();
   }
@@ -433,6 +448,7 @@ export class LimbTreeView {
   #onMouseDown(e) {
     if (!this.#panInteraction) return;
     this.#cancelZoomOutAndBack();
+    this.#zoomMomentum?.cancel();
     this.#panInteraction.onMouseDown(e.clientX, e.clientY);
     this.#updateCursor();
   }
@@ -510,6 +526,25 @@ export class LimbTreeView {
     this.#zoom.setLevel(final.level);
     this.#zoom.focusPoint = { ...final.focusPoint };
     this.#frameScheduler?.markDirty();
+  }
+
+  /**
+   * Schedule a momentum release check 150ms after the last scroll event.
+   * Each new scroll resets the timer.
+   */
+  #scheduleMomentumRelease() {
+    if (this.#momentumReleaseTimer !== null) {
+      clearTimeout(this.#momentumReleaseTimer);
+    }
+    this.#momentumReleaseTimer = setTimeout(() => {
+      this.#momentumReleaseTimer = null;
+      if (this.#zoomMomentum) {
+        this.#zoomMomentum.onRelease(performance.now());
+        if (this.#zoomMomentum.isActive) {
+          this.#frameScheduler?.markDirty();
+        }
+      }
+    }, 150);
   }
 
   /**
@@ -612,6 +647,17 @@ export class LimbTreeView {
         if (!frame.done) {
           this.#frameScheduler?.markDirty();
         }
+      }
+    }
+
+    // Advance zoom momentum if active
+    if (this.#zoomMomentum?.isActive && this.#zoom) {
+      const momentumDelta = this.#zoomMomentum.update(now - this.#animationLastTime);
+      if (momentumDelta !== 0) {
+        this.#zoom.setLevel(this.#zoom.level + momentumDelta);
+      }
+      if (this.#zoomMomentum.isActive) {
+        this.#frameScheduler?.markDirty();
       }
     }
 
@@ -1061,6 +1107,11 @@ export class LimbTreeView {
         this.#canvas.removeEventListener("mouseup", this.#mouseupHandler);
       }
     }
+    if (this.#momentumReleaseTimer !== null) {
+      clearTimeout(this.#momentumReleaseTimer);
+      this.#momentumReleaseTimer = null;
+    }
+    this.#zoomMomentum?.cancel();
     if (this.#frameScheduler) {
       this.#frameScheduler.destroy();
     }
@@ -1079,6 +1130,8 @@ export class LimbTreeView {
     this.#revealAnimator = null;
     this.#zoomOutAndBackAnimator = null;
     this.#newChildZoomHandler = null;
+    this.#zoomMomentum = null;
+    this.#momentumReleaseTimer = null;
     this.#frameScheduler = null;
     this.#positions = null;
     this.#parentMap = null;
