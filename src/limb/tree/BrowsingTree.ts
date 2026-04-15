@@ -277,6 +277,8 @@ export class BrowsingTree {
         // Update branch root from storage data
         branchRoot.childIds = [...stored.childIds];
         branchRoot.descendantCount = stored.descendantCount;
+        // Include branch root for screenshot restoration
+        loadedNodeIds.push(branchRootId);
         continue;
       }
       const node: TreeNode = {
@@ -334,6 +336,11 @@ export class BrowsingTree {
       throw new Error(
         `Node "${branchRootId}" is not a branch root (not a direct child of root)`
       );
+    }
+
+    // Idempotency: branch is already deactivated (no children in memory, not active)
+    if (branchRoot.childIds.length === 0 && this.activeBranchId !== branchRootId) {
+      return;
     }
 
     // Collect all descendants for saving

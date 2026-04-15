@@ -848,6 +848,35 @@ describe('BrowsingTree', () => {
         expect(tree.nodes.get('c1')!.screenshot).not.toBeNull();
       });
 
+      it('restores branch root screenshot during activation', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        await storage.saveBranch(branch.id, [
+          makeStoredNode({
+            id: branch.id,
+            url: 'https://branch.com',
+            parentId: tree.rootId,
+            childIds: ['c1'],
+            branchRootId: branch.id,
+            descendantCount: 1,
+          }),
+          makeStoredNode({
+            id: 'c1',
+            url: 'https://c1.com',
+            parentId: branch.id,
+            branchRootId: branch.id,
+          }),
+        ]);
+        // Save screenshots for both the branch root and child
+        await storage.saveScreenshot(branch.id, 'low', new Uint8Array([255, 216, 255]));
+        await storage.saveScreenshot('c1', 'low', new Uint8Array([255, 216, 254]));
+
+        await tree.activateBranch(branch.id, storage);
+
+        // Branch root screenshot should also be restored
+        expect(tree.nodes.get(branch.id)!.screenshot).not.toBeNull();
+        expect(tree.nodes.get('c1')!.screenshot).not.toBeNull();
+      });
+
       it('does not set screenshot when storage has none', async () => {
         const branch = tree.addChild(tree.rootId, 'https://branch.com');
         await storage.saveBranch(branch.id, [
@@ -978,6 +1007,23 @@ describe('BrowsingTree', () => {
         await tree.deactivateBranch(branch.id, storage);
 
         expect(tree.activeBranchId).toBeNull();
+      });
+
+      it('is a no-op when called on an already-deactivated branch', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        const child = tree.addChild(branch.id, 'https://child.com');
+
+        // First deactivation — saves branch with child to storage
+        await tree.deactivateBranch(branch.id, storage);
+
+        const storedAfterFirst = await storage.loadBranch(branch.id);
+        expect(storedAfterFirst).toHaveLength(2); // branch root + child
+
+        // Second deactivation — should be a no-op, not overwrite storage
+        await tree.deactivateBranch(branch.id, storage);
+
+        const storedAfterSecond = await storage.loadBranch(branch.id);
+        expect(storedAfterSecond).toHaveLength(2); // still intact
       });
 
       it('throws when branch root does not exist', async () => {
