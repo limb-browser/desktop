@@ -804,6 +804,9 @@ export class LimbTreeView {
         maxLiveTabs: this.#maxLiveTabs,
       });
       this.#applyTabPositions(posFrame);
+      if (posFrame.crossFades.size > 0) {
+        this.#frameScheduler?.markDirty();
+      }
     }
   }
 
