@@ -261,13 +261,14 @@ function init() {
     if (resultEl) {
       const nodeId = resultEl.dataset.nodeId;
       const branchRootId = resultEl.dataset.branchRootId;
-      if (nodeId && branchRootId === tree.activeBranchId) {
-        tree.focusNode(nodeId);
-        if (treeView) {
-          treeView.setFocusedNodeId(nodeId);
-          treeView.animateToNode(nodeId, 1);
-        }
-      } else if (nodeId && branchRootId && storage) {
+      if (!nodeId || !branchRootId) return;
+
+      const branchRoot = tree.nodes.get(branchRootId);
+      const needsActivation = branchRoot
+        && branchRoot.childIds.length === 0
+        && storage;
+
+      if (needsActivation) {
         tree.switchBranch(branchRootId, storage).then(() => {
           tree.focusNode(nodeId);
           if (treeView) {
@@ -275,6 +276,12 @@ function init() {
             treeView.animateToNode(nodeId, 1);
           }
         });
+      } else {
+        tree.focusNode(nodeId);
+        if (treeView) {
+          treeView.setFocusedNodeId(nodeId);
+          treeView.animateToNode(nodeId, 1);
+        }
       }
       return;
     }

@@ -5,7 +5,7 @@ depends_on:
   - task-025
   - task-027
   - task-028
-progress: needs-revision
+progress: ready-for-review
 review: "specs/reviews/review-TASK_046-R2.md"
 coverage_sections: []
 commits: []
