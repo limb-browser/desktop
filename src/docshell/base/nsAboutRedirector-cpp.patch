@@ -1,12 +1,11 @@
 diff --git a/docshell/base/nsAboutRedirector.cpp b/docshell/base/nsAboutRedirector.cpp
-index 6789b3d1d8ba3477c30da8b8dff54a659206c37f..b2e4f8c9d1a34567890abcdef1234567890abcde 100644
+index a13b07368c8ea1b7510d55ac9e3dcae50f226158..0aad5269eb207ccd0974688ac27062c195230402 100644
 --- a/docshell/base/nsAboutRedirector.cpp
 +++ b/docshell/base/nsAboutRedirector.cpp
-@@ -117,7 +117,10 @@ static const RedirEntry kRedirMap[] = {
+@@ -117,6 +117,15 @@ static const RedirEntry kRedirMap[] = {
      {"crashes", "chrome://global/content/crashes.html",
       nsIAboutModule::IS_SECURE_CHROME_UI},
  #endif
--    {"credits", "https://www.mozilla.org/credits/",
 +    {"limb-home", "chrome://browser/content/limb/home/limb-home.html",
 +     nsIAboutModule::IS_SECURE_CHROME_UI |
 +         nsIAboutModule::ALLOW_SCRIPT},
@@ -16,7 +15,6 @@ index 6789b3d1d8ba3477c30da8b8dff54a659206c37f..b2e4f8c9d1a34567890abcdef1234567
 +    {"limb-settings", "chrome://browser/content/limb/settings/limb-settings.html",
 +     nsIAboutModule::IS_SECURE_CHROME_UI |
 +         nsIAboutModule::ALLOW_SCRIPT},
-+    {"credits", "https://zen-browser.app/about/",
+     {"credits", "https://zen-browser.app/about/",
       nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
           nsIAboutModule::URI_MUST_LOAD_IN_CHILD},
-     {"fingerprintingprotection",
