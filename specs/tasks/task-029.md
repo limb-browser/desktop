@@ -4,7 +4,7 @@ spec_ref: "settings.md S3"
 depends_on:
   - task-021
   - task-025
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []

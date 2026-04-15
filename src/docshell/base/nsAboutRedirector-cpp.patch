@@ -10,6 +10,9 @@ index 6789b3d1d8ba3477c30da8b8dff54a659206c37f..b2e4f8c9d1a34567890abcdef1234567
 +    {"limb-home", "chrome://browser/content/limb/home/limb-home.html",
 +     nsIAboutModule::IS_SECURE_CHROME_UI |
 +         nsIAboutModule::ALLOW_SCRIPT},
++    {"limb-settings", "chrome://browser/content/limb/settings/limb-settings.html",
++     nsIAboutModule::IS_SECURE_CHROME_UI |
++         nsIAboutModule::ALLOW_SCRIPT},
 +    {"credits", "https://zen-browser.app/about/",
       nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
           nsIAboutModule::URI_MUST_LOAD_IN_CHILD},

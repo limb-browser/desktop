@@ -101,7 +101,9 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    const branchRouter = new BranchCommandRouter(browsingTree, tabBridge, autoSaveAdapter, confirmPort, homeUrl, branchProbe);
 +    window.gLimbBranchRouter = branchRouter;
 +    const treeNav = new TreeNavigator(browsingTree);
-+    const keyNavAdapter = new KeyboardNavigationAdapter(treeNav, window.gLimbTreeView, gURLBar, branchRouter);
++    const keyNavAdapter = new KeyboardNavigationAdapter(treeNav, window.gLimbTreeView, gURLBar, branchRouter, () => {
++      gBrowser.selectedBrowser.loadURI(Services.io.newURI("about:limb-settings"), { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });
++    });
 +    keyNavAdapter.install(window);
      gBrowser.addEventListener("DOMUpdateBlockedPopups", e =>
        PopupAndRedirectBlockerObserver.handleEvent(e)

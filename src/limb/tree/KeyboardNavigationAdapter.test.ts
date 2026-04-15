@@ -502,6 +502,42 @@ describe('KeyboardNavigationAdapter', () => {
     });
   });
 
+  describe('Ctrl+, — open settings', () => {
+    it('calls openSettings callback on Ctrl+,', () => {
+      let called = false;
+      const settingsAdapter = new KeyboardNavigationAdapter(
+        nav, treeView, urlBar, null, () => { called = true; },
+      );
+      const settingsWin = createFakeWindow();
+      settingsAdapter.install(settingsWin as unknown as Window);
+
+      dispatchKeydown(settingsWin, ',', { ctrlKey: true });
+
+      expect(called).toBe(true);
+    });
+
+    it('prevents default and stops propagation', () => {
+      const settingsAdapter = new KeyboardNavigationAdapter(
+        nav, treeView, urlBar, null, () => {},
+      );
+      const settingsWin = createFakeWindow();
+      settingsAdapter.install(settingsWin as unknown as Window);
+
+      const { defaultPrevented, propagationStopped } = dispatchKeydown(
+        settingsWin, ',', { ctrlKey: true },
+      );
+
+      expect(defaultPrevented).toBe(true);
+      expect(propagationStopped).toBe(true);
+    });
+
+    it('is a no-op when no openSettings callback is provided', () => {
+      const { defaultPrevented } = dispatchKeydown(win, ',', { ctrlKey: true });
+
+      expect(defaultPrevented).toBe(false);
+    });
+  });
+
   describe('install / uninstall', () => {
     it('registers a keydown listener on install', () => {
       const newWin = createFakeWindow();

@@ -188,6 +188,16 @@ function init() {
 
   newBranchBtn.addEventListener("click", createNewBranch);
   startBrowsingBtn.addEventListener("click", createNewBranch);
+
+  const settingsGear = document.getElementById("settings-gear");
+  settingsGear.addEventListener("click", () => {
+    const browser = chromeWindow.gBrowser?.selectedBrowser;
+    if (browser) {
+      browser.loadURI(Services.io.newURI("about:limb-settings"), {
+        triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+      });
+    }
+  });
 }
 
 if (document.readyState === "loading") {

@@ -35,6 +35,9 @@ body {
 
 /* Search bar */
 #search-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 32px;
 }
 
@@ -47,6 +50,26 @@ body {
   color: var(--text);
   font-size: 15px;
   outline: none;
+}
+
+#settings-gear {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 100ms ease-out, background 100ms ease-out;
+}
+
+#settings-gear:hover {
+  color: var(--accent);
+  background: var(--surface-hover);
 }
 
 #search-bar::placeholder {

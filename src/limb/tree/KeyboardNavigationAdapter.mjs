@@ -11,6 +11,7 @@
  * - Ctrl+0: reset zoom to fit entire tree
  * - Ctrl+1: zoom to 100% centered on focused node
  * - Ctrl+N: create new branch (when branchRouter provided)
+ * - Ctrl+,: open settings (when openSettings provided)
  * - Escape: blur address bar or zoom to focused node
  *
  * See spec navigation.md S4.1, S4.2, S4.3; navigation.md S5.2.
@@ -27,6 +28,8 @@ export class KeyboardNavigationAdapter {
   #urlBar;
   /** @type {{ createBranch(): Promise<string> } | null} */
   #branchRouter;
+  /** @type {(() => void) | null} */
+  #openSettings;
   /** @type {((e: KeyboardEvent) => void) | null} */
   #keyHandler = null;
   /** @type {Window | null} */
@@ -37,12 +40,14 @@ export class KeyboardNavigationAdapter {
    * @param {{ zoomLevel: number, setZoomLevel(level: number): void, setFocusedNodeId(nodeId: string): void, centerOnNode(nodeId: string): void, animateToNode(nodeId: string, level: number): void }} treeView
    * @param {{ focused: boolean, blur(): void }} urlBar
    * @param {{ createBranch(): Promise<string> } | null} [branchRouter]
+   * @param {(() => void) | null} [openSettings]
    */
-  constructor(navigator, treeView, urlBar, branchRouter = null) {
+  constructor(navigator, treeView, urlBar, branchRouter = null, openSettings = null) {
     this.#navigator = navigator;
     this.#treeView = treeView;
     this.#urlBar = urlBar;
     this.#branchRouter = branchRouter;
+    this.#openSettings = openSettings;
   }
 
   /**
@@ -133,6 +138,10 @@ export class KeyboardNavigationAdapter {
         this.#treeView.setFocusedNodeId(nodeId);
         this.#treeView.animateToNode(nodeId, 1);
       });
+    } else if (e.key === "," && this.#openSettings) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.#openSettings();
     }
   }
 
