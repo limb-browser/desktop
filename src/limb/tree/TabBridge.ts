@@ -83,6 +83,13 @@ export class TabBridge<TTab> {
     }
   }
 
+  async closeOrphanTab(tab: TTab): Promise<void> {
+    if (this.tabToNode.has(tab)) {
+      return;
+    }
+    await this.#tabPort.closeTab(tab);
+  }
+
   async onNodeRemoved(
     nodeId: string,
     descendantIds: string[]

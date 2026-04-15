@@ -1,0 +1,248 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+import { describe, it, expect, beforeEach } from 'vitest';
+import { TabCommandRouter } from './TabCommandRouter';
+import { BrowsingTree } from './BrowsingTree';
+import { TabBridge } from './TabBridge';
+import { InMemoryTabPort } from './InMemoryTabPort';
+import type { FakeTab } from './InMemoryTabPort';
+import type { TabCommandRouterProbe } from '../ports/TabCommandRouterProbe';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+function createFakeProbe(): TabCommandRouterProbe & {
+  calls: { method: string; args: unknown[] }[];
+} {
+  const calls: { method: string; args: unknown[] }[] = [];
+  return {
+    calls,
+    newTabRouted(parentId: string, childId: string) {
+      calls.push({ method: 'newTabRouted', args: [parentId, childId] });
+    },
+    closeTabRouted(nodeId: string) {
+      calls.push({ method: 'closeTabRouted', args: [nodeId] });
+    },
+    orphanTabBlocked() {
+      calls.push({ method: 'orphanTabBlocked', args: [] });
+    },
+  };
+}
+
+describe('TabCommandRouter', () => {
+  let tree: BrowsingTree;
+  let tabPort: InMemoryTabPort;
+  let bridge: TabBridge<FakeTab>;
+  let probe: ReturnType<typeof createFakeProbe>;
+  let router: TabCommandRouter<FakeTab>;
+  const homepage = 'https://home.example.com';
+
+  beforeEach(async () => {
+    tree = new BrowsingTree('https://root.example.com');
+    tabPort = new InMemoryTabPort();
+    bridge = new TabBridge(tabPort);
+    probe = createFakeProbe();
+    router = new TabCommandRouter(tree, bridge, homepage, probe);
+
+    // Create a tab for the root node (simulating browser startup)
+    const root = tree.nodes.get(tree.rootId)!;
+    await bridge.createTabForNode({ id: root.id, url: root.url });
+  });
+
+  describe('handleNewTab', () => {
+    it('creates a child node of the focused node', async () => {
+      const nodeCountBefore = tree.nodes.size;
+      await router.handleNewTab();
+      expect(tree.nodes.size).toBe(nodeCountBefore + 1);
+    });
+
+    it('new child has the focused node as parent', async () => {
+      const parentId = tree.focusedNodeId;
+      await router.handleNewTab();
+      // The focused node is now the child
+      const child = tree.nodes.get(tree.focusedNodeId)!;
+      expect(child.parentId).toBe(parentId);
+    });
+
+    it('uses the homepage URL for new nodes', async () => {
+      await router.handleNewTab();
+      const child = tree.nodes.get(tree.focusedNodeId)!;
+      expect(child.url).toBe(homepage);
+    });
+
+    it('creates a tab for the new child via TabBridge', async () => {
+      await router.handleNewTab();
+      const childId = tree.focusedNodeId;
+      expect(bridge.getTabForNode(childId)).toBeDefined();
+    });
+
+    it('focuses the new child node in the tree', async () => {
+      const rootId = tree.focusedNodeId;
+      await router.handleNewTab();
+      expect(tree.focusedNodeId).not.toBe(rootId);
+    });
+
+    it('syncs focus to the new tab', async () => {
+      await router.handleNewTab();
+      const childId = tree.focusedNodeId;
+      const tab = bridge.getTabForNode(childId)!;
+      expect(tabPort.selectedTab).toBe(tab);
+    });
+
+    it('fires newTabRouted probe', async () => {
+      const parentId = tree.focusedNodeId;
+      await router.handleNewTab();
+      const childId = tree.focusedNodeId;
+      expect(probe.calls).toContainEqual({
+        method: 'newTabRouted',
+        args: [parentId, childId],
+      });
+    });
+
+    it('creates nested children when called multiple times', async () => {
+      await router.handleNewTab();
+      const firstChildId = tree.focusedNodeId;
+      await router.handleNewTab();
+      const secondChildId = tree.focusedNodeId;
+      const secondChild = tree.nodes.get(secondChildId)!;
+      expect(secondChild.parentId).toBe(firstChildId);
+    });
+  });
+
+  describe('handleCloseTab', () => {
+    it('removes the focused node from the tree', async () => {
+      await router.handleNewTab();
+      const childId = tree.focusedNodeId;
+      await router.handleCloseTab();
+      expect(tree.nodes.has(childId)).toBe(false);
+    });
+
+    it('closes the tab for the removed node', async () => {
+      await router.handleNewTab();
+      const childId = tree.focusedNodeId;
+      const tab = bridge.getTabForNode(childId)!;
+      await router.handleCloseTab();
+      expect(tab.closed).toBe(true);
+      expect(bridge.getTabForNode(childId)).toBeUndefined();
+    });
+
+    it('moves focus to the parent node', async () => {
+      const rootId = tree.focusedNodeId;
+      await router.handleNewTab();
+      await router.handleCloseTab();
+      expect(tree.focusedNodeId).toBe(rootId);
+    });
+
+    it('syncs focus to the parent tab', async () => {
+      await router.handleNewTab();
+      await router.handleCloseTab();
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      expect(tabPort.selectedTab).toBe(rootTab);
+    });
+
+    it('fires closeTabRouted probe', async () => {
+      await router.handleNewTab();
+      const childId = tree.focusedNodeId;
+      probe.calls.length = 0;
+      await router.handleCloseTab();
+      expect(probe.calls).toContainEqual({
+        method: 'closeTabRouted',
+        args: [childId],
+      });
+    });
+
+    it('is a no-op when focused node is root', async () => {
+      const nodeCountBefore = tree.nodes.size;
+      await router.handleCloseTab();
+      expect(tree.nodes.size).toBe(nodeCountBefore);
+      expect(tree.focusedNodeId).toBe(tree.rootId);
+    });
+
+    it('does not fire closeTabRouted probe when focused node is root', async () => {
+      probe.calls.length = 0;
+      await router.handleCloseTab();
+      const closeCalls = probe.calls.filter(
+        (c) => c.method === 'closeTabRouted'
+      );
+      expect(closeCalls).toHaveLength(0);
+    });
+
+    it('closes tabs for descendant nodes', async () => {
+      await router.handleNewTab(); // child of root
+      const childId = tree.focusedNodeId;
+      await router.handleNewTab(); // grandchild of root
+      const grandchildId = tree.focusedNodeId;
+
+      // Focus back to child, then close it (removing child + grandchild)
+      tree.focusNode(childId);
+      await router.handleCloseTab();
+
+      expect(bridge.getTabForNode(childId)).toBeUndefined();
+      expect(bridge.getTabForNode(grandchildId)).toBeUndefined();
+    });
+  });
+
+  describe('handleExternalTabOpen', () => {
+    it('closes tabs that have no node association', async () => {
+      // Simulate Firefox creating a tab outside the tree
+      const orphanTab: FakeTab = {
+        url: 'https://orphan.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(orphanTab);
+
+      await router.handleExternalTabOpen(orphanTab);
+      expect(orphanTab.closed).toBe(true);
+    });
+
+    it('fires orphanTabBlocked probe', async () => {
+      const orphanTab: FakeTab = {
+        url: 'https://orphan.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(orphanTab);
+
+      probe.calls.length = 0;
+      await router.handleExternalTabOpen(orphanTab);
+      expect(probe.calls).toContainEqual({
+        method: 'orphanTabBlocked',
+        args: [],
+      });
+    });
+
+    it('does nothing for tabs that have a node', async () => {
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      probe.calls.length = 0;
+      await router.handleExternalTabOpen(rootTab);
+      expect(rootTab.closed).toBe(false);
+      const blockCalls = probe.calls.filter(
+        (c) => c.method === 'orphanTabBlocked'
+      );
+      expect(blockCalls).toHaveLength(0);
+    });
+  });
+
+  describe('without probe', () => {
+    it('works when no probe is provided', async () => {
+      const noprobeRouter = new TabCommandRouter(tree, bridge, homepage);
+      await noprobeRouter.handleNewTab();
+      expect(tree.nodes.size).toBe(2);
+      await noprobeRouter.handleCloseTab();
+      expect(tree.nodes.size).toBe(1);
+    });
+  });
+});
+
+describe('tab bar CSS', () => {
+  it('hides the Firefox tab bar', () => {
+    const cssPath = path.resolve(__dirname, 'limb-hide-tabbar.css');
+    const css = fs.readFileSync(cssPath, 'utf-8');
+    expect(css).toContain('#tabbrowser-tabs');
+    expect(css).toContain('display: none');
+  });
+});

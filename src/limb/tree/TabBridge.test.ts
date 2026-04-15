@@ -404,6 +404,23 @@ describe('TabBridge', () => {
     });
   });
 
+  describe('closeOrphanTab', () => {
+    it('closes a tab that has no node association', async () => {
+      const orphan: FakeTab = { url: 'https://orphan.com', nodeId: '', closed: false, suspended: false };
+      tabPort.tabs.push(orphan);
+      await bridge.closeOrphanTab(orphan);
+      expect(orphan.closed).toBe(true);
+    });
+
+    it('does nothing for a tab that has a node association', async () => {
+      await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
+      const tab = bridge.getTabForNode('node-1')!;
+      await bridge.closeOrphanTab(tab);
+      expect(tab.closed).toBe(false);
+      expect(bridge.getTabForNode('node-1')).toBeDefined();
+    });
+  });
+
   describe('without probe', () => {
     it('works when no probe is provided', async () => {
       const noProbeBridge = new TabBridge(tabPort);

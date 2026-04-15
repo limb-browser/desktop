@@ -1,0 +1,19 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* Hide the Firefox/Zen tab bar. Node creation is the only way to create tabs
+   (spec tab-bridge.md S4.3). The tab bar is fully hidden, not just collapsed,
+   to prevent accidental interaction. */
+
+#tabbrowser-tabs {
+  display: none !important;
+}
+
+#TabsToolbar {
+  display: none !important;
+}
+
+#zen-sidebar-tabs-wrapper {
+  display: none !important;
+}
