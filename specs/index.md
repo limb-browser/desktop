@@ -24,6 +24,7 @@ Specs define WHAT the system does. Code implements specs. If they disagree, fix 
 
 | Spec | Path | Summary |
 |---|---|---|
+| **Chrome Integration** | [`chrome-integration.md`](chrome-integration.md) | DOM structure, bootstrap sequence, build system rules |
 | **Patch Strategy** | [`patch-strategy.md`](patch-strategy.md) | Which Firefox files we patch, why, principles for small patches |
 | **Tree Rendering** | [`tree-rendering.md`](tree-rendering.md) | Canvas integration with Firefox chrome, rendering pipeline |
 | **Tab Bridge** | [`tab-bridge.md`](tab-bridge.md) | How Firefox tabs map to tree nodes |
