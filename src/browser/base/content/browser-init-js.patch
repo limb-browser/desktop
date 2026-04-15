@@ -11,10 +11,7 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      "chrome://browser/content/limb/tree/LimbTreeView.mjs",
 +      { global: "current" }
 +    );
-+    const { BrowsingTree } = ChromeUtils.importESModule(
-+      "chrome://browser/content/limb/tree/BrowsingTree.ts",
-+      { global: "current" }
-+    );
++
 +    const { computeLayout } = ChromeUtils.importESModule(
 +      "chrome://browser/content/limb/tree/TreeLayout.ts",
 +      { global: "current" }
@@ -43,12 +40,8 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      "chrome://browser/content/limb/tree/TreeRestorerAdapter.mjs",
 +      { global: "current" }
 +    );
-+    const browsingTree = new BrowsingTree("https://example.com");
-+    const a = browsingTree.addChild(browsingTree.rootId, "https://a.example.com");
-+    const b = browsingTree.addChild(browsingTree.rootId, "https://b.example.com");
-+    browsingTree.addChild(a.id, "https://a1.example.com");
-+    browsingTree.addChild(a.id, "https://a2.example.com");
-+    browsingTree.addChild(b.id, "https://b1.example.com");
++    const treeRestorerProbe = { treeRestored(n) { console.debug("Tree restored:", n, "nodes"); }, orphanedNodeReparented(id) { console.debug("Orphan reparented:", id); }, preLimbTabAdopted(id) { console.debug("Pre-Limb tab adopted:", id); } };
++    const { tree: browsingTree } = restoreTreeFromTabs(gBrowser, treeRestorerProbe);
 +    const positions = computeLayout(browsingTree);
 +    const parentMap = new Map();
 +    for (const [nodeId, node] of browsingTree.nodes) {

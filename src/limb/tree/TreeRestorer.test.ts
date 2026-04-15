@@ -148,6 +148,25 @@ describe('TreeRestorer', () => {
       const adoptCalls = probe.calls.filter(c => c.method === 'preLimbTabAdopted');
       expect(adoptCalls).toHaveLength(1);
     });
+
+    it('pre-Limb tab appearing before real root does not hijack root selection', () => {
+      // Pre-Limb tab (no nodeId) appears BEFORE the real root in the array.
+      // The real root (with original nodeId) should still be selected as root,
+      // not the synthesized pre-Limb tab.
+      const tabs: RestoredTabData[] = [
+        { nodeId: null, parentId: null, createdAt: null, url: 'https://preLimb.com', title: 'Pre-Limb', favicon: null },
+        { nodeId: 'real-root', parentId: null, createdAt: 1000, url: 'https://root.com', title: 'Root', favicon: null },
+        { nodeId: 'child-1', parentId: 'real-root', createdAt: 2000, url: 'https://child.com', title: 'Child', favicon: null },
+      ];
+      const tree = restorer.restore(tabs);
+      expect(tree.rootId).toBe('real-root');
+      expect(tree.nodes.get('real-root')!.parentId).toBeNull();
+      // Pre-Limb tab should be a child of the real root, not the root itself
+      const realRoot = tree.nodes.get('real-root')!;
+      expect(realRoot.childIds).toHaveLength(2); // child-1 + pre-Limb adopted
+      // child-1 should still have real-root as parent
+      expect(tree.nodes.get('child-1')!.parentId).toBe('real-root');
+    });
   });
 
   describe('missing createdAt', () => {

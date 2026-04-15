@@ -30,9 +30,9 @@ export class TabCommandRouter<TTab> {
     try {
       const parentId = this.#tree.focusedNodeId;
       const child = this.#tree.addChild(parentId, this.#homepage);
-      await this.#bridge.createTabForNode({ id: child.id, url: child.url });
+      await this.#bridge.createTabForNode({ id: child.id, url: child.url, parentId: child.parentId, createdAt: child.createdAt });
       this.#tree.focusNode(child.id);
-      await this.#bridge.syncFocusToTab(child.id, child.url);
+      await this.#bridge.syncFocusToTab(child.id, child.url, child.parentId, child.createdAt);
       this.#probe?.newTabRouted(parentId, child.id);
     } finally {
       this.#creatingTab = false;
@@ -54,7 +54,7 @@ export class TabCommandRouter<TTab> {
     await this.#bridge.onNodeRemoved(nodeId, descendants);
 
     const newFocused = this.#tree.nodes.get(this.#tree.focusedNodeId)!;
-    await this.#bridge.syncFocusToTab(newFocused.id, newFocused.url);
+    await this.#bridge.syncFocusToTab(newFocused.id, newFocused.url, newFocused.parentId, newFocused.createdAt);
     this.#probe?.closeTabRouted(nodeId);
   }
 
@@ -74,9 +74,9 @@ export class TabCommandRouter<TTab> {
       const openerNodeId = this.#bridge.getNodeForTab(openerTab);
       if (openerNodeId) {
         const child = this.#tree.addChild(openerNodeId, url);
-        this.#bridge.registerExistingTab(tab, child.id);
+        this.#bridge.registerExistingTab(tab, child.id, child.parentId, child.createdAt);
         this.#tree.focusNode(child.id);
-        await this.#bridge.syncFocusToTab(child.id, url);
+        await this.#bridge.syncFocusToTab(child.id, url, child.parentId, child.createdAt);
         this.#probe?.linkIntercepted(openerNodeId, child.id);
         return;
       }

@@ -24,9 +24,11 @@ export class TreeRestorer {
 
   restore(tabsData: RestoredTabData[]): BrowsingTree {
     const now = Date.now();
-    const processed = this.#processTabData(tabsData, now);
+    const { processed, synthesizedIds } = this.#processTabData(tabsData, now);
 
-    let rootData = processed.find(t => t.parentId === null);
+    // Prefer a tab with an original nodeId as root (not a synthesized pre-Limb tab)
+    let rootData = processed.find(t => t.parentId === null && !synthesizedIds.has(t.nodeId))
+      ?? processed.find(t => t.parentId === null);
     if (!rootData) {
       rootData = {
         nodeId: crypto.randomUUID(),
@@ -90,17 +92,22 @@ export class TreeRestorer {
   #processTabData(
     tabsData: RestoredTabData[],
     now: number
-  ): Array<{
-    nodeId: string;
-    parentId: string | null;
-    createdAt: number;
-    url: string;
-    title: string;
-    favicon: string | null;
-  }> {
-    return tabsData.map(tab => {
+  ): {
+    processed: Array<{
+      nodeId: string;
+      parentId: string | null;
+      createdAt: number;
+      url: string;
+      title: string;
+      favicon: string | null;
+    }>;
+    synthesizedIds: Set<string>;
+  } {
+    const synthesizedIds = new Set<string>();
+    const processed = tabsData.map(tab => {
       if (tab.nodeId === null) {
         const newId = crypto.randomUUID();
+        synthesizedIds.add(newId);
         this.#probe?.preLimbTabAdopted(newId);
         return {
           nodeId: newId,
@@ -120,5 +127,6 @@ export class TreeRestorer {
         favicon: tab.favicon,
       };
     });
+    return { processed, synthesizedIds };
   }
 }

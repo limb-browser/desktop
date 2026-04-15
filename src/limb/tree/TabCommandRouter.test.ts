@@ -111,6 +111,16 @@ describe('TabCommandRouter', () => {
       const secondChild = tree.nodes.get(secondChildId)!;
       expect(secondChild.parentId).toBe(firstChildId);
     });
+
+    it('sets tree attributes (parentId, createdAt) on the tab', async () => {
+      const parentId = tree.focusedNodeId;
+      await router.handleNewTab();
+      const childId = tree.focusedNodeId;
+      const child = tree.nodes.get(childId)!;
+      const tab = bridge.getTabForNode(childId)!;
+      expect(tab.parentId).toBe(parentId);
+      expect(tab.createdAt).toBe(child.createdAt);
+    });
   });
 
   describe('handleCloseTab', () => {
@@ -358,6 +368,25 @@ describe('TabCommandRouter', () => {
 
       await router.handleExternalTabOpen(newTab, 'https://link.example.com', rootTab);
       expect(tabPort.selectedTab).toBe(newTab);
+    });
+
+    it('sets tree attributes on registered tab for link intercept', async () => {
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      const newTab: FakeTab = {
+        url: 'https://link.example.com',
+        nodeId: '',
+        parentId: null,
+        createdAt: null,
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(newTab);
+
+      await router.handleExternalTabOpen(newTab, 'https://link.example.com', rootTab);
+      const childId = tree.focusedNodeId;
+      const child = tree.nodes.get(childId)!;
+      expect(newTab.parentId).toBe(tree.rootId);
+      expect(newTab.createdAt).toBe(child.createdAt);
     });
 
     it('fires linkIntercepted probe', async () => {
