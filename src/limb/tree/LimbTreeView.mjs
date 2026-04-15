@@ -19,6 +19,7 @@
 
 import { ZoomState } from "./ZoomState.mjs";
 import { TreeRenderer } from "./TreeRenderer.mjs";
+import { LODComputer } from "./LODComputer.mjs";
 
 // Zoom level change per 100px of wheel deltaY
 const ZOOM_SENSITIVITY = 0.05;
@@ -27,6 +28,15 @@ const ZOOM_SENSITIVITY = 0.05;
 const BASE_NODE_WIDTH = 0.8;
 const BASE_NODE_HEIGHT = 0.6;
 const NODE_CORNER_RADIUS_RATIO = 0.05; // fraction of node width
+
+// Visual fill colors per LOD tier
+const TIER_COLORS = {
+  "favicon": "#2a2a2a",
+  "screenshot-low": "#2a3a2a",
+  "screenshot-high": "#2a2a3a",
+  "live": "#3a3a2a",
+  "focused": "#2a3a3a",
+};
 
 export class LimbTreeView {
   /** @type {HTMLCanvasElement | null} */
@@ -40,11 +50,17 @@ export class LimbTreeView {
   #zoom = null;
   /** @type {TreeRenderer | null} */
   #renderer = null;
+  /** @type {LODComputer | null} */
+  #lodComputer = null;
 
   /** @type {Map<string, { x: number, y: number }> | null} */
   #positions = null;
   /** @type {Map<string, string> | null} */
   #parentMap = null;
+  /** @type {string | null} */
+  #focusedNodeId = null;
+  /** @type {Map<string, string> | null} */
+  #tiers = null;
 
   /** @type {((e: WheelEvent) => void) | null} */
   #wheelHandler = null;
@@ -68,6 +84,7 @@ export class LimbTreeView {
     );
 
     this.#renderer = new TreeRenderer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT);
+    this.#lodComputer = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT);
 
     this.#resizeHandler = () => this.#resize();
     this.#wheelHandler = (e) => this.#onWheel(e);
@@ -84,10 +101,12 @@ export class LimbTreeView {
    * @param {Map<string, { x: number, y: number }>} positions - Logical node positions from TreeLayout
    * @param {Map<string, string>} parentMap - childId -> parentId mapping
    * @param {{ width: number, height: number }} treeExtent - Bounding extent of the tree
+   * @param {string} [focusedNodeId] - ID of the currently focused node (for LOD computation)
    */
-  setTreeData(positions, parentMap, treeExtent) {
+  setTreeData(positions, parentMap, treeExtent, focusedNodeId) {
     this.#positions = positions;
     this.#parentMap = parentMap;
+    this.#focusedNodeId = focusedNodeId ?? null;
     if (this.#zoom) {
       this.#zoom.treeExtent = { ...treeExtent };
     }
@@ -132,6 +151,16 @@ export class LimbTreeView {
 
     if (this.#positions && this.#parentMap) {
       const zoom = this.#zoom;
+
+      // Compute LOD tiers for all nodes
+      if (this.#lodComputer && this.#focusedNodeId) {
+        this.#tiers = this.#lodComputer.computeTiers(
+          { focusedNodeId: this.#focusedNodeId },
+          this.#positions,
+          zoom,
+        );
+      }
+
       const frame = this.#renderer.computeFrame(
         this.#positions,
         this.#parentMap,
@@ -156,12 +185,15 @@ export class LimbTreeView {
         ctx.stroke();
       }
 
-      // Paint node rectangles
+      // Paint node rectangles, colored by LOD tier
       const cornerRadius = Math.max(2, frame.nodes[0]?.width * NODE_CORNER_RADIUS_RATIO || 2);
-      ctx.fillStyle = "#2a2a2a";
-      ctx.strokeStyle = "#444";
       ctx.lineWidth = 1;
       for (const node of frame.nodes) {
+        const tier = this.#tiers?.get(node.nodeId);
+        if (tier === "culled") continue;
+
+        ctx.fillStyle = TIER_COLORS[tier] ?? "#2a2a2a";
+        ctx.strokeStyle = tier === "focused" ? "#88f" : "#444";
         const r = Math.min(cornerRadius, node.width / 2, node.height / 2);
         ctx.beginPath();
         ctx.roundRect(node.x, node.y, node.width, node.height, r);
@@ -193,8 +225,11 @@ export class LimbTreeView {
     this.#initialized = false;
     this.#zoom = null;
     this.#renderer = null;
+    this.#lodComputer = null;
     this.#positions = null;
     this.#parentMap = null;
+    this.#focusedNodeId = null;
+    this.#tiers = null;
     this.#resizeHandler = null;
     this.#wheelHandler = null;
   }
