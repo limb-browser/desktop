@@ -86,7 +86,8 @@ index 86294fe79c..455309a56b 100644
 +      { global: "current" }
 +    );
 +    const tabBridgeProbe = { tabCreated(id) { console.debug("Tab created:", id); }, tabClosed(id) { console.debug("Tab closed:", id); }, focusSynced(id) { console.debug("Focus synced:", id); }, locationChanged(id, url) { console.debug("Location:", id, url); }, titleChanged(id, t) { console.debug("Title:", id, t); }, faviconChanged(id, f) { console.debug("Favicon:", id, f); } };
-+    const tabBridge = new TabBridge(new FirefoxTabPort(gBrowser), tabBridgeProbe);
++    const firefoxTabPort = new FirefoxTabPort(gBrowser);
++    const tabBridge = new TabBridge(firefoxTabPort, tabBridgeProbe);
 +    for (const [nodeId, tab] of restoredTabMap) {
 +      const node = browsingTree.nodes.get(nodeId);
 +      if (node) tabBridge.registerExistingTab(tab, nodeId, node.parentId, node.createdAt);
@@ -114,6 +115,14 @@ index 86294fe79c..455309a56b 100644
 +    window.gLimbTreeView.setTabPositioner(tabPositioner);
 +    window.gLimbTreeView.setTabBridge(tabBridge);
 +    window.gLimbTreeView.setMaxLiveTabs(Services.prefs.getIntPref("limb.tree.max-live-tabs", 8));
++    const { TabPreloader } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/TabPreloader.mjs",
++      { global: "current" }
++    );
++    const tabPreloaderProbe = { preloadStarted(id) { console.debug("Preload started:", id); }, preloadCompleted(id) { console.debug("Preload completed:", id); }, preloadCancelled(id) { console.debug("Preload cancelled:", id); } };
++    const tabPreloader = new TabPreloader(tabPreloaderProbe);
++    window.gLimbTreeView.setTabPreloader(tabPreloader);
++    window.gLimbTreeView.setTabPort(firefoxTabPort);
 +    const confirmPort = new BrowserConfirmationPort(window);
 +    const homeUrl = Services.prefs.getStringPref("limb.home.url", "about:blank");
 +    const tabCommandProbe = { newTabRouted(pId, cId) { console.debug("New tab routed:", pId, "->", cId); }, closeTabRouted(id) { console.debug("Tab close routed:", id); }, orphanTabBlocked() { console.debug("Orphan tab blocked"); }, linkIntercepted(pId, cId) { console.debug("Link intercepted:", pId, "->", cId); } };

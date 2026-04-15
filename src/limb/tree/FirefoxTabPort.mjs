@@ -51,6 +51,14 @@ export class FirefoxTabPort {
    * @param {object} tab
    * @returns {Promise<void>}
    */
+  async suspendTab(tab) {
+    this.#gBrowser.discardBrowser(tab);
+  }
+
+  /**
+   * @param {object} tab
+   * @returns {Promise<void>}
+   */
   async restoreTab(tab) {
     const browser = tab.linkedBrowser;
     if (browser && browser.currentURI?.spec === "about:blank") {
