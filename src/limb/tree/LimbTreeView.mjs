@@ -159,6 +159,16 @@ export class LimbTreeView {
   /** @type {boolean} */
   #wasDegraded = false;
 
+  // Per-animation frame counters for degraded mode skip logic (interaction-feel.md S6)
+  /** @type {number} */
+  #zoomAnimFrames = 0;
+  /** @type {number} */
+  #layoutAnimFrames = 0;
+  /** @type {number} */
+  #revealAnimFrames = 0;
+  /** @type {number} */
+  #panAnimFrames = 0;
+
   /** @type {((e: WheelEvent) => void) | null} */
   #wheelHandler = null;
   /** @type {(() => void) | null} */
@@ -534,9 +544,51 @@ export class LimbTreeView {
     }
     this.#wasDegraded = isDegraded;
 
-    // In degraded mode, skip animations running more than 2 frames
-    if (isDegraded && this.#frameScheduler && this.#frameScheduler.degradedFrameCount > 2) {
-      this.#skipAllAnimations();
+    // Track per-animation frame counts
+    if (this.#zoomAnimator?.isAnimating) {
+      this.#zoomAnimFrames++;
+    } else {
+      this.#zoomAnimFrames = 0;
+    }
+    if (this.#layoutAnimator?.isAnimating) {
+      this.#layoutAnimFrames++;
+    } else {
+      this.#layoutAnimFrames = 0;
+    }
+    if (this.#revealAnimator?.isAnimating) {
+      this.#revealAnimFrames++;
+    } else {
+      this.#revealAnimFrames = 0;
+    }
+    if (this.#animation) {
+      this.#panAnimFrames++;
+    } else {
+      this.#panAnimFrames = 0;
+    }
+
+    // In degraded mode, skip individual animations running more than 2 frames
+    if (isDegraded) {
+      if (this.#zoomAnimator?.isAnimating && this.#zoom && this.#zoomAnimFrames > 2) {
+        const finalFrame = this.#zoomAnimator.skipToEnd();
+        if (finalFrame) {
+          this.#zoom.setLevel(finalFrame.level);
+          this.#zoom.focusPoint = { ...finalFrame.focusPoint };
+        }
+      }
+      if (this.#layoutAnimator?.isAnimating && this.#layoutAnimFrames > 2) {
+        this.#layoutAnimator.skipToEnd();
+        this.#layoutAnimatedFrame = null;
+      }
+      if (this.#revealAnimator?.isAnimating && this.#revealAnimFrames > 2) {
+        this.#revealAnimator.skipToEnd();
+      }
+      if (this.#animation && this.#zoom && this.#panAnimFrames > 2) {
+        this.#zoom.focusPoint = { ...this.#animation.endFocus };
+        if (this.#animation.startLevel !== this.#animation.endLevel) {
+          this.#zoom.setLevel(this.#animation.endLevel);
+        }
+        this.#animation = null;
+      }
     }
 
     // Advance ZoomOutAndBackAnimator if active (mutually exclusive with ZoomAnimator)
@@ -599,36 +651,6 @@ export class LimbTreeView {
 
     this.#animationLastTime = now;
     this.#paint();
-  }
-
-  /**
-   * Skip all running animations to their final state.
-   * Used in degraded mode to reduce frame cost.
-   */
-  #skipAllAnimations() {
-    if (this.#zoomAnimator?.isAnimating && this.#zoom) {
-      const finalFrame = this.#zoomAnimator.skipToEnd();
-      if (finalFrame) {
-        this.#zoom.setLevel(finalFrame.level);
-        this.#zoom.focusPoint = { ...finalFrame.focusPoint };
-      }
-    }
-    if (this.#layoutAnimator?.isAnimating) {
-      this.#layoutAnimator.skipToEnd();
-      this.#layoutAnimatedFrame = null;
-    }
-    if (this.#revealAnimator?.isAnimating) {
-      this.#revealAnimator.skipToEnd();
-    }
-    if (this.#animation) {
-      if (this.#zoom) {
-        this.#zoom.focusPoint = { ...this.#animation.endFocus };
-        if (this.#animation.startLevel !== this.#animation.endLevel) {
-          this.#zoom.setLevel(this.#animation.endLevel);
-        }
-      }
-      this.#animation = null;
-    }
   }
 
   #paint() {
@@ -1075,6 +1097,10 @@ export class LimbTreeView {
     this.#onFoldToggled = null;
     this.#foldNodes = new Map();
     this.#wasDegraded = false;
+    this.#zoomAnimFrames = 0;
+    this.#layoutAnimFrames = 0;
+    this.#revealAnimFrames = 0;
+    this.#panAnimFrames = 0;
     this.#resizeHandler = null;
     this.#wheelHandler = null;
     this.#mousedownHandler = null;

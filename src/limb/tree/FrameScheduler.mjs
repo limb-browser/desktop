@@ -41,8 +41,6 @@ export class FrameScheduler {
   #now;
   /** @type {DegradedModeController} */
   #degradedMode;
-  /** @type {number} */
-  #degradedFrameCount = 0;
 
   /**
    * @param {() => void} paint - The paint callback to invoke each frame.
@@ -62,11 +60,6 @@ export class FrameScheduler {
   /** @returns {boolean} */
   get isDegraded() {
     return this.#degradedMode.isDegraded;
-  }
-
-  /** @returns {number} Number of paint frames since entering degraded mode. */
-  get degradedFrameCount() {
-    return this.#degradedFrameCount;
   }
 
   /**
@@ -93,7 +86,6 @@ export class FrameScheduler {
     if (this.#dirty) {
       this.#dirty = false;
       this.#idleFrameCount = 0;
-      const wasDegraded = this.#degradedMode.isDegraded;
       const start = this.#now();
       this.#paint();
       const elapsed = this.#now() - start;
@@ -101,12 +93,6 @@ export class FrameScheduler {
         this.#performanceProbe?.frameBudgetExceeded(elapsed, FRAME_BUDGET_MS);
       }
       this.#degradedMode.recordFrameDuration(elapsed);
-      if (this.#degradedMode.isDegraded) {
-        this.#degradedFrameCount++;
-      } else if (wasDegraded) {
-        // Just exited degraded mode
-        this.#degradedFrameCount = 0;
-      }
       this.#probe?.framePainted();
     } else {
       this.#idleFrameCount++;

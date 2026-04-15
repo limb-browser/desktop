@@ -361,9 +361,10 @@ describe('FrameScheduler', () => {
   });
 
   describe('degraded mode integration', () => {
-    function setupWithDegraded(paintDurationMs: number) {
+    function setupWithDegraded(initialPaintDurationMs: number) {
       const raf = new FakeAnimationFrame();
       let clock = 0;
+      let paintDurationMs = initialPaintDurationMs;
       const now = () => clock;
       const paint = () => { clock += paintDurationMs; };
       const { probe, calls: probeCalls } = createProbe();
@@ -391,7 +392,8 @@ describe('FrameScheduler', () => {
         performanceProbe: perfProbe,
         now,
       });
-      return { scheduler, raf, perfCalls, probeCalls };
+      const setPaintDuration = (ms: number) => { paintDurationMs = ms; };
+      return { scheduler, raf, perfCalls, probeCalls, setPaintDuration };
     }
 
     it('enters degraded mode after 3 slow frames', () => {
@@ -406,7 +408,7 @@ describe('FrameScheduler', () => {
     });
 
     it('exits degraded mode after 10 consecutive fast frames', () => {
-      const { scheduler, raf } = setupWithDegraded(20);
+      const { scheduler, raf, setPaintDuration } = setupWithDegraded(20);
 
       // Enter degraded mode
       for (let i = 0; i < 3; i++) {
@@ -415,8 +417,13 @@ describe('FrameScheduler', () => {
       }
       expect(scheduler.isDegraded).toBe(true);
 
-      // Now make frames fast (need to create a new scheduler with fast paint
-      // since paint duration is fixed). Instead, use the degradedFrameCount test.
+      // Switch to fast paint durations and run 10 fast frames
+      setPaintDuration(8);
+      for (let i = 0; i < 10; i++) {
+        scheduler.markDirty();
+        raf.tick();
+      }
+      expect(scheduler.isDegraded).toBe(false);
     });
 
     it('is not degraded initially', () => {
@@ -435,25 +442,24 @@ describe('FrameScheduler', () => {
       expect(perfCalls.some(c => c.method === 'degradedModeEntered')).toBe(true);
     });
 
-    it('tracks degraded frame count', () => {
-      const { scheduler, raf } = setupWithDegraded(20);
+    it('fires degradedModeExited probe event on exit', () => {
+      const { scheduler, raf, perfCalls, setPaintDuration } = setupWithDegraded(20);
 
-      // Enter degraded mode (frame 3 is the first degraded frame)
+      // Enter degraded mode
       for (let i = 0; i < 3; i++) {
         scheduler.markDirty();
         raf.tick();
       }
       expect(scheduler.isDegraded).toBe(true);
-      expect(scheduler.degradedFrameCount).toBe(1);
 
-      // Frame 4 and 5 are additional degraded frames
-      scheduler.markDirty();
-      raf.tick();
-      expect(scheduler.degradedFrameCount).toBe(2);
+      // Exit degraded mode with fast frames
+      setPaintDuration(8);
+      for (let i = 0; i < 10; i++) {
+        scheduler.markDirty();
+        raf.tick();
+      }
 
-      scheduler.markDirty();
-      raf.tick();
-      expect(scheduler.degradedFrameCount).toBe(3);
+      expect(perfCalls.some(c => c.method === 'degradedModeExited')).toBe(true);
     });
 
     it('does not record frame duration for idle frames', () => {
