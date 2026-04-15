@@ -8,10 +8,6 @@ import { assignTimeGroup } from './TimeGrouper';
 // Use a fixed "now" for deterministic tests: 2026-04-15 14:00:00 UTC (Wednesday)
 const NOW = Date.UTC(2026, 3, 15, 14, 0, 0);
 
-function daysAgo(days: number): number {
-  return NOW - days * 24 * 60 * 60 * 1000;
-}
-
 describe('assignTimeGroup', () => {
   it('returns "Today" for a timestamp from earlier today', () => {
     // 2026-04-15 06:00:00 UTC — same day as NOW
