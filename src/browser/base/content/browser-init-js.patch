@@ -12,8 +12,8 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      { global: "current" }
 +    );
 +
-+    const { computeLayout } = ChromeUtils.importESModule(
-+      "chrome://browser/content/limb/tree/TreeLayout.ts",
++    const { BranchFoldAdapter } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/BranchFoldAdapter.mjs",
 +      { global: "current" }
 +    );
 +    ChromeUtils.importESModule(
@@ -55,26 +55,17 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    const treeRestorerProbe = { treeRestored(n) { console.debug("Tree restored:", n, "nodes"); }, orphanedNodeReparented(id) { console.debug("Orphan reparented:", id); }, preLimbTabAdopted(id) { console.debug("Pre-Limb tab adopted:", id); } };
 +    const { tree: browsingTree, tabMap: restoredTabMap } = restoreTreeFromTabs(gBrowser, treeRestorerProbe);
 +    window.gLimbBrowsingTree = browsingTree; // about:limb-home loads limb/home/limb-home.mjs via <script>
-+    const positions = computeLayout(browsingTree);
-+    const parentMap = new Map();
-+    for (const [nodeId, node] of browsingTree.nodes) {
-+      if (node.parentId) parentMap.set(nodeId, node.parentId);
-+    }
-+    let maxX = 0, maxY = 0;
-+    for (const pos of positions.values()) {
-+      if (pos.x > maxX) maxX = pos.x;
-+      if (pos.y > maxY) maxY = pos.y;
-+    }
-+    const treeExtent = { width: maxX + 2, height: maxY + 2 };
 +    window.gLimbTreeView = new LimbTreeView();
 +    const navBar = document.getElementById("nav-bar");
 +    const addressBarAdapter = new AddressBarAdapter(navBar, window.gLimbTreeView);
 +    const lodProbe = { tierChanged(nodeId, prev, next) { console.debug("LOD tier:", nodeId, prev, "->", next); } };
 +    const animationProbe = { animationStarted(from, to) { console.debug("Zoom anim:", from, "->", to); }, animationCompleted() { console.debug("Zoom anim complete"); }, animationCancelled() { console.debug("Zoom anim cancelled"); } };
 +    const frameSchedulerProbe = { loopStarted() { console.debug("Frame loop started"); }, framePainted() {}, loopStopped() { console.debug("Frame loop stopped"); } };
-+    window.gLimbTreeView.init(document.getElementById("limb-tree-canvas"), addressBarAdapter.zoomProbe, lodProbe, { animationProbe, frameSchedulerProbe });
++    const branchFoldProbe = { foldComputed(r, f) { console.debug("Fold computed:", r, "recent,", f, "folds"); }, foldExpanded(id) { console.debug("Fold expanded:", id); }, foldCollapsed(id) { console.debug("Fold collapsed:", id); } };
++    const branchFoldAdapter = new BranchFoldAdapter(browsingTree, window.gLimbTreeView, branchFoldProbe);
++    window.gLimbTreeView.init(document.getElementById("limb-tree-canvas"), addressBarAdapter.zoomProbe, lodProbe, { animationProbe, frameSchedulerProbe, onFoldToggled: (foldId) => branchFoldAdapter.handleFoldToggle(foldId) });
 +    addressBarAdapter.attach();
-+    window.gLimbTreeView.setTreeData(positions, parentMap, treeExtent, browsingTree.focusedNodeId);
++    branchFoldAdapter.updateLayout();
 +    const autoSaveProbe = { saveTriggered(reason) { console.debug("Auto-save:", reason); }, saveDebounced(n) { console.debug("Auto-save debounced:", n); }, periodicFlushStarted() { console.debug("Periodic flush started"); }, periodicFlushStopped() { console.debug("Periodic flush stopped"); } };
 +    const { TabStateFlusher } = ChromeUtils.importESModule("resource:///modules/sessionstore/TabStateFlusher.sys.mjs");
 +    const autoSaveAdapter = new AutoSaveAdapter(() => { TabStateFlusher.flushWindow(window); }, autoSaveProbe);

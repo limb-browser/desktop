@@ -3,7 +3,7 @@ title: "Implement branch folding at root level"
 spec_ref: "unified-tree.md S4"
 depends_on:
   - task-006
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []

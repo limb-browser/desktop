@@ -27,6 +27,7 @@ import { hitTestNodes } from "./HitTester.mjs";
 import { ZoomAnimator } from "./ZoomAnimator.mjs";
 import { FrameScheduler } from "./FrameScheduler.mjs";
 import { LayoutAnimator } from "./LayoutAnimator.mjs";
+import { computeFoldNodeFrame, formatFoldLabel } from "./FoldNodeRenderer.mjs";
 
 // Zoom level change per 100px of wheel deltaY
 const ZOOM_SENSITIVITY = 0.05;
@@ -115,6 +116,10 @@ export class LimbTreeView {
   #animationLastTime = 0;
   /** @type {((nodeId: string) => void) | null} */
   #onNodeClicked = null;
+  /** @type {((foldId: string) => void) | null} */
+  #onFoldToggled = null;
+  /** @type {Map<string, { id: string, monthLabel: string, branchCount: number, branchIds: string[] }>} */
+  #foldNodes = new Map();
 
   /** @type {Map<string, { x: number, y: number }> | null} */
   #positions = null;
@@ -151,7 +156,7 @@ export class LimbTreeView {
    * @param {HTMLCanvasElement} canvas
    * @param {{ zoomChanged(level: number, zoomScale: number): void }} [probe]
    * @param {{ tierChanged(nodeId: string, previousTier: string, newTier: string): void }} [lodProbe]
-   * @param {{ onNodeClicked?: (nodeId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe }} [options]
+   * @param {{ onNodeClicked?: (nodeId: string) => void, onFoldToggled?: (foldId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe }} [options]
    */
   init(canvas, probe, lodProbe, options) {
     this.#canvas = canvas;
@@ -172,6 +177,7 @@ export class LimbTreeView {
     this.#zoomAnimator = new ZoomAnimator(options?.animationProbe);
     this.#layoutAnimator = new LayoutAnimator(options?.layoutAnimationProbe);
     this.#onNodeClicked = options?.onNodeClicked ?? null;
+    this.#onFoldToggled = options?.onFoldToggled ?? null;
     this.#frameScheduler = new FrameScheduler(
       () => this.#onFrame(),
       options?.frameSchedulerProbe,
@@ -227,6 +233,15 @@ export class LimbTreeView {
    */
   setScreenshotManager(screenshotManager) {
     this.#screenshotManager = screenshotManager;
+  }
+
+  /**
+   * Set the fold node metadata for rendering fold nodes with stacked-cards appearance.
+   * @param {Map<string, { id: string, monthLabel: string, branchCount: number, branchIds: string[] }>} foldNodes
+   */
+  setFoldNodes(foldNodes) {
+    this.#foldNodes = foldNodes;
+    this.#frameScheduler?.markDirty();
   }
 
   /**
@@ -356,6 +371,12 @@ export class LimbTreeView {
   #handleClickToFocus(screenX, screenY) {
     const clickedNodeId = hitTestNodes(screenX, screenY, this.#lastFrameNodes);
     if (!clickedNodeId || !this.#zoom || !this.#positions || !this.#zoomAnimator) return;
+
+    // Check if the clicked node is a fold node
+    if (this.#foldNodes.has(clickedNodeId)) {
+      this.#onFoldToggled?.(clickedNodeId);
+      return;
+    }
 
     // Notify external listener (e.g., BrowsingTree.focusNode)
     this.#onNodeClicked?.(clickedNodeId);
@@ -554,6 +575,58 @@ export class LimbTreeView {
         // Apply layout animation opacity for fading in/out nodes
         const nodeAlpha = animated?.opacity?.get(node.nodeId) ?? 1;
 
+        // Draw fold nodes with stacked-cards appearance
+        const foldMeta = this.#foldNodes.get(node.nodeId);
+        if (foldMeta) {
+          const foldFrame = computeFoldNodeFrame({
+            x: node.x,
+            y: node.y + offsetY,
+            width: node.width,
+            height: node.height,
+          });
+
+          ctx.save();
+          ctx.globalAlpha = nodeAlpha;
+
+          // Draw background cards (back to front)
+          for (const bg of foldFrame.backgroundCards) {
+            ctx.fillStyle = "#222";
+            ctx.strokeStyle = "#444";
+            ctx.beginPath();
+            ctx.roundRect(bg.x, bg.y, bg.width, bg.height, r);
+            ctx.fill();
+            ctx.stroke();
+          }
+
+          // Draw front card
+          ctx.fillStyle = "#2a2a2a";
+          ctx.strokeStyle = "#666";
+          ctx.beginPath();
+          ctx.roundRect(
+            foldFrame.frontCard.x, foldFrame.frontCard.y,
+            foldFrame.frontCard.width, foldFrame.frontCard.height,
+            r,
+          );
+          ctx.fill();
+          ctx.stroke();
+
+          // Draw fold label
+          const label = formatFoldLabel(foldMeta.monthLabel, foldMeta.branchCount);
+          const fontSize = Math.max(8, Math.min(14, node.width * 0.08));
+          ctx.fillStyle = "#ccc";
+          ctx.font = `${fontSize}px system-ui, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(
+            label,
+            foldFrame.frontCard.x + foldFrame.frontCard.width / 2,
+            foldFrame.frontCard.y + foldFrame.frontCard.height / 2,
+          );
+
+          ctx.restore();
+          continue;
+        }
+
         // Draw screenshot for screenshot-tier nodes
         if ((tier === "screenshot-low" || tier === "screenshot-high") && this.#screenshotManager) {
           const resolution = tier === "screenshot-low" ? "low" : "high";
@@ -713,6 +786,8 @@ export class LimbTreeView {
     this.#animation = null;
     this.#animationLastTime = 0;
     this.#onNodeClicked = null;
+    this.#onFoldToggled = null;
+    this.#foldNodes = new Map();
     this.#resizeHandler = null;
     this.#wheelHandler = null;
     this.#mousedownHandler = null;
