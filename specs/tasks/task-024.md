@@ -3,7 +3,7 @@ title: "Implement auto-save triggers"
 spec_ref: "persistence.md S3"
 depends_on:
   - task-023
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []

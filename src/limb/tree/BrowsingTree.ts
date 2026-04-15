@@ -46,6 +46,10 @@ export class BrowsingTree {
     this.nodes = new Map([[rootId, root]]);
   }
 
+  setProbe(probe: BrowsingTreeProbe): void {
+    this.#probe = probe;
+  }
+
   addChild(parentId: string, url: string): TreeNode {
     const parent = this.nodes.get(parentId);
     if (!parent) {

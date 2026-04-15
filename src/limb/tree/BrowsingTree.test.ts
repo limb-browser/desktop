@@ -513,4 +513,34 @@ describe('BrowsingTree', () => {
       expect(noProbTree.nodes.size).toBe(1);
     });
   });
+
+  describe('setProbe', () => {
+    it('attaches a probe after construction', () => {
+      const lateTree = new BrowsingTree('https://example.com');
+      const lateProbe = createFakeProbe();
+      lateTree.setProbe(lateProbe);
+
+      const child = lateTree.addChild(lateTree.rootId, 'https://a.com');
+      expect(lateProbe.calls).toContainEqual({
+        method: 'childAdded',
+        args: [lateTree.rootId, child.id],
+      });
+    });
+
+    it('replaces the existing probe', () => {
+      const newProbe = createFakeProbe();
+      tree.setProbe(newProbe);
+
+      const child = tree.addChild(tree.rootId, 'https://a.com');
+      expect(newProbe.calls).toContainEqual({
+        method: 'childAdded',
+        args: [tree.rootId, child.id],
+      });
+      // Original probe should not receive new events after setProbe
+      const originalPostSetCalls = probe.calls.filter(
+        (c) => c.args.includes(child.id)
+      );
+      expect(originalPostSetCalls).toHaveLength(0);
+    });
+  });
 });

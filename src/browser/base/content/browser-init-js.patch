@@ -40,6 +40,10 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      "chrome://browser/content/limb/tree/TreeRestorerAdapter.mjs",
 +      { global: "current" }
 +    );
++    const { AutoSaveAdapter } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/AutoSaveAdapter.mjs",
++      { global: "current" }
++    );
 +    const treeRestorerProbe = { treeRestored(n) { console.debug("Tree restored:", n, "nodes"); }, orphanedNodeReparented(id) { console.debug("Orphan reparented:", id); }, preLimbTabAdopted(id) { console.debug("Pre-Limb tab adopted:", id); } };
 +    const { tree: browsingTree } = restoreTreeFromTabs(gBrowser, treeRestorerProbe);
 +    const positions = computeLayout(browsingTree);
@@ -65,6 +69,11 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    const treeNav = new TreeNavigator(browsingTree);
 +    const keyNavAdapter = new KeyboardNavigationAdapter(treeNav, window.gLimbTreeView, gURLBar);
 +    keyNavAdapter.install(window);
++    const autoSaveProbe = { saveTriggered(reason) { console.debug("Auto-save:", reason); }, saveDebounced(n) { console.debug("Auto-save debounced:", n); }, periodicFlushStarted() { console.debug("Periodic flush started"); }, periodicFlushStopped() { console.debug("Periodic flush stopped"); } };
++    const { TabStateFlusher } = ChromeUtils.importESModule("resource:///modules/sessionstore/TabStateFlusher.sys.mjs");
++    const autoSaveAdapter = new AutoSaveAdapter(() => { TabStateFlusher.flushWindow(window); }, autoSaveProbe);
++    autoSaveAdapter.install(browsingTree);
++    window.gLimbAutoSaveAdapter = autoSaveAdapter;
      gBrowser.addEventListener("DOMUpdateBlockedPopups", e =>
        PopupAndRedirectBlockerObserver.handleEvent(e)
      );
