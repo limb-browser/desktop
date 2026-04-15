@@ -17,6 +17,11 @@ index eb24c3ffdd2cfb33379aca993af5171fdb91ac2c..15d3fbff397df23f112355e22ca5dba5
 +    tabData._zenPinnedInitialState = tab._zenPinnedInitialState;
 +    tabData._zenIsActiveTab = tab._zenContentsVisible;
 +
++    // Limb tree metadata for session persistence (persistence.md S1.3)
++    tabData.limbNodeId = tab.getAttribute("limb-node-id") || undefined;
++    tabData.limbTreeParentId = tab.getAttribute("limb-tree-parent-id") || undefined;
++    tabData.limbTreeCreatedAt = tab.getAttribute("limb-tree-created-at") || undefined;
++
      tabData.searchMode = tab.ownerGlobal.gURLBar.getSearchMode(browser, true);
 +    if (tabData.searchMode?.source === tab.ownerGlobal.UrlbarUtils.RESULT_SOURCE.ZEN_ACTIONS) {
 +      delete tabData.searchMode;

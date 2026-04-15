@@ -7,6 +7,8 @@ import type { TabPort } from '../ports/TabPort';
 export interface FakeTab {
   url: string;
   nodeId: string;
+  parentId: string | null;
+  createdAt: number | null;
   closed: boolean;
   suspended: boolean;
 }
@@ -25,7 +27,7 @@ export class InMemoryTabPort implements TabPort<FakeTab> {
   onTabCreated: ((tab: FakeTab) => void) | null = null;
 
   async openTab(url: string, nodeId: string): Promise<FakeTab> {
-    const tab: FakeTab = { url, nodeId, closed: false, suspended: false };
+    const tab: FakeTab = { url, nodeId, parentId: null, createdAt: null, closed: false, suspended: false };
     this.tabs.push(tab);
     this.onTabCreated?.(tab);
     return tab;
@@ -48,6 +50,11 @@ export class InMemoryTabPort implements TabPort<FakeTab> {
 
   async isTabSuspended(tab: FakeTab): Promise<boolean> {
     return tab.suspended;
+  }
+
+  setTreeAttributes(tab: FakeTab, parentId: string | null, createdAt: number): void {
+    tab.parentId = parentId;
+    tab.createdAt = createdAt;
   }
 
   get openTabs(): FakeTab[] {

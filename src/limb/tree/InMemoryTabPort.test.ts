@@ -103,6 +103,22 @@ describe('InMemoryTabPort', () => {
     });
   });
 
+  describe('setTreeAttributes', () => {
+    it('sets parentId and createdAt on the tab', async () => {
+      const tab = await port.openTab('https://example.com', 'node-1');
+      port.setTreeAttributes(tab, 'parent-1', 1000);
+      expect(tab.parentId).toBe('parent-1');
+      expect(tab.createdAt).toBe(1000);
+    });
+
+    it('sets null parentId for root tabs', async () => {
+      const tab = await port.openTab('https://root.com', 'root-1');
+      port.setTreeAttributes(tab, null, 2000);
+      expect(tab.parentId).toBeNull();
+      expect(tab.createdAt).toBe(2000);
+    });
+  });
+
   describe('openTabs', () => {
     it('returns only tabs that are not closed', async () => {
       const tab1 = await port.openTab('https://a.com', 'n1');

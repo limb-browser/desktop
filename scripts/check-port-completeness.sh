@@ -36,10 +36,12 @@ for port_file in src/limb/ports/*Port.ts; do
     [[ "$impl_file" == *.test.* ]] && continue
     [[ "$impl_file" == */ports/* ]] && continue
 
-    # Extract public async method names from the implementation
-    impl_methods=$(grep -Po '^\s+async\s+\K\w+(?=\()' "$impl_file" 2>/dev/null || true)
-    # Filter out private methods (starting with #)
-    impl_methods=$(echo "$impl_methods" | grep -v '^#' | sort -u | grep -v '^$' || true)
+    # Extract public method names from the implementation (async and non-async)
+    impl_async=$(grep -Po '^\s+async\s+\K\w+(?=\()' "$impl_file" 2>/dev/null || true)
+    impl_sync=$(grep -Po '^\s+\K\w+(?=\([^)]*\).*\{)' "$impl_file" 2>/dev/null || true)
+    impl_methods=$(echo -e "${impl_async}\n${impl_sync}" | sort -u)
+    # Filter out private methods (starting with #), keywords, and empty lines
+    impl_methods=$(echo "$impl_methods" | grep -v '^#' | grep -v '^if$\|^for$\|^while$\|^return$\|^constructor$\|^get$\|^set$' | sort -u | grep -v '^$' || true)
 
     # Check: port methods missing from implementation
     while IFS= read -r method; do

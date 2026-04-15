@@ -17,11 +17,14 @@ export class TabBridge<TTab> {
     this.#probe = probe ?? null;
   }
 
-  async createTabForNode(node: { id: string; url: string }): Promise<void> {
+  async createTabForNode(node: { id: string; url: string; parentId?: string | null; createdAt?: number }): Promise<void> {
     if (this.nodeToTab.has(node.id)) {
       throw new Error(`Node "${node.id}" already has a tab`);
     }
     const tab = await this.#tabPort.openTab(node.url, node.id);
+    if (node.parentId !== undefined && node.createdAt !== undefined) {
+      this.#tabPort.setTreeAttributes(tab, node.parentId, node.createdAt);
+    }
     this.nodeToTab.set(node.id, tab);
     this.tabToNode.set(tab, node.id);
     this.#probe?.tabCreated(node.id);
@@ -38,12 +41,15 @@ export class TabBridge<TTab> {
     this.#probe?.tabClosed(nodeId);
   }
 
-  registerExistingTab(tab: TTab, nodeId: string): void {
+  registerExistingTab(tab: TTab, nodeId: string, parentId?: string | null, createdAt?: number): void {
     if (this.nodeToTab.has(nodeId)) {
       throw new Error(`Node "${nodeId}" already has a tab`);
     }
     if (this.tabToNode.has(tab)) {
       throw new Error(`Tab is already mapped to node "${this.tabToNode.get(tab)}"`);
+    }
+    if (parentId !== undefined && createdAt !== undefined) {
+      this.#tabPort.setTreeAttributes(tab, parentId, createdAt);
     }
     this.nodeToTab.set(nodeId, tab);
     this.tabToNode.set(tab, nodeId);
@@ -58,13 +64,16 @@ export class TabBridge<TTab> {
     return this.tabToNode.get(tab);
   }
 
-  async syncFocusToTab(nodeId: string, nodeUrl: string): Promise<void> {
+  async syncFocusToTab(nodeId: string, nodeUrl: string, parentId?: string | null, createdAt?: number): Promise<void> {
     if (this.#syncing) return;
     this.#syncing = true;
     try {
       let tab = this.nodeToTab.get(nodeId);
       if (!tab) {
         tab = await this.#tabPort.openTab(nodeUrl, nodeId);
+        if (parentId !== undefined && createdAt !== undefined) {
+          this.#tabPort.setTreeAttributes(tab, parentId, createdAt);
+        }
         this.nodeToTab.set(nodeId, tab);
         this.tabToNode.set(tab, nodeId);
         this.#probe?.tabCreated(nodeId);

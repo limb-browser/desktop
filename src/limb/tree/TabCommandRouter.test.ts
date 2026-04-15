@@ -191,6 +191,8 @@ describe('TabCommandRouter', () => {
       const orphanTab: FakeTab = {
         url: 'https://orphan.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -204,6 +206,8 @@ describe('TabCommandRouter', () => {
       const orphanTab: FakeTab = {
         url: 'https://orphan.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -232,6 +236,8 @@ describe('TabCommandRouter', () => {
       const orphanTab: FakeTab = {
         url: 'https://orphan.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -239,6 +245,8 @@ describe('TabCommandRouter', () => {
       const unknownOpener: FakeTab = {
         url: 'https://unknown.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -254,6 +262,8 @@ describe('TabCommandRouter', () => {
       const newTab: FakeTab = {
         url: 'https://link.example.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -269,6 +279,8 @@ describe('TabCommandRouter', () => {
       const newTab: FakeTab = {
         url: 'https://link.example.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -284,6 +296,8 @@ describe('TabCommandRouter', () => {
       const newTab: FakeTab = {
         url: 'https://specific-page.example.com/article',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -299,6 +313,8 @@ describe('TabCommandRouter', () => {
       const newTab: FakeTab = {
         url: 'https://link.example.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -315,6 +331,8 @@ describe('TabCommandRouter', () => {
       const newTab: FakeTab = {
         url: 'https://link.example.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -331,6 +349,8 @@ describe('TabCommandRouter', () => {
       const newTab: FakeTab = {
         url: 'https://link.example.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -345,6 +365,8 @@ describe('TabCommandRouter', () => {
       const newTab: FakeTab = {
         url: 'https://link.example.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -364,6 +386,8 @@ describe('TabCommandRouter', () => {
       const newTab: FakeTab = {
         url: 'https://link.example.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -382,6 +406,8 @@ describe('TabCommandRouter', () => {
       const windowOpenTab: FakeTab = {
         url: 'https://popup.example.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -399,6 +425,8 @@ describe('TabCommandRouter', () => {
       const newTab: FakeTab = {
         url: 'https://link.example.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -415,6 +443,8 @@ describe('TabCommandRouter', () => {
       const firstTab: FakeTab = {
         url: 'https://first.example.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };
@@ -426,6 +456,8 @@ describe('TabCommandRouter', () => {
       const secondTab: FakeTab = {
         url: 'https://second.example.com',
         nodeId: '',
+        parentId: null,
+        createdAt: null,
         closed: false,
         suspended: false,
       };

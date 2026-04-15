@@ -39,6 +39,10 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      "chrome://browser/content/limb/tree/KeyboardNavigationAdapter.mjs",
 +      { global: "current" }
 +    );
++    const { restoreTreeFromTabs } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/TreeRestorerAdapter.mjs",
++      { global: "current" }
++    );
 +    const browsingTree = new BrowsingTree("https://example.com");
 +    const a = browsingTree.addChild(browsingTree.rootId, "https://a.example.com");
 +    const b = browsingTree.addChild(browsingTree.rootId, "https://b.example.com");

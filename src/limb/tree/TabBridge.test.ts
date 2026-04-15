@@ -90,9 +90,23 @@ describe('TabBridge', () => {
     it('creates a tab for the root node (startup scenario)', async () => {
       const tree = new BrowsingTree('https://start.com');
       const root = tree.nodes.get(tree.rootId)!;
-      await bridge.createTabForNode({ id: root.id, url: root.url });
+      await bridge.createTabForNode({ id: root.id, url: root.url, parentId: null, createdAt: root.createdAt });
       expect(bridge.getTabForNode(root.id)).toBeDefined();
       expect(bridge.getTabForNode(root.id)!.url).toBe('https://start.com');
+    });
+
+    it('sets tree attributes (parentId, createdAt) on the tab', async () => {
+      await bridge.createTabForNode({ id: 'child-1', url: 'https://child.com', parentId: 'root-1', createdAt: 1000 });
+      const tab = bridge.getTabForNode('child-1')!;
+      expect(tab.parentId).toBe('root-1');
+      expect(tab.createdAt).toBe(1000);
+    });
+
+    it('sets null parentId for root nodes', async () => {
+      await bridge.createTabForNode({ id: 'root-1', url: 'https://root.com', parentId: null, createdAt: 500 });
+      const tab = bridge.getTabForNode('root-1')!;
+      expect(tab.parentId).toBeNull();
+      expect(tab.createdAt).toBe(500);
     });
   });
 
@@ -196,7 +210,7 @@ describe('TabBridge', () => {
     });
 
     it('returns undefined for unknown tab', () => {
-      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', closed: false, suspended: false };
+      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', parentId: null, createdAt: null, closed: false, suspended: false };
       expect(bridge.getNodeForTab(unknownTab)).toBeUndefined();
     });
   });
@@ -306,6 +320,13 @@ describe('TabBridge', () => {
       expect(tabPort.selectedTab).toBe(tab);
     });
 
+    it('sets tree attributes when creating a tab on focus', async () => {
+      await bridge.syncFocusToTab('node-1', 'https://example.com', 'parent-1', 3000);
+      const tab = bridge.getTabForNode('node-1')!;
+      expect(tab.parentId).toBe('parent-1');
+      expect(tab.createdAt).toBe(3000);
+    });
+
     it('fires focusSynced probe', async () => {
       await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
       probe.calls.length = 0;
@@ -349,7 +370,7 @@ describe('TabBridge', () => {
 
     it('is a no-op for an unknown tab', () => {
       const focusCalls: string[] = [];
-      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', closed: false, suspended: false };
+      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', parentId: null, createdAt: null, closed: false, suspended: false };
       bridge.onExternalTabSelected(unknownTab, (nodeId) => focusCalls.push(nodeId));
       expect(focusCalls).toHaveLength(0);
     });
@@ -415,19 +436,19 @@ describe('TabBridge', () => {
 
   describe('registerExistingTab', () => {
     it('registers node-to-tab mapping', () => {
-      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', closed: false, suspended: false };
+      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', parentId: null, createdAt: null, closed: false, suspended: false };
       bridge.registerExistingTab(tab, 'node-1');
       expect(bridge.getTabForNode('node-1')).toBe(tab);
     });
 
     it('registers tab-to-node mapping', () => {
-      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', closed: false, suspended: false };
+      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', parentId: null, createdAt: null, closed: false, suspended: false };
       bridge.registerExistingTab(tab, 'node-1');
       expect(bridge.getNodeForTab(tab)).toBe('node-1');
     });
 
     it('fires tabCreated probe', () => {
-      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', closed: false, suspended: false };
+      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', parentId: null, createdAt: null, closed: false, suspended: false };
       probe.calls.length = 0;
       bridge.registerExistingTab(tab, 'node-1');
       expect(probe.calls).toContainEqual({
@@ -438,18 +459,18 @@ describe('TabBridge', () => {
 
     it('throws if node already has a tab', async () => {
       await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
-      const anotherTab: FakeTab = { url: 'https://other.com', nodeId: 'node-1', closed: false, suspended: false };
+      const anotherTab: FakeTab = { url: 'https://other.com', nodeId: 'node-1', parentId: null, createdAt: null, closed: false, suspended: false };
       expect(() => bridge.registerExistingTab(anotherTab, 'node-1')).toThrow();
     });
 
     it('throws if tab is already mapped to a different node', () => {
-      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', closed: false, suspended: false };
+      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', parentId: null, createdAt: null, closed: false, suspended: false };
       bridge.registerExistingTab(tab, 'node-1');
       expect(() => bridge.registerExistingTab(tab, 'node-2')).toThrow();
     });
 
     it('maintains bidirectional map consistency', () => {
-      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', closed: false, suspended: false };
+      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', parentId: null, createdAt: null, closed: false, suspended: false };
       bridge.registerExistingTab(tab, 'node-1');
       for (const [nodeId, t] of bridge.nodeToTab) {
         expect(bridge.tabToNode.get(t)).toBe(nodeId);
@@ -458,11 +479,18 @@ describe('TabBridge', () => {
         expect(bridge.nodeToTab.get(nodeId)).toBe(t);
       }
     });
+
+    it('sets tree attributes on the tab', () => {
+      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', parentId: null, createdAt: null, closed: false, suspended: false };
+      bridge.registerExistingTab(tab, 'node-1', 'parent-1', 2000);
+      expect(tab.parentId).toBe('parent-1');
+      expect(tab.createdAt).toBe(2000);
+    });
   });
 
   describe('closeOrphanTab', () => {
     it('closes a tab that has no node association', async () => {
-      const orphan: FakeTab = { url: 'https://orphan.com', nodeId: '', closed: false, suspended: false };
+      const orphan: FakeTab = { url: 'https://orphan.com', nodeId: '', parentId: null, createdAt: null, closed: false, suspended: false };
       tabPort.tabs.push(orphan);
       await bridge.closeOrphanTab(orphan);
       expect(orphan.closed).toBe(true);
@@ -506,7 +534,7 @@ describe('TabBridge', () => {
     });
 
     it('is a no-op for an unknown tab', () => {
-      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', closed: false, suspended: false };
+      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', parentId: null, createdAt: null, closed: false, suspended: false };
       const updateCalls: string[] = [];
       bridge.onTabLocationChanged(unknownTab, 'https://new.com', (nodeId) => updateCalls.push(nodeId));
       expect(updateCalls).toHaveLength(0);
@@ -564,7 +592,7 @@ describe('TabBridge', () => {
     });
 
     it('is a no-op for an unknown tab', () => {
-      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', closed: false, suspended: false };
+      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', parentId: null, createdAt: null, closed: false, suspended: false };
       const updateCalls: string[] = [];
       bridge.onTabTitleChanged(unknownTab, 'Title', (nodeId) => updateCalls.push(nodeId));
       expect(updateCalls).toHaveLength(0);
@@ -621,7 +649,7 @@ describe('TabBridge', () => {
     });
 
     it('is a no-op for an unknown tab', () => {
-      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', closed: false, suspended: false };
+      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', parentId: null, createdAt: null, closed: false, suspended: false };
       const updateCalls: string[] = [];
       bridge.onTabFaviconChanged(unknownTab, 'icon.png', (nodeId) => updateCalls.push(nodeId));
       expect(updateCalls).toHaveLength(0);

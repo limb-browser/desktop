@@ -300,6 +300,17 @@ index 3bebeb70e1a88aefb3ef4bc2114bd85b0d8d1e51..5414adeca242f00bff98c5e41de74f33
 +    if (tabData.zenDefaultUserContextId) {
 +      tab.setAttribute("zenDefaultUserContextId", true);
 +    }
++
++    // Restore Limb tree metadata (persistence.md S1.3)
++    if (tabData.limbNodeId) {
++      tab.setAttribute("limb-node-id", tabData.limbNodeId);
++    }
++    if (tabData.limbTreeParentId) {
++      tab.setAttribute("limb-tree-parent-id", tabData.limbTreeParentId);
++    }
++    if (tabData.limbTreeCreatedAt) {
++      tab.setAttribute("limb-tree-created-at", tabData.limbTreeCreatedAt);
++    }
 
      if (tabData.pinned) {
        tabbrowser.pinTab(tab);
