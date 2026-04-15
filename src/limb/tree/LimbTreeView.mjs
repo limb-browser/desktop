@@ -33,6 +33,7 @@ import { TabPositioner } from "./TabPositioner.mjs";
 import { ZoomOutAndBackAnimator } from "./ZoomOutAndBackAnimator.mjs";
 import { NewChildZoomHandler } from "./NewChildZoomHandler.mjs";
 import { ZoomMomentum } from "./ZoomMomentum.mjs";
+import { PanMomentum } from "./PanMomentum.mjs";
 
 // Zoom level change per 100px of wheel deltaY
 const ZOOM_SENSITIVITY = 0.05;
@@ -122,6 +123,10 @@ export class LimbTreeView {
   #zoomMomentum = null;
   /** @type {number | null} */
   #momentumReleaseTimer = null;
+  /** @type {PanMomentum | null} */
+  #panMomentum = null;
+  /** @type {number} */
+  #lastDragTime = 0;
   /** @type {FrameScheduler | null} */
   #frameScheduler = null;
 
@@ -190,7 +195,7 @@ export class LimbTreeView {
    * @param {HTMLCanvasElement} canvas
    * @param {{ zoomChanged(level: number, zoomScale: number): void }} [probe]
    * @param {{ tierChanged(nodeId: string, previousTier: string, newTier: string): void }} [lodProbe]
-   * @param {{ onNodeClicked?: (nodeId: string) => void, onFoldToggled?: (foldId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe, performanceProbe?: import('../ports/PerformanceProbe').PerformanceProbe, revealAnimationProbe?: import('../ports/RevealAnimationProbe').RevealAnimationProbe, zoomOutAndBackProbe?: import('../ports/ZoomOutAndBackProbe').ZoomOutAndBackProbe, zoomMomentumProbe?: import('../ports/ZoomMomentumProbe').ZoomMomentumProbe }} [options]
+   * @param {{ onNodeClicked?: (nodeId: string) => void, onFoldToggled?: (foldId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe, performanceProbe?: import('../ports/PerformanceProbe').PerformanceProbe, revealAnimationProbe?: import('../ports/RevealAnimationProbe').RevealAnimationProbe, zoomOutAndBackProbe?: import('../ports/ZoomOutAndBackProbe').ZoomOutAndBackProbe, zoomMomentumProbe?: import('../ports/ZoomMomentumProbe').ZoomMomentumProbe, panMomentumProbe?: import('../ports/PanMomentumProbe').PanMomentumProbe }} [options]
    */
   init(canvas, probe, lodProbe, options) {
     this.#canvas = canvas;
@@ -214,6 +219,7 @@ export class LimbTreeView {
     this.#zoomOutAndBackAnimator = new ZoomOutAndBackAnimator(options?.zoomOutAndBackProbe);
     this.#newChildZoomHandler = new NewChildZoomHandler(this.#zoomOutAndBackAnimator);
     this.#zoomMomentum = new ZoomMomentum(options?.zoomMomentumProbe);
+    this.#panMomentum = new PanMomentum(options?.panMomentumProbe);
     this.#onNodeClicked = options?.onNodeClicked ?? null;
     this.#onFoldToggled = options?.onFoldToggled ?? null;
     this.#frameScheduler = new FrameScheduler(
@@ -244,6 +250,7 @@ export class LimbTreeView {
    */
   setZoomLevel(level) {
     if (!this.#zoom) return;
+    this.#panMomentum?.cancel();
     this.#zoom.setLevel(level);
     this.#frameScheduler?.markDirty();
   }
@@ -430,6 +437,7 @@ export class LimbTreeView {
     e.preventDefault();
 
     this.#cancelZoomOutAndBack();
+    this.#panMomentum?.cancel();
 
     const deltaLevel = -(e.deltaY / 100) * ZOOM_SENSITIVITY;
     this.#zoom.zoomAtCursor(deltaLevel, e.clientX, e.clientY);
@@ -449,6 +457,8 @@ export class LimbTreeView {
     if (!this.#panInteraction) return;
     this.#cancelZoomOutAndBack();
     this.#zoomMomentum?.cancel();
+    this.#panMomentum?.cancel();
+    this.#lastDragTime = 0;
     this.#panInteraction.onMouseDown(e.clientX, e.clientY);
     this.#updateCursor();
   }
@@ -456,7 +466,37 @@ export class LimbTreeView {
   /** @param {MouseEvent} e */
   #onMouseMove(e) {
     if (!this.#panInteraction) return;
+
+    const prevFocus = this.#zoom ? { ...this.#zoom.focusPoint } : null;
+
     if (this.#panInteraction.onMouseMove(e.clientX, e.clientY)) {
+      // Apply boundary damping and record drag for velocity tracking
+      if (this.#panMomentum && this.#zoom && prevFocus) {
+        const treeBounds = this.#getTreeBounds();
+        if (treeBounds) {
+          const rawDx = this.#zoom.focusPoint.x - prevFocus.x;
+          const rawDy = this.#zoom.focusPoint.y - prevFocus.y;
+
+          // Reduce pan speed by 80% when outside tree bounds
+          const damped = this.#panMomentum.dampDelta(rawDx, rawDy, prevFocus, treeBounds);
+          this.#zoom.focusPoint = {
+            x: prevFocus.x + damped.dx,
+            y: prevFocus.y + damped.dy,
+          };
+
+          // Enforce hard limit: 20% of tree stays visible
+          const vls = this.#getViewportLogicalSize();
+          this.#zoom.focusPoint = this.#panMomentum.clampForVisibility(
+            this.#zoom.focusPoint, treeBounds, vls,
+          );
+
+          // Record drag sample for momentum velocity
+          const now = performance.now();
+          const dt = this.#lastDragTime > 0 ? now - this.#lastDragTime : 16;
+          this.#panMomentum.recordDrag(damped.dx, damped.dy, dt);
+          this.#lastDragTime = now;
+        }
+      }
       this.#updateCursor();
       this.#frameScheduler?.markDirty();
       return;
@@ -473,6 +513,18 @@ export class LimbTreeView {
     if (!this.#panInteraction) return;
     const wasClick = this.#panInteraction.onMouseUp();
     this.#updateCursor();
+    this.#lastDragTime = 0;
+
+    // Start pan momentum on drag release
+    if (!wasClick && this.#panMomentum && this.#zoom) {
+      const treeBounds = this.#getTreeBounds();
+      if (treeBounds) {
+        this.#panMomentum.release(this.#zoom.focusPoint, treeBounds);
+        if (this.#panMomentum.isActive) {
+          this.#frameScheduler?.markDirty();
+        }
+      }
+    }
 
     if (wasClick && this.#zoom && this.#zoom.level < 0.9) {
       this.#handleClickToFocus(e.clientX, e.clientY);
@@ -554,6 +606,7 @@ export class LimbTreeView {
    */
   #startAnimationLoop() {
     this.#animation = null;
+    this.#panMomentum?.cancel();
     this.#animationLastTime = performance.now();
     this.#frameScheduler?.markDirty();
   }
@@ -693,6 +746,23 @@ export class LimbTreeView {
         this.#frameScheduler?.markDirty();
       } else {
         this.#animation = null;
+      }
+    }
+
+    // Advance pan momentum if active (inertial pan after drag release)
+    if (this.#panMomentum?.isActive && this.#zoom) {
+      const treeBounds = this.#getTreeBounds();
+      if (treeBounds) {
+        const deltaMs = now - this.#animationLastTime;
+        const vls = this.#getViewportLogicalSize();
+        const result = this.#panMomentum.update(deltaMs, this.#zoom.focusPoint, treeBounds, vls);
+        this.#zoom.focusPoint = {
+          x: this.#zoom.focusPoint.x + result.dx,
+          y: this.#zoom.focusPoint.y + result.dy,
+        };
+        if (result.active) {
+          this.#frameScheduler?.markDirty();
+        }
       }
     }
 
@@ -1072,6 +1142,44 @@ export class LimbTreeView {
   }
 
   /**
+   * Compute the tree's bounding box from current positions.
+   * Returns null if no positions are available.
+   * @returns {{ minX: number, minY: number, maxX: number, maxY: number } | null}
+   */
+  #getTreeBounds() {
+    if (!this.#positions || this.#positions.size === 0) return null;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const pos of this.#positions.values()) {
+      if (pos.x < minX) minX = pos.x;
+      if (pos.y < minY) minY = pos.y;
+      if (pos.x > maxX) maxX = pos.x;
+      if (pos.y > maxY) maxY = pos.y;
+    }
+    return {
+      minX: minX - BASE_NODE_WIDTH / 2,
+      minY: minY - BASE_NODE_HEIGHT / 2,
+      maxX: maxX + BASE_NODE_WIDTH / 2,
+      maxY: maxY + BASE_NODE_HEIGHT / 2,
+    };
+  }
+
+  /**
+   * Compute the viewport dimensions in logical units at the current zoom.
+   * @returns {{ width: number, height: number }}
+   */
+  #getViewportLogicalSize() {
+    if (!this.#zoom) return { width: 1, height: 1 };
+    const scale = this.#zoom.zoomScale;
+    return {
+      width: this.#zoom.viewportSize.width / scale,
+      height: this.#zoom.viewportSize.height / scale,
+    };
+  }
+
+  /**
    * Start an animated transition to the target focus point and zoom level.
    * @param {{ x: number, y: number }} targetFocus
    * @param {number} targetLevel
@@ -1079,6 +1187,7 @@ export class LimbTreeView {
   #startAnimation(targetFocus, targetLevel) {
     if (!this.#zoom) return;
     this.#zoomAnimator?.cancel();
+    this.#panMomentum?.cancel();
     this.#animation = {
       startFocus: { ...this.#zoom.focusPoint },
       endFocus: targetFocus,
@@ -1113,6 +1222,7 @@ export class LimbTreeView {
       this.#momentumReleaseTimer = null;
     }
     this.#zoomMomentum?.cancel();
+    this.#panMomentum?.cancel();
     if (this.#frameScheduler) {
       this.#frameScheduler.destroy();
     }
@@ -1133,6 +1243,8 @@ export class LimbTreeView {
     this.#newChildZoomHandler = null;
     this.#zoomMomentum = null;
     this.#momentumReleaseTimer = null;
+    this.#panMomentum = null;
+    this.#lastDragTime = 0;
     this.#frameScheduler = null;
     this.#positions = null;
     this.#parentMap = null;
