@@ -1,9 +1,9 @@
 ---
 title: "Implement ZoomState and Ctrl+Scroll zoom interaction"
-spec_ref: "zoom-lod.md S1; interaction-feel.md S5.3"
+spec_ref: "zoom-lod.md S1"
 depends_on:
   - task-005
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []
