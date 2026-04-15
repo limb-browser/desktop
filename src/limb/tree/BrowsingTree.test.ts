@@ -771,6 +771,108 @@ describe('BrowsingTree', () => {
         ).rejects.toThrow();
       });
 
+      it('is a no-op when called on the already-active branch', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        await storage.saveBranch(branch.id, [
+          makeStoredNode({
+            id: branch.id,
+            url: 'https://branch.com',
+            parentId: tree.rootId,
+            childIds: ['c1'],
+            branchRootId: branch.id,
+            descendantCount: 1,
+          }),
+          makeStoredNode({
+            id: 'c1',
+            url: 'https://c1.com',
+            parentId: branch.id,
+            branchRootId: branch.id,
+          }),
+        ]);
+
+        await tree.activateBranch(branch.id, storage);
+        const countAfterFirst = tree.nodes.get(tree.rootId)!.descendantCount;
+
+        // Calling again should be a no-op — no double-counting
+        await tree.activateBranch(branch.id, storage);
+
+        expect(tree.activeBranchId).toBe(branch.id);
+        expect(tree.nodes.get(tree.rootId)!.descendantCount).toBe(countAfterFirst);
+      });
+
+      it('throws when branch root already has in-memory children', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        tree.addChild(branch.id, 'https://existing-child.com');
+
+        // Branch root has children in memory — activating would orphan them
+        await expect(
+          tree.activateBranch(branch.id, storage)
+        ).rejects.toThrow();
+      });
+
+      it('does not corrupt descendantCount when storage returns empty', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        // storage has no data for this branch — loadBranch returns []
+        const rootCountBefore = tree.nodes.get(tree.rootId)!.descendantCount;
+
+        await tree.activateBranch(branch.id, storage);
+
+        expect(tree.nodes.get(tree.rootId)!.descendantCount).toBe(rootCountBefore);
+        expect(tree.activeBranchId).toBe(branch.id);
+      });
+
+      it('restores screenshots for loaded nodes', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        await storage.saveBranch(branch.id, [
+          makeStoredNode({
+            id: branch.id,
+            url: 'https://branch.com',
+            parentId: tree.rootId,
+            childIds: ['c1'],
+            branchRootId: branch.id,
+            descendantCount: 1,
+          }),
+          makeStoredNode({
+            id: 'c1',
+            url: 'https://c1.com',
+            parentId: branch.id,
+            branchRootId: branch.id,
+          }),
+        ]);
+        // Save a screenshot for the child node
+        await storage.saveScreenshot('c1', 'low', new Uint8Array([255, 216, 255]));
+
+        await tree.activateBranch(branch.id, storage);
+
+        // Screenshot should be restored on the loaded node
+        expect(tree.nodes.get('c1')!.screenshot).not.toBeNull();
+      });
+
+      it('does not set screenshot when storage has none', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        await storage.saveBranch(branch.id, [
+          makeStoredNode({
+            id: branch.id,
+            url: 'https://branch.com',
+            parentId: tree.rootId,
+            childIds: ['c1'],
+            branchRootId: branch.id,
+            descendantCount: 1,
+          }),
+          makeStoredNode({
+            id: 'c1',
+            url: 'https://c1.com',
+            parentId: branch.id,
+            branchRootId: branch.id,
+          }),
+        ]);
+        // No screenshot saved for c1
+
+        await tree.activateBranch(branch.id, storage);
+
+        expect(tree.nodes.get('c1')!.screenshot).toBeNull();
+      });
+
       it('updates descendantCount on branch root after loading', async () => {
         const branch = tree.addChild(tree.rootId, 'https://branch.com');
         await storage.saveBranch(branch.id, [

@@ -249,9 +249,29 @@ export class BrowsingTree {
       );
     }
 
+    // F1: Idempotency — already active, nothing to do
+    if (this.activeBranchId === branchRootId) {
+      return;
+    }
+
+    // F1: Branch root already has in-memory children — activating would orphan them
+    if (branchRoot.childIds.length > 0) {
+      throw new Error(
+        `Branch root "${branchRootId}" already has in-memory children; deactivate first`
+      );
+    }
+
     const storedNodes = await storage.loadBranch(branchRootId);
 
+    // F2: Empty storage result — no subtree to load
+    if (storedNodes.length === 0) {
+      this.activeBranchId = branchRootId;
+      this.#probe?.branchActivated(branchRootId, 0);
+      return;
+    }
+
     // Insert descendant nodes into the tree
+    const loadedNodeIds: string[] = [];
     for (const stored of storedNodes) {
       if (stored.id === branchRootId) {
         // Update branch root from storage data
@@ -273,6 +293,7 @@ export class BrowsingTree {
         descendantCount: stored.descendantCount,
       };
       this.nodes.set(node.id, node);
+      loadedNodeIds.push(node.id);
     }
 
     // Update root's descendantCount to include newly loaded nodes
@@ -280,8 +301,25 @@ export class BrowsingTree {
     const root = this.nodes.get(this.rootId)!;
     root.descendantCount += loadedDescendants;
 
+    // F3: Restore screenshots for loaded nodes
+    for (const nodeId of loadedNodeIds) {
+      const data = await storage.loadScreenshot(nodeId, 'low');
+      if (data) {
+        this.nodes.get(nodeId)!.screenshot =
+          BrowsingTree.#uint8ArrayToDataUrl(data);
+      }
+    }
+
     this.activeBranchId = branchRootId;
     this.#probe?.branchActivated(branchRootId, storedNodes.length);
+  }
+
+  static #uint8ArrayToDataUrl(data: Uint8Array): string {
+    let binary = '';
+    for (let i = 0; i < data.length; i++) {
+      binary += String.fromCharCode(data[i]);
+    }
+    return `data:image/jpeg;base64,${btoa(binary)}`;
   }
 
   async deactivateBranch(
