@@ -30,7 +30,8 @@ import { LayoutAnimator } from "./LayoutAnimator.mjs";
 import { RevealAnimator } from "./RevealAnimator.mjs";
 import { computeFoldNodeFrame, formatFoldLabel } from "./FoldNodeRenderer.mjs";
 import { TabPositioner } from "./TabPositioner.mjs";
-import { ZoomOutAndBackAnimator, computeIntermediateZoomLevel } from "./ZoomOutAndBackAnimator.mjs";
+import { ZoomOutAndBackAnimator } from "./ZoomOutAndBackAnimator.mjs";
+import { NewChildZoomHandler } from "./NewChildZoomHandler.mjs";
 
 // Zoom level change per 100px of wheel deltaY
 const ZOOM_SENSITIVITY = 0.05;
@@ -114,6 +115,8 @@ export class LimbTreeView {
   #revealAnimator = null;
   /** @type {ZoomOutAndBackAnimator | null} */
   #zoomOutAndBackAnimator = null;
+  /** @type {NewChildZoomHandler | null} */
+  #newChildZoomHandler = null;
   /** @type {FrameScheduler | null} */
   #frameScheduler = null;
 
@@ -191,6 +194,7 @@ export class LimbTreeView {
     this.#layoutAnimator = new LayoutAnimator(options?.layoutAnimationProbe);
     this.#revealAnimator = new RevealAnimator(options?.revealAnimationProbe);
     this.#zoomOutAndBackAnimator = new ZoomOutAndBackAnimator(options?.zoomOutAndBackProbe);
+    this.#newChildZoomHandler = new NewChildZoomHandler(this.#zoomOutAndBackAnimator);
     this.#onNodeClicked = options?.onNodeClicked ?? null;
     this.#onFoldToggled = options?.onFoldToggled ?? null;
     this.#frameScheduler = new FrameScheduler(
@@ -318,11 +322,14 @@ export class LimbTreeView {
   }
 
   /**
-   * Play a zoom-out-and-back animation to reveal new branch creation.
+   * Handle new child creation: update focus and optionally play the
+   * zoom-out-and-back animation.
    *
    * If zoomLevel >= 0.9, animates: zoom out to show parent+child, hold,
    * then zoom into the new child at level 1.0.
-   * If zoomLevel < 0.9, does nothing (the tree is already visible).
+   * If zoomLevel < 0.9, centers on the new child (the tree is already visible).
+   *
+   * Always updates focusedNodeId to the child (navigation.md S1.1 step 5).
    *
    * Called after addChild creates a new node. The layout must already
    * contain the child's position (call setTreeData first).
@@ -331,33 +338,30 @@ export class LimbTreeView {
    * @param {string} childId - ID of the newly created child node
    */
   playZoomOutAndBack(parentId, childId) {
-    if (!this.#zoom || !this.#positions || !this.#zoomOutAndBackAnimator) return;
-    if (this.#zoom.level < 0.9) return;
+    if (!this.#zoom || !this.#positions || !this.#newChildZoomHandler) return;
 
-    const parentPos = this.#positions.get(parentId);
-    const childPos = this.#positions.get(childId);
-    if (!parentPos || !childPos) return;
+    // Always update focus to the new child (spec step 5)
+    this.#focusedNodeId = childId;
 
-    // Cancel any in-progress zoom or pan animation
-    this.#zoomAnimator?.cancel();
-    this.#animation = null;
+    const result = this.#newChildZoomHandler.handle({
+      zoomLevel: this.#zoom.level,
+      parentPos: this.#positions.get(parentId),
+      childPos: this.#positions.get(childId),
+      viewportSize: this.#zoom.viewportSize,
+      treeExtent: this.#zoom.treeExtent,
+      currentFocus: { ...this.#zoom.focusPoint },
+      nodeWidth: BASE_NODE_WIDTH,
+      nodeHeight: BASE_NODE_HEIGHT,
+    });
 
-    const holdLevel = computeIntermediateZoomLevel(
-      parentPos, childPos,
-      this.#zoom.viewportSize, this.#zoom.treeExtent,
-      BASE_NODE_WIDTH, BASE_NODE_HEIGHT,
-    );
-    const holdFocus = {
-      x: (parentPos.x + childPos.x) / 2,
-      y: (parentPos.y + childPos.y) / 2,
-    };
-
-    this.#zoomOutAndBackAnimator.start(
-      this.#zoom.level, holdLevel, 1.0,
-      { ...this.#zoom.focusPoint }, holdFocus, { x: childPos.x, y: childPos.y },
-    );
-
-    this.#startAnimationLoop();
+    if (result === "centered") {
+      this.centerOnNode(childId);
+    } else if (result === "animated") {
+      // Cancel any in-progress zoom or pan animation
+      this.#zoomAnimator?.cancel();
+      this.#animation = null;
+      this.#startAnimationLoop();
+    }
   }
 
   /**
@@ -1004,6 +1008,7 @@ export class LimbTreeView {
     this.#layoutAnimatedFrame = null;
     this.#revealAnimator = null;
     this.#zoomOutAndBackAnimator = null;
+    this.#newChildZoomHandler = null;
     this.#frameScheduler = null;
     this.#positions = null;
     this.#parentMap = null;
