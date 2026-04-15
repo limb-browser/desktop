@@ -42,6 +42,9 @@ export class TabBridge<TTab> {
     if (this.nodeToTab.has(nodeId)) {
       throw new Error(`Node "${nodeId}" already has a tab`);
     }
+    if (this.tabToNode.has(tab)) {
+      throw new Error(`Tab is already mapped to node "${this.tabToNode.get(tab)}"`);
+    }
     this.nodeToTab.set(nodeId, tab);
     this.tabToNode.set(tab, nodeId);
     this.#probe?.tabCreated(nodeId);

@@ -442,6 +442,12 @@ describe('TabBridge', () => {
       expect(() => bridge.registerExistingTab(anotherTab, 'node-1')).toThrow();
     });
 
+    it('throws if tab is already mapped to a different node', () => {
+      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', closed: false, suspended: false };
+      bridge.registerExistingTab(tab, 'node-1');
+      expect(() => bridge.registerExistingTab(tab, 'node-2')).toThrow();
+    });
+
     it('maintains bidirectional map consistency', () => {
       const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', closed: false, suspended: false };
       bridge.registerExistingTab(tab, 'node-1');

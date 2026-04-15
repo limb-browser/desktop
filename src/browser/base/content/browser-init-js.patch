@@ -15,6 +15,10 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      "chrome://browser/content/limb/tree/testTreeData.mjs",
 +      { global: "current" }
 +    );
++    const { LimbTabCommandAdapter } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/LimbTabCommandAdapter.mjs",
++      { global: "current" }
++    );
 +    window.gLimbTreeView = new LimbTreeView();
 +    window.gLimbTreeView.init(document.getElementById("limb-tree-canvas"));
 +    const testTree = buildTestTreeData();
