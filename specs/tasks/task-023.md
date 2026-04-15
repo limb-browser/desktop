@@ -4,8 +4,8 @@ spec_ref: "persistence.md S1; tab-bridge.md S1.2"
 depends_on:
   - task-003
   - task-008
-progress: ready-for-review
-review: ""
+progress: needs-revision
+review: "specs/reviews/review-task-023-R1.md"
 coverage_sections: []
 commits: []
 ---
