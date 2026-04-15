@@ -34,6 +34,7 @@ import { ZoomOutAndBackAnimator } from "./ZoomOutAndBackAnimator.mjs";
 import { NewChildZoomHandler } from "./NewChildZoomHandler.mjs";
 import { ZoomMomentum } from "./ZoomMomentum.mjs";
 import { PanMomentum } from "./PanMomentum.mjs";
+import { AnimationCoordinator } from "./AnimationCoordinator.mjs";
 
 // Zoom level change per 100px of wheel deltaY
 const ZOOM_SENSITIVITY = 0.05;
@@ -129,6 +130,12 @@ export class LimbTreeView {
   #lastDragTime = 0;
   /** @type {FrameScheduler | null} */
   #frameScheduler = null;
+  /** @type {AnimationCoordinator | null} */
+  #coordinator = null;
+  /** @type {number} */
+  #zoomRegistrationGen = 0;
+  /** @type {string | null} */
+  #currentZoomAnimType = null;
 
   /** @type {import('./HitTester.mjs').NodeRect[]} */
   #lastFrameNodes = [];
@@ -163,7 +170,7 @@ export class LimbTreeView {
   #maxLiveTabs = 8;
 
   // Animation state for pan-only viewport transitions (centerOnNode)
-  /** @type {{ startFocus: { x: number, y: number }, endFocus: { x: number, y: number }, startLevel: number, endLevel: number, startTime: number, duration: number } | null} */
+  /** @type {{ startFocus: { x: number, y: number }, endFocus: { x: number, y: number }, startLevel: number, endLevel: number, duration: number } | null} */
   #animation = null;
 
   /** @type {boolean} */
@@ -176,8 +183,6 @@ export class LimbTreeView {
   #layoutAnimFrames = 0;
   /** @type {number} */
   #revealAnimFrames = 0;
-  /** @type {number} */
-  #panAnimFrames = 0;
 
   /** @type {((e: WheelEvent) => void) | null} */
   #wheelHandler = null;
@@ -195,7 +200,7 @@ export class LimbTreeView {
    * @param {HTMLCanvasElement} canvas
    * @param {{ zoomChanged(level: number, zoomScale: number): void }} [probe]
    * @param {{ tierChanged(nodeId: string, previousTier: string, newTier: string): void }} [lodProbe]
-   * @param {{ onNodeClicked?: (nodeId: string) => void, onFoldToggled?: (foldId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe, performanceProbe?: import('../ports/PerformanceProbe').PerformanceProbe, revealAnimationProbe?: import('../ports/RevealAnimationProbe').RevealAnimationProbe, zoomOutAndBackProbe?: import('../ports/ZoomOutAndBackProbe').ZoomOutAndBackProbe, zoomMomentumProbe?: import('../ports/ZoomMomentumProbe').ZoomMomentumProbe, panMomentumProbe?: import('../ports/PanMomentumProbe').PanMomentumProbe }} [options]
+   * @param {{ onNodeClicked?: (nodeId: string) => void, onFoldToggled?: (foldId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe, performanceProbe?: import('../ports/PerformanceProbe').PerformanceProbe, revealAnimationProbe?: import('../ports/RevealAnimationProbe').RevealAnimationProbe, zoomOutAndBackProbe?: import('../ports/ZoomOutAndBackProbe').ZoomOutAndBackProbe, zoomMomentumProbe?: import('../ports/ZoomMomentumProbe').ZoomMomentumProbe, panMomentumProbe?: import('../ports/PanMomentumProbe').PanMomentumProbe, coordinatorProbe?: import('../ports/AnimationCoordinatorProbe').AnimationCoordinatorProbe }} [options]
    */
   init(canvas, probe, lodProbe, options) {
     this.#canvas = canvas;
@@ -226,6 +231,10 @@ export class LimbTreeView {
       () => this.#onFrame(),
       options?.frameSchedulerProbe,
       { performanceProbe: options?.performanceProbe },
+    );
+    this.#coordinator = new AnimationCoordinator(
+      options?.coordinatorProbe,
+      { markDirty: () => this.#frameScheduler?.markDirty() },
     );
 
     this.#resizeHandler = () => this.#resize();
@@ -345,7 +354,7 @@ export class LimbTreeView {
       { x: pos.x, y: pos.y },
     );
 
-    this.#startAnimationLoop();
+    this.#registerZoomAnimation();
   }
 
   /**
@@ -384,11 +393,10 @@ export class LimbTreeView {
     if (result === "centered") {
       this.centerOnNode(childId);
     } else if (result === "animated") {
-      // Cancel any in-progress zoom, pan, or momentum animation
-      this.#zoomAnimator?.cancel();
+      // Cancel any in-progress momentum animation
       this.#zoomMomentum?.cancel();
       this.#animation = null;
-      this.#startAnimationLoop();
+      this.#registerZoomOutAndBackAnimation();
     }
   }
 
@@ -436,7 +444,7 @@ export class LimbTreeView {
     if (!e.ctrlKey || !this.#zoom) return;
     e.preventDefault();
 
-    this.#cancelZoomOutAndBack();
+    this.#cancelProgrammaticAnimations();
     this.#panMomentum?.cancel();
 
     const deltaLevel = -(e.deltaY / 100) * ZOOM_SENSITIVITY;
@@ -455,7 +463,7 @@ export class LimbTreeView {
   /** @param {MouseEvent} e */
   #onMouseDown(e) {
     if (!this.#panInteraction) return;
-    this.#cancelZoomOutAndBack();
+    this.#cancelProgrammaticAnimations();
     this.#zoomMomentum?.cancel();
     this.#panMomentum?.cancel();
     this.#lastDragTime = 0;
@@ -565,20 +573,15 @@ export class LimbTreeView {
       { x: targetPos.x, y: targetPos.y },
     );
 
-    this.#startAnimationLoop();
+    this.#registerZoomAnimation();
   }
 
   /**
-   * Cancel the zoom-out-and-back animation and jump to the final state
-   * (zoomed into the new child at level 1.0).
+   * Cancel all programmatic animations via the coordinator.
+   * User input (scroll, click, drag) takes priority.
    */
-  #cancelZoomOutAndBack() {
-    if (!this.#zoomOutAndBackAnimator?.isAnimating || !this.#zoom) return;
-    const final = this.#zoomOutAndBackAnimator.finalState;
-    this.#zoomOutAndBackAnimator.cancel();
-    this.#zoom.setLevel(final.level);
-    this.#zoom.focusPoint = { ...final.focusPoint };
-    this.#frameScheduler?.markDirty();
+  #cancelProgrammaticAnimations() {
+    this.#coordinator?.cancelProgrammatic();
   }
 
   /**
@@ -602,14 +605,134 @@ export class LimbTreeView {
   }
 
   /**
-   * Start a zoom animation via the ZoomAnimator.
-   * Cancels any in-progress pan animation and kicks the frame scheduler.
+   * Register the ZoomAnimator's current animation with the coordinator
+   * as a programmatic zoom animation.
    */
-  #startAnimationLoop() {
+  #registerZoomAnimation() {
+    if (!this.#coordinator || !this.#zoomAnimator || !this.#zoom) return;
+    // Cancel sibling animators to avoid stale isAnimating state (R3)
+    this.#zoomOutAndBackAnimator?.cancel();
     this.#animation = null;
     this.#panMomentum?.cancel();
-    this.#animationLastTime = performance.now();
-    this.#frameScheduler?.markDirty();
+    // Reset frame counter on animation type change
+    if (this.#currentZoomAnimType !== 'zoom-animator') {
+      this.#zoomAnimFrames = 0;
+    }
+    this.#currentZoomAnimType = 'zoom-animator';
+    // Gen guard: prevent stale cancel handler from cancelling newly-started animation (R2)
+    const gen = ++this.#zoomRegistrationGen;
+    const zoomAnimator = this.#zoomAnimator;
+    const zoom = this.#zoom;
+    const view = this;
+    this.#coordinator.register('zoom', {
+      tick(deltaMs) {
+        const frame = zoomAnimator.update(deltaMs);
+        if (frame) {
+          zoom.setLevel(frame.level);
+          zoom.focusPoint = { x: frame.focusPoint.x, y: frame.focusPoint.y };
+        }
+        return frame === null || frame.done;
+      },
+      cancel() {
+        if (view.#zoomRegistrationGen !== gen) return;
+        zoomAnimator.cancel();
+      },
+    }, 'programmatic');
+  }
+
+  /**
+   * Register the ZoomOutAndBackAnimator's current animation with the
+   * coordinator as a programmatic zoom animation.
+   *
+   * On cancellation, jumps to the final state (zoomed into the new
+   * child at level 1.0) so user input can take over cleanly.
+   */
+  #registerZoomOutAndBackAnimation() {
+    if (!this.#coordinator || !this.#zoomOutAndBackAnimator || !this.#zoom) return;
+    // Cancel sibling animators to avoid stale isAnimating state (R3)
+    this.#zoomAnimator?.cancel();
+    this.#animation = null;
+    this.#panMomentum?.cancel();
+    // Reset frame counter on animation type change
+    if (this.#currentZoomAnimType !== 'zoom-out-and-back') {
+      this.#zoomAnimFrames = 0;
+    }
+    this.#currentZoomAnimType = 'zoom-out-and-back';
+    // Gen guard
+    const gen = ++this.#zoomRegistrationGen;
+    const animator = this.#zoomOutAndBackAnimator;
+    const zoom = this.#zoom;
+    const view = this;
+    this.#coordinator.register('zoom', {
+      tick(deltaMs) {
+        const frame = animator.update(deltaMs);
+        if (frame) {
+          zoom.setLevel(frame.level);
+          zoom.focusPoint = { x: frame.focusPoint.x, y: frame.focusPoint.y };
+        }
+        return frame === null || frame.done;
+      },
+      cancel() {
+        if (view.#zoomRegistrationGen !== gen) return;
+        if (animator.isAnimating) {
+          const final = animator.finalState;
+          animator.cancel();
+          zoom.setLevel(final.level);
+          zoom.focusPoint = { x: final.focusPoint.x, y: final.focusPoint.y };
+        }
+      },
+    }, 'programmatic');
+  }
+
+  /**
+   * Register the pan animation (#animation) with the coordinator
+   * as a programmatic zoom animation.
+   *
+   * Pan animations drive focusPoint (and optionally zoom level),
+   * which conflicts with zoom/zoomOutAndBack on the same property.
+   */
+  #registerPanAnimation() {
+    if (!this.#coordinator || !this.#zoom || !this.#animation) return;
+    // Cancel sibling animators to avoid stale isAnimating state (R3)
+    this.#zoomAnimator?.cancel();
+    this.#zoomOutAndBackAnimator?.cancel();
+    this.#panMomentum?.cancel();
+    // Reset frame counter on animation type change
+    if (this.#currentZoomAnimType !== 'pan') {
+      this.#zoomAnimFrames = 0;
+    }
+    this.#currentZoomAnimType = 'pan';
+    // Gen guard
+    const gen = ++this.#zoomRegistrationGen;
+    const zoom = this.#zoom;
+    const anim = this.#animation;
+    const view = this;
+    let elapsed = 0;
+    this.#coordinator.register('zoom', {
+      tick(deltaMs) {
+        elapsed += deltaMs;
+        const rawT = Math.min(1, elapsed / anim.duration);
+        const t = easeOut(rawT);
+        zoom.focusPoint = {
+          x: anim.startFocus.x + (anim.endFocus.x - anim.startFocus.x) * t,
+          y: anim.startFocus.y + (anim.endFocus.y - anim.startFocus.y) * t,
+        };
+        if (anim.startLevel !== anim.endLevel) {
+          zoom.setLevel(
+            anim.startLevel + (anim.endLevel - anim.startLevel) * t,
+          );
+        }
+        if (rawT >= 1) {
+          view.#animation = null;
+          return true;
+        }
+        return false;
+      },
+      cancel() {
+        if (view.#zoomRegistrationGen !== gen) return;
+        view.#animation = null;
+      },
+    }, 'programmatic');
   }
 
   #updateCursor() {
@@ -635,7 +758,7 @@ export class LimbTreeView {
     this.#wasDegraded = isDegraded;
 
     // Track per-animation frame counts
-    if (this.#zoomAnimator?.isAnimating) {
+    if (this.#coordinator?.isActive('zoom')) {
       this.#zoomAnimFrames++;
     } else {
       this.#zoomAnimFrames = 0;
@@ -650,19 +773,29 @@ export class LimbTreeView {
     } else {
       this.#revealAnimFrames = 0;
     }
-    if (this.#animation) {
-      this.#panAnimFrames++;
-    } else {
-      this.#panAnimFrames = 0;
-    }
 
     // In degraded mode, skip individual animations running more than 2 frames
     if (isDegraded) {
-      if (this.#zoomAnimator?.isAnimating && this.#zoom && this.#zoomAnimFrames > 2) {
-        const finalFrame = this.#zoomAnimator.skipToEnd();
-        if (finalFrame) {
-          this.#zoom.setLevel(finalFrame.level);
-          this.#zoom.focusPoint = { ...finalFrame.focusPoint };
+      if (this.#coordinator?.isActive('zoom') && this.#zoom && this.#zoomAnimFrames > 2) {
+        if (this.#zoomAnimator?.isAnimating) {
+          const finalFrame = this.#zoomAnimator.skipToEnd();
+          if (finalFrame) {
+            this.#zoom.setLevel(finalFrame.level);
+            this.#zoom.focusPoint = { ...finalFrame.focusPoint };
+          }
+        }
+        if (this.#zoomOutAndBackAnimator?.isAnimating) {
+          const final = this.#zoomOutAndBackAnimator.finalState;
+          this.#zoomOutAndBackAnimator.cancel();
+          this.#zoom.setLevel(final.level);
+          this.#zoom.focusPoint = { ...final.focusPoint };
+        }
+        if (this.#animation) {
+          this.#zoom.focusPoint = { ...this.#animation.endFocus };
+          if (this.#animation.startLevel !== this.#animation.endLevel) {
+            this.#zoom.setLevel(this.#animation.endLevel);
+          }
+          this.#animation = null;
         }
       }
       if (this.#layoutAnimator?.isAnimating && this.#layoutAnimFrames > 2) {
@@ -672,38 +805,11 @@ export class LimbTreeView {
       if (this.#revealAnimator?.isAnimating && this.#revealAnimFrames > 2) {
         this.#revealAnimator.skipToEnd();
       }
-      if (this.#animation && this.#zoom && this.#panAnimFrames > 2) {
-        this.#zoom.focusPoint = { ...this.#animation.endFocus };
-        if (this.#animation.startLevel !== this.#animation.endLevel) {
-          this.#zoom.setLevel(this.#animation.endLevel);
-        }
-        this.#animation = null;
-      }
     }
 
-    // Advance ZoomOutAndBackAnimator if active (mutually exclusive with ZoomAnimator)
-    if (this.#zoomOutAndBackAnimator?.isAnimating && this.#zoom) {
-      const deltaMs = now - this.#animationLastTime;
-      const frame = this.#zoomOutAndBackAnimator.update(deltaMs);
-      if (frame) {
-        this.#zoom.setLevel(frame.level);
-        this.#zoom.focusPoint = { ...frame.focusPoint };
-        if (!frame.done) {
-          this.#frameScheduler?.markDirty();
-        }
-      }
-    } else if (this.#zoomAnimator?.isAnimating && this.#zoom) {
-      // Advance ZoomAnimator if active
-      const deltaMs = now - this.#animationLastTime;
-      const frame = this.#zoomAnimator.update(deltaMs);
-      if (frame) {
-        this.#zoom.setLevel(frame.level);
-        this.#zoom.focusPoint = { ...frame.focusPoint };
-        if (!frame.done) {
-          this.#frameScheduler?.markDirty();
-        }
-      }
-    }
+    // Advance all coordinated animations (zoom, zoom-out-and-back, pan)
+    // using the shared time source (interaction-feel.md S7.4).
+    this.#coordinator?.tick();
 
     // Advance zoom momentum if active
     if (this.#zoomMomentum?.isActive && this.#zoom) {
@@ -725,29 +831,6 @@ export class LimbTreeView {
       }
     } else {
       this.#layoutAnimatedFrame = null;
-    }
-
-    // Advance pan animation if active
-    if (this.#animation && this.#zoom) {
-      const elapsed = now - this.#animation.startTime;
-      const rawT = Math.min(1, elapsed / this.#animation.duration);
-      const t = easeOut(rawT);
-
-      this.#zoom.focusPoint = {
-        x: this.#animation.startFocus.x + (this.#animation.endFocus.x - this.#animation.startFocus.x) * t,
-        y: this.#animation.startFocus.y + (this.#animation.endFocus.y - this.#animation.startFocus.y) * t,
-      };
-      if (this.#animation.startLevel !== this.#animation.endLevel) {
-        this.#zoom.setLevel(
-          this.#animation.startLevel + (this.#animation.endLevel - this.#animation.startLevel) * t,
-        );
-      }
-
-      if (rawT < 1) {
-        this.#frameScheduler?.markDirty();
-      } else {
-        this.#animation = null;
-      }
     }
 
     // Advance pan momentum if active (inertial pan after drag release)
@@ -1187,17 +1270,14 @@ export class LimbTreeView {
    */
   #startAnimation(targetFocus, targetLevel) {
     if (!this.#zoom) return;
-    this.#zoomAnimator?.cancel();
-    this.#panMomentum?.cancel();
     this.#animation = {
       startFocus: { ...this.#zoom.focusPoint },
       endFocus: targetFocus,
       startLevel: this.#zoom.level,
       endLevel: targetLevel,
-      startTime: performance.now(),
       duration: ANIMATION_DURATION_MS,
     };
-    this.#frameScheduler?.markDirty();
+    this.#registerPanAnimation();
   }
 
   destroy() {
@@ -1224,6 +1304,7 @@ export class LimbTreeView {
     }
     this.#zoomMomentum?.cancel();
     this.#panMomentum?.cancel();
+    this.#coordinator?.cancelAll();
     if (this.#frameScheduler) {
       this.#frameScheduler.destroy();
     }
@@ -1247,6 +1328,9 @@ export class LimbTreeView {
     this.#panMomentum = null;
     this.#lastDragTime = 0;
     this.#frameScheduler = null;
+    this.#coordinator = null;
+    this.#zoomRegistrationGen = 0;
+    this.#currentZoomAnimType = null;
     this.#positions = null;
     this.#parentMap = null;
     this.#focusedNodeId = null;
@@ -1267,7 +1351,6 @@ export class LimbTreeView {
     this.#zoomAnimFrames = 0;
     this.#layoutAnimFrames = 0;
     this.#revealAnimFrames = 0;
-    this.#panAnimFrames = 0;
     this.#resizeHandler = null;
     this.#wheelHandler = null;
     this.#mousedownHandler = null;

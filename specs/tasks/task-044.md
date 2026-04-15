@@ -4,8 +4,8 @@ spec_ref: "interaction-feel.md S7.4"
 depends_on:
   - task-022
   - task-014
-progress: not-started
-review: ""
+progress: ready-for-review
+review: "specs/reviews/review-task-044-R3.md"
 coverage_sections: []
 commits: []
 ---
