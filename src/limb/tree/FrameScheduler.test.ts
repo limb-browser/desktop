@@ -1,0 +1,245 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+import { describe, it, expect } from 'vitest';
+import { FrameScheduler } from './FrameScheduler.mjs';
+import type { FrameSchedulerProbe } from '../ports/FrameSchedulerProbe';
+
+class FakeAnimationFrame {
+  private callbacks = new Map<number, () => void>();
+  private nextId = 1;
+
+  requestFrame = (cb: () => void): number => {
+    const id = this.nextId++;
+    this.callbacks.set(id, cb);
+    return id;
+  };
+
+  cancelFrame = (id: number): void => {
+    this.callbacks.delete(id);
+  };
+
+  tick(): void {
+    const cbs = [...this.callbacks.entries()];
+    this.callbacks.clear();
+    for (const [, cb] of cbs) {
+      cb();
+    }
+  }
+
+  get pendingCount(): number {
+    return this.callbacks.size;
+  }
+}
+
+function createProbe() {
+  const calls: string[] = [];
+  const probe: FrameSchedulerProbe = {
+    loopStarted() { calls.push('loopStarted'); },
+    framePainted() { calls.push('framePainted'); },
+    loopStopped() { calls.push('loopStopped'); },
+  };
+  return { probe, calls };
+}
+
+function setup() {
+  const raf = new FakeAnimationFrame();
+  const paintCalls: number[] = [];
+  let paintCount = 0;
+  const paint = () => { paintCount++; paintCalls.push(paintCount); };
+  const { probe, calls } = createProbe();
+  const scheduler = new FrameScheduler(paint, probe, {
+    requestFrame: raf.requestFrame,
+    cancelFrame: raf.cancelFrame,
+  });
+  return { scheduler, raf, paintCalls, probe, calls, getPaintCount: () => paintCount };
+}
+
+describe('FrameScheduler', () => {
+  describe('frame loop runs when dirty', () => {
+    it('paints on the next frame after markDirty()', () => {
+      const { scheduler, raf, getPaintCount } = setup();
+
+      scheduler.markDirty();
+      expect(getPaintCount()).toBe(0); // not yet painted
+
+      raf.tick(); // run the scheduled frame
+      expect(getPaintCount()).toBe(1);
+    });
+
+    it('paints again when markDirty() is called between frames', () => {
+      const { scheduler, raf, getPaintCount } = setup();
+
+      scheduler.markDirty();
+      raf.tick();
+      expect(getPaintCount()).toBe(1);
+
+      scheduler.markDirty();
+      raf.tick();
+      expect(getPaintCount()).toBe(2);
+    });
+
+    it('paints only once per frame even if markDirty() called multiple times', () => {
+      const { scheduler, raf, getPaintCount } = setup();
+
+      scheduler.markDirty();
+      scheduler.markDirty();
+      scheduler.markDirty();
+      raf.tick();
+      expect(getPaintCount()).toBe(1);
+    });
+  });
+
+  describe('frame loop stops after 30 idle frames', () => {
+    it('stops scheduling after 30 consecutive frames with no dirty flag', () => {
+      const { scheduler, raf } = setup();
+
+      scheduler.markDirty();
+      raf.tick(); // paints, resets idle count
+
+      // Run 30 idle frames (no markDirty)
+      for (let i = 0; i < 30; i++) {
+        raf.tick();
+      }
+
+      // No more frames should be scheduled
+      expect(raf.pendingCount).toBe(0);
+    });
+
+    it('does not stop before 30 idle frames', () => {
+      const { scheduler, raf } = setup();
+
+      scheduler.markDirty();
+      raf.tick();
+
+      // Run 29 idle frames
+      for (let i = 0; i < 29; i++) {
+        raf.tick();
+      }
+
+      // Should still have a pending frame
+      expect(raf.pendingCount).toBe(1);
+    });
+
+    it('resets idle count when markDirty() is called mid-countdown', () => {
+      const { scheduler, raf, getPaintCount } = setup();
+
+      scheduler.markDirty();
+      raf.tick(); // paint 1
+
+      // 20 idle frames
+      for (let i = 0; i < 20; i++) {
+        raf.tick();
+      }
+
+      // Mark dirty again — should reset the idle counter
+      scheduler.markDirty();
+      raf.tick(); // paint 2
+      expect(getPaintCount()).toBe(2);
+
+      // Now run 30 more idle frames
+      for (let i = 0; i < 30; i++) {
+        raf.tick();
+      }
+
+      expect(raf.pendingCount).toBe(0);
+    });
+  });
+
+  describe('markDirty() resumes the loop', () => {
+    it('resumes after the loop has stopped due to idle timeout', () => {
+      const { scheduler, raf, getPaintCount } = setup();
+
+      scheduler.markDirty();
+      raf.tick(); // paint 1
+
+      // Stop the loop
+      for (let i = 0; i < 30; i++) {
+        raf.tick();
+      }
+      expect(raf.pendingCount).toBe(0);
+
+      // Resume
+      scheduler.markDirty();
+      expect(raf.pendingCount).toBe(1);
+
+      raf.tick();
+      expect(getPaintCount()).toBe(2);
+    });
+  });
+
+  describe('no frames are scheduled when nothing has changed', () => {
+    it('does not schedule any frames before first markDirty()', () => {
+      const { raf } = setup();
+      expect(raf.pendingCount).toBe(0);
+    });
+  });
+
+  describe('probe events', () => {
+    it('fires loopStarted when the loop begins', () => {
+      const { scheduler, calls } = setup();
+
+      scheduler.markDirty();
+      expect(calls).toContain('loopStarted');
+    });
+
+    it('fires framePainted on each paint', () => {
+      const { scheduler, raf, calls } = setup();
+
+      scheduler.markDirty();
+      raf.tick();
+      expect(calls).toContain('framePainted');
+    });
+
+    it('fires loopStopped after 30 idle frames', () => {
+      const { scheduler, raf, calls } = setup();
+
+      scheduler.markDirty();
+      raf.tick();
+
+      for (let i = 0; i < 30; i++) {
+        raf.tick();
+      }
+
+      expect(calls).toContain('loopStopped');
+    });
+
+    it('fires loopStarted again when resuming after stop', () => {
+      const { scheduler, raf, calls } = setup();
+
+      scheduler.markDirty();
+      raf.tick();
+
+      for (let i = 0; i < 30; i++) {
+        raf.tick();
+      }
+
+      calls.length = 0; // clear
+
+      scheduler.markDirty();
+      expect(calls).toContain('loopStarted');
+    });
+  });
+
+  describe('destroy', () => {
+    it('cancels any pending frame', () => {
+      const { scheduler, raf } = setup();
+
+      scheduler.markDirty();
+      expect(raf.pendingCount).toBe(1);
+
+      scheduler.destroy();
+      expect(raf.pendingCount).toBe(0);
+    });
+
+    it('does not paint after destroy', () => {
+      const { scheduler, raf, getPaintCount } = setup();
+
+      scheduler.markDirty();
+      scheduler.destroy();
+      raf.tick();
+      expect(getPaintCount()).toBe(0);
+    });
+  });
+});
