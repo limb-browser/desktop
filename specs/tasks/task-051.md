@@ -2,7 +2,7 @@
 title: "Fix address bar visibility thresholds in chrome-integration.md"
 spec_ref: "chrome-integration.md S2.5; navigation.md S2.1"
 depends_on: []
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []

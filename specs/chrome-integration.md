@@ -91,7 +91,7 @@ The nav bar (`#nav-bar`) remains in its standard Firefox position. Its visibilit
 }
 ```
 
-At zoom level >= 0.9 (focused): visible. Below 0.5 (zoomed out): hidden. Between: fading.
+Visibility controlled by `AddressBarAdapter` via CSS custom properties. The address bar fades in over zoom range [0.85, 0.95] per navigation.md S2.1. Below 0.85: hidden (opacity 0, pointer-events none). Above 0.95: fully visible.
 
 ## S3 Bootstrap Sequence
 
