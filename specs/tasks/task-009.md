@@ -3,8 +3,8 @@ title: "Implement focus synchronization between tree and tabs"
 spec_ref: "tab-bridge.md S2"
 depends_on:
   - task-008
-progress: ready-for-review
-review: ""
+progress: complete
+review: "specs/reviews/review-TASK_009-R1.md"
 coverage_sections: []
 commits: []
 ---
