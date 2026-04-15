@@ -23,6 +23,8 @@ import { LODComputer } from "./LODComputer.mjs";
 import { PanInteraction } from "./PanInteraction.mjs";
 import { NodeLabelComputer } from "./NodeLabelComputer.mjs";
 import { HoverInteraction } from "./HoverInteraction.mjs";
+import { hitTestNodes } from "./HitTester.mjs";
+import { ZoomAnimator } from "./ZoomAnimator.mjs";
 
 // Zoom level change per 100px of wheel deltaY
 const ZOOM_SENSITIVITY = 0.05;
@@ -73,6 +75,17 @@ export class LimbTreeView {
   #labelComputer = null;
   /** @type {HoverInteraction | null} */
   #hoverInteraction = null;
+  /** @type {ZoomAnimator | null} */
+  #zoomAnimator = null;
+
+  /** @type {import('./HitTester.mjs').NodeRect[]} */
+  #lastFrameNodes = [];
+  /** @type {number | null} */
+  #animationFrameId = null;
+  /** @type {number} */
+  #animationLastTime = 0;
+  /** @type {((nodeId: string) => void) | null} */
+  #onNodeClicked = null;
 
   /** @type {Map<string, { x: number, y: number }> | null} */
   #positions = null;
@@ -103,8 +116,9 @@ export class LimbTreeView {
    * @param {HTMLCanvasElement} canvas
    * @param {{ zoomChanged(level: number, zoomScale: number): void }} [probe]
    * @param {{ tierChanged(nodeId: string, previousTier: string, newTier: string): void }} [lodProbe]
+   * @param {{ onNodeClicked?: (nodeId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe }} [options]
    */
-  init(canvas, probe, lodProbe) {
+  init(canvas, probe, lodProbe, options) {
     this.#canvas = canvas;
     this.#ctx = canvas.getContext("2d");
     this.#initialized = true;
@@ -120,6 +134,8 @@ export class LimbTreeView {
     this.#panInteraction = new PanInteraction(this.#zoom);
     this.#labelComputer = new NodeLabelComputer();
     this.#hoverInteraction = new HoverInteraction();
+    this.#zoomAnimator = new ZoomAnimator(options?.animationProbe);
+    this.#onNodeClicked = options?.onNodeClicked ?? null;
 
     this.#resizeHandler = () => this.#resize();
     this.#wheelHandler = (e) => this.#onWheel(e);
@@ -223,11 +239,78 @@ export class LimbTreeView {
     }
   }
 
-  /** @param {MouseEvent} _e */
-  #onMouseUp(_e) {
+  /** @param {MouseEvent} e */
+  #onMouseUp(e) {
     if (!this.#panInteraction) return;
-    this.#panInteraction.onMouseUp();
+    const wasClick = this.#panInteraction.onMouseUp();
     this.#updateCursor();
+
+    if (wasClick && this.#zoom && this.#zoom.level < 0.9) {
+      this.#handleClickToFocus(e.clientX, e.clientY);
+    }
+  }
+
+  /**
+   * Handle a click on the canvas for click-to-focus behavior.
+   * Hit-tests against last rendered node rects, then starts a zoom
+   * animation to the clicked node if found.
+   *
+   * @param {number} screenX
+   * @param {number} screenY
+   */
+  #handleClickToFocus(screenX, screenY) {
+    const clickedNodeId = hitTestNodes(screenX, screenY, this.#lastFrameNodes);
+    if (!clickedNodeId || !this.#zoom || !this.#positions || !this.#zoomAnimator) return;
+
+    // Notify external listener (e.g., BrowsingTree.focusNode)
+    this.#onNodeClicked?.(clickedNodeId);
+    this.#focusedNodeId = clickedNodeId;
+
+    // Get the clicked node's logical position for the animation target
+    const targetPos = this.#positions.get(clickedNodeId);
+    if (!targetPos) return;
+
+    this.#zoomAnimator.start(
+      this.#zoom.level,
+      1.0,
+      { ...this.#zoom.focusPoint },
+      { x: targetPos.x, y: targetPos.y },
+    );
+
+    this.#startAnimationLoop();
+  }
+
+  /**
+   * Start a requestAnimationFrame loop for zoom animation.
+   * Cancels any existing loop.
+   */
+  #startAnimationLoop() {
+    if (this.#animationFrameId !== null) {
+      cancelAnimationFrame(this.#animationFrameId);
+    }
+    this.#animationLastTime = performance.now();
+
+    const tick = (now) => {
+      const deltaMs = now - this.#animationLastTime;
+      this.#animationLastTime = now;
+
+      if (!this.#zoomAnimator || !this.#zoom) return;
+
+      const frame = this.#zoomAnimator.update(deltaMs);
+      if (!frame) return;
+
+      this.#zoom.setLevel(frame.level);
+      this.#zoom.focusPoint = { ...frame.focusPoint };
+      this.#paint();
+
+      if (!frame.done) {
+        this.#animationFrameId = requestAnimationFrame(tick);
+      } else {
+        this.#animationFrameId = null;
+      }
+    };
+
+    this.#animationFrameId = requestAnimationFrame(tick);
   }
 
   #updateCursor() {
@@ -271,6 +354,9 @@ export class LimbTreeView {
         h,
         this.#focusedNodeId,
       );
+
+      // Store for hit testing on click
+      this.#lastFrameNodes = frame.nodes;
 
       // Compute hover state
       let hoverProgress = new Map();
@@ -391,6 +477,9 @@ export class LimbTreeView {
         this.#canvas.removeEventListener("mouseup", this.#mouseupHandler);
       }
     }
+    if (this.#animationFrameId !== null) {
+      cancelAnimationFrame(this.#animationFrameId);
+    }
     this.#canvas = null;
     this.#ctx = null;
     this.#initialized = false;
@@ -400,12 +489,17 @@ export class LimbTreeView {
     this.#panInteraction = null;
     this.#labelComputer = null;
     this.#hoverInteraction = null;
+    this.#zoomAnimator = null;
     this.#positions = null;
     this.#parentMap = null;
     this.#focusedNodeId = null;
     this.#tiers = null;
     this.#titles = new Map();
     this.#lastFrameTime = 0;
+    this.#lastFrameNodes = [];
+    this.#animationFrameId = null;
+    this.#animationLastTime = 0;
+    this.#onNodeClicked = null;
     this.#resizeHandler = null;
     this.#wheelHandler = null;
     this.#mousedownHandler = null;
