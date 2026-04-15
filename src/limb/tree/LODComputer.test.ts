@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { LODComputer } from './LODComputer.mjs';
 import type { LODProbe } from '../ports/LODProbe';
+import type { PerformanceProbe } from '../ports/PerformanceProbe';
 
 const BASE_NODE_WIDTH = 0.8;
 const BASE_NODE_HEIGHT = 0.6;
@@ -695,6 +696,128 @@ describe('LODComputer', () => {
       const tiers = noProbComputer.computeTiers(tree, positions, zoom);
 
       expect(tiers.get('n1')).toBe('favicon');
+    });
+  });
+
+  describe('performance probe: LOD computation timing', () => {
+    function createPerfProbe() {
+      const calls: { method: string; args: number[] }[] = [];
+      const perfProbe: PerformanceProbe = {
+        frameBudgetExceeded(actualMs, budgetMs) {
+          calls.push({ method: 'frameBudgetExceeded', args: [actualMs, budgetMs] });
+        },
+        lodComputationTime(ms) {
+          calls.push({ method: 'lodComputationTime', args: [ms] });
+        },
+        memorySnapshot(heapMB, screenshotsMB, tabCount) {
+          calls.push({ method: 'memorySnapshot', args: [heapMB, screenshotsMB, tabCount] });
+        },
+      };
+      return { perfProbe, calls };
+    }
+
+    it('reports lodComputationTime after each computeTiers call', () => {
+      const { perfProbe, calls } = createPerfProbe();
+      let clock = 0;
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
+        performanceProbe: perfProbe,
+        now: () => clock,
+      });
+
+      const positions = new Map([['n1', { x: 0, y: 0 }]]);
+      const tree = createFakeTree('other');
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100) });
+
+      // Simulate 2ms of computation by advancing clock when computeTiers runs
+      const origCompute = comp.computeTiers.bind(comp);
+      // We can't easily intercept internal timing, so we advance clock before calling
+      // The implementation will call now() at start and end.
+      // Advance clock by 2ms to simulate computation time.
+      clock = 0;
+      // Monkey-patch won't work well; instead, let's rely on the implementation
+      // calling now() at start, then doing work, then now() at end.
+      // For the test, we need the two now() calls to return different values.
+      // Use a counter-based now:
+      let nowCallCount = 0;
+      const comp2 = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
+        performanceProbe: perfProbe,
+        now: () => {
+          nowCallCount++;
+          // First call returns 100, second returns 103 (3ms elapsed)
+          return nowCallCount % 2 === 1 ? 100 : 103;
+        },
+      });
+
+      comp2.computeTiers(tree, positions, zoom);
+
+      expect(calls.length).toBe(1);
+      expect(calls[0].method).toBe('lodComputationTime');
+      expect(calls[0].args[0]).toBe(3);
+    });
+
+    it('reports lodComputationTime on every call', () => {
+      const { perfProbe, calls } = createPerfProbe();
+      let clock = 0;
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
+        performanceProbe: perfProbe,
+        now: () => {
+          const v = clock;
+          clock += 1; // Each now() call advances by 1ms
+          return v;
+        },
+      });
+
+      const positions = new Map([['n1', { x: 0, y: 0 }]]);
+      const tree = createFakeTree('other');
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100) });
+
+      comp.computeTiers(tree, positions, zoom);
+      comp.computeTiers(tree, positions, zoom);
+
+      const lodCalls = calls.filter(c => c.method === 'lodComputationTime');
+      expect(lodCalls.length).toBe(2);
+    });
+
+    it('reports zero when computation is instantaneous', () => {
+      const { perfProbe, calls } = createPerfProbe();
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
+        performanceProbe: perfProbe,
+        now: () => 50, // Always returns same value
+      });
+
+      const positions = new Map([['n1', { x: 0, y: 0 }]]);
+      const tree = createFakeTree('other');
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100) });
+
+      comp.computeTiers(tree, positions, zoom);
+
+      expect(calls[0].args[0]).toBe(0);
+    });
+
+    it('works without a performance probe', () => {
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT);
+      const positions = new Map([['n1', { x: 0, y: 0 }]]);
+      const tree = createFakeTree('other');
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100) });
+
+      // Should not throw
+      const tiers = comp.computeTiers(tree, positions, zoom);
+      expect(tiers.get('n1')).toBeDefined();
+    });
+
+    it('still computes correct tiers when performance probe is attached', () => {
+      const { perfProbe } = createPerfProbe();
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
+        performanceProbe: perfProbe,
+        now: () => 0,
+      });
+
+      const positions = new Map([['n1', { x: 0, y: 0 }]]);
+      const tree = createFakeTree('other');
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100) });
+
+      const tiers = stabilize(comp, tree, positions, zoom);
+      expect(tiers.get('n1')).toBe('screenshot-low');
     });
   });
 });

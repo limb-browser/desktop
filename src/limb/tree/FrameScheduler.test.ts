@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { FrameScheduler } from './FrameScheduler.mjs';
 import type { FrameSchedulerProbe } from '../ports/FrameSchedulerProbe';
+import type { PerformanceProbe } from '../ports/PerformanceProbe';
 
 class FakeAnimationFrame {
   private callbacks = new Map<number, () => void>();
@@ -240,6 +241,116 @@ describe('FrameScheduler', () => {
       scheduler.destroy();
       raf.tick();
       expect(getPaintCount()).toBe(0);
+    });
+  });
+
+  describe('performance probe: frame budget', () => {
+    function createPerfProbe() {
+      const calls: { method: string; args: number[] }[] = [];
+      const perfProbe: PerformanceProbe = {
+        frameBudgetExceeded(actualMs, budgetMs) {
+          calls.push({ method: 'frameBudgetExceeded', args: [actualMs, budgetMs] });
+        },
+        lodComputationTime(ms) {
+          calls.push({ method: 'lodComputationTime', args: [ms] });
+        },
+        memorySnapshot(heapMB, screenshotsMB, tabCount) {
+          calls.push({ method: 'memorySnapshot', args: [heapMB, screenshotsMB, tabCount] });
+        },
+      };
+      return { perfProbe, calls };
+    }
+
+    function setupWithPerf(paintDurationMs: number) {
+      const raf = new FakeAnimationFrame();
+      let clock = 0;
+      const now = () => clock;
+      const paint = () => { clock += paintDurationMs; };
+      const { probe, calls: probeCalls } = createProbe();
+      const { perfProbe, calls: perfCalls } = createPerfProbe();
+      const scheduler = new FrameScheduler(paint, probe, {
+        requestFrame: raf.requestFrame,
+        cancelFrame: raf.cancelFrame,
+        performanceProbe: perfProbe,
+        now,
+      });
+      return { scheduler, raf, perfCalls, probeCalls };
+    }
+
+    it('fires frameBudgetExceeded when paint takes longer than 16ms', () => {
+      const { scheduler, raf, perfCalls } = setupWithPerf(20);
+
+      scheduler.markDirty();
+      raf.tick();
+
+      expect(perfCalls).toEqual([
+        { method: 'frameBudgetExceeded', args: [20, 16] },
+      ]);
+    });
+
+    it('does not fire frameBudgetExceeded when paint takes exactly 16ms', () => {
+      const { scheduler, raf, perfCalls } = setupWithPerf(16);
+
+      scheduler.markDirty();
+      raf.tick();
+
+      expect(perfCalls).toEqual([]);
+    });
+
+    it('does not fire frameBudgetExceeded when paint takes less than 16ms', () => {
+      const { scheduler, raf, perfCalls } = setupWithPerf(10);
+
+      scheduler.markDirty();
+      raf.tick();
+
+      expect(perfCalls).toEqual([]);
+    });
+
+    it('reports the actual frame duration in frameBudgetExceeded', () => {
+      const { scheduler, raf, perfCalls } = setupWithPerf(42);
+
+      scheduler.markDirty();
+      raf.tick();
+
+      expect(perfCalls[0].args[0]).toBe(42);
+      expect(perfCalls[0].args[1]).toBe(16);
+    });
+
+    it('fires frameBudgetExceeded on each over-budget frame', () => {
+      const { scheduler, raf, perfCalls } = setupWithPerf(25);
+
+      scheduler.markDirty();
+      raf.tick();
+      scheduler.markDirty();
+      raf.tick();
+
+      expect(perfCalls.length).toBe(2);
+    });
+
+    it('does not fire on idle frames (no paint)', () => {
+      const { scheduler, raf, perfCalls } = setupWithPerf(20);
+
+      scheduler.markDirty();
+      raf.tick(); // paints (over budget)
+      perfCalls.length = 0;
+
+      raf.tick(); // idle frame, no paint
+      expect(perfCalls).toEqual([]);
+    });
+
+    it('works without a performance probe', () => {
+      const raf = new FakeAnimationFrame();
+      let painted = false;
+      const paint = () => { painted = true; };
+      const scheduler = new FrameScheduler(paint, null, {
+        requestFrame: raf.requestFrame,
+        cancelFrame: raf.cancelFrame,
+      });
+
+      scheduler.markDirty();
+      raf.tick();
+
+      expect(painted).toBe(true);
     });
   });
 });

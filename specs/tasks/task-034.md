@@ -3,7 +3,7 @@ title: "Implement performance probes"
 spec_ref: "performance.md S6"
 depends_on:
   - task-022
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []

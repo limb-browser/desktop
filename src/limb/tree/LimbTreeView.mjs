@@ -156,7 +156,7 @@ export class LimbTreeView {
    * @param {HTMLCanvasElement} canvas
    * @param {{ zoomChanged(level: number, zoomScale: number): void }} [probe]
    * @param {{ tierChanged(nodeId: string, previousTier: string, newTier: string): void }} [lodProbe]
-   * @param {{ onNodeClicked?: (nodeId: string) => void, onFoldToggled?: (foldId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe }} [options]
+   * @param {{ onNodeClicked?: (nodeId: string) => void, onFoldToggled?: (foldId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe, performanceProbe?: import('../ports/PerformanceProbe').PerformanceProbe }} [options]
    */
   init(canvas, probe, lodProbe, options) {
     this.#canvas = canvas;
@@ -170,7 +170,7 @@ export class LimbTreeView {
     );
 
     this.#renderer = new TreeRenderer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT);
-    this.#lodComputer = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, lodProbe);
+    this.#lodComputer = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, lodProbe, { performanceProbe: options?.performanceProbe });
     this.#panInteraction = new PanInteraction(this.#zoom);
     this.#labelComputer = new NodeLabelComputer();
     this.#hoverInteraction = new HoverInteraction();
@@ -181,6 +181,7 @@ export class LimbTreeView {
     this.#frameScheduler = new FrameScheduler(
       () => this.#onFrame(),
       options?.frameSchedulerProbe,
+      { performanceProbe: options?.performanceProbe },
     );
 
     this.#resizeHandler = () => this.#resize();

@@ -14,6 +14,7 @@
  */
 
 const IDLE_FRAME_LIMIT = 30;
+const FRAME_BUDGET_MS = 16;
 
 export class FrameScheduler {
   /** @type {boolean} */
@@ -32,17 +33,23 @@ export class FrameScheduler {
   #cancelFrame;
   /** @type {import('../ports/FrameSchedulerProbe').FrameSchedulerProbe | null} */
   #probe;
+  /** @type {import('../ports/PerformanceProbe').PerformanceProbe | null} */
+  #performanceProbe;
+  /** @type {() => number} */
+  #now;
 
   /**
    * @param {() => void} paint - The paint callback to invoke each frame.
    * @param {import('../ports/FrameSchedulerProbe').FrameSchedulerProbe} [probe]
-   * @param {{ requestFrame?: (cb: () => void) => number, cancelFrame?: (id: number) => void }} [options]
+   * @param {{ requestFrame?: (cb: () => void) => number, cancelFrame?: (id: number) => void, performanceProbe?: import('../ports/PerformanceProbe').PerformanceProbe, now?: () => number }} [options]
    */
   constructor(paint, probe, options) {
     this.#paint = paint;
     this.#probe = probe ?? null;
     this.#requestFrame = options?.requestFrame ?? requestAnimationFrame;
     this.#cancelFrame = options?.cancelFrame ?? cancelAnimationFrame;
+    this.#performanceProbe = options?.performanceProbe ?? null;
+    this.#now = options?.now ?? (() => performance.now());
   }
 
   /**
@@ -69,7 +76,12 @@ export class FrameScheduler {
     if (this.#dirty) {
       this.#dirty = false;
       this.#idleFrameCount = 0;
+      const start = this.#now();
       this.#paint();
+      const elapsed = this.#now() - start;
+      if (elapsed > FRAME_BUDGET_MS) {
+        this.#performanceProbe?.frameBudgetExceeded(elapsed, FRAME_BUDGET_MS);
+      }
       this.#probe?.framePainted();
     } else {
       this.#idleFrameCount++;

@@ -63,16 +63,23 @@ export class LODComputer {
   #previousTiers = new Map();
   /** @type {{ tierChanged(nodeId: string, previousTier: string, newTier: string): void } | null} */
   #probe;
+  /** @type {import('../ports/PerformanceProbe').PerformanceProbe | null} */
+  #performanceProbe;
+  /** @type {() => number} */
+  #now;
 
   /**
    * @param {number} baseNodeWidth - Logical node width (same unit as layout positions)
    * @param {number} baseNodeHeight - Logical node height
    * @param {{ tierChanged(nodeId: string, previousTier: string, newTier: string): void }} [probe]
+   * @param {{ performanceProbe?: import('../ports/PerformanceProbe').PerformanceProbe, now?: () => number }} [options]
    */
-  constructor(baseNodeWidth, baseNodeHeight, probe) {
+  constructor(baseNodeWidth, baseNodeHeight, probe, options) {
     this.#baseNodeWidth = baseNodeWidth;
     this.#baseNodeHeight = baseNodeHeight;
     this.#probe = probe ?? null;
+    this.#performanceProbe = options?.performanceProbe ?? null;
+    this.#now = options?.now ?? (() => performance.now());
   }
 
   /**
@@ -84,6 +91,7 @@ export class LODComputer {
    * @returns {Map<string, LODTier>}
    */
   computeTiers(tree, layout, zoomState) {
+    const start = this.#now();
     const result = /** @type {Map<string, string>} */ (new Map());
     const zoomScale = zoomState.zoomScale;
     const zoomLevel = zoomState.level;
@@ -141,6 +149,8 @@ export class LODComputer {
     }
 
     this.#previousTiers = new Map(result);
+    const elapsed = this.#now() - start;
+    this.#performanceProbe?.lodComputationTime(elapsed);
     return result;
   }
 }
