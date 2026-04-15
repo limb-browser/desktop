@@ -29,6 +29,7 @@ import { FrameScheduler } from "./FrameScheduler.mjs";
 import { LayoutAnimator } from "./LayoutAnimator.mjs";
 import { RevealAnimator } from "./RevealAnimator.mjs";
 import { computeFoldNodeFrame, formatFoldLabel } from "./FoldNodeRenderer.mjs";
+import { TabPositioner } from "./TabPositioner.mjs";
 
 // Zoom level change per 100px of wheel deltaY
 const ZOOM_SENSITIVITY = 0.05;
@@ -138,6 +139,12 @@ export class LimbTreeView {
   #lastFrameTime = 0;
   /** @type {import('./ScreenshotManager.mjs').ScreenshotManager | null} */
   #screenshotManager = null;
+  /** @type {TabPositioner | null} */
+  #tabPositioner = null;
+  /** @type {{ getTabForNode(nodeId: string): any, nodeToTab: Map<string, any> } | null} */
+  #tabBridge = null;
+  /** @type {number} */
+  #maxLiveTabs = 8;
 
   // Animation state for pan-only viewport transitions (centerOnNode)
   /** @type {{ startFocus: { x: number, y: number }, endFocus: { x: number, y: number }, startLevel: number, endLevel: number, startTime: number, duration: number } | null} */
@@ -238,6 +245,30 @@ export class LimbTreeView {
    */
   setScreenshotManager(screenshotManager) {
     this.#screenshotManager = screenshotManager;
+  }
+
+  /**
+   * Set the TabPositioner for positioning browser elements based on zoom and LOD.
+   * @param {TabPositioner} tabPositioner
+   */
+  setTabPositioner(tabPositioner) {
+    this.#tabPositioner = tabPositioner;
+  }
+
+  /**
+   * Set the TabBridge for mapping node IDs to tab elements.
+   * @param {{ getTabForNode(nodeId: string): any, nodeToTab: Map<string, any> }} tabBridge
+   */
+  setTabBridge(tabBridge) {
+    this.#tabBridge = tabBridge;
+  }
+
+  /**
+   * Set the maximum number of simultaneously live tabs.
+   * @param {number} maxLiveTabs
+   */
+  setMaxLiveTabs(maxLiveTabs) {
+    this.#maxLiveTabs = maxLiveTabs;
   }
 
   /**
@@ -757,6 +788,89 @@ export class LimbTreeView {
       8,
       h - 8,
     );
+
+    // Position tab browser elements based on zoom and LOD
+    if (this.#tabPositioner && this.#tiers && this.#positions) {
+      const posFrame = this.#tabPositioner.computeFrame({
+        zoomLevel: this.#zoom.level,
+        viewportSize: this.#zoom.viewportSize,
+        focusedNodeId: this.#focusedNodeId,
+        tiers: this.#tiers,
+        nodePositions: this.#positions,
+        logicalToScreen: (x, y) => this.#zoom.logicalToScreen(x, y),
+        baseNodeWidth: BASE_NODE_WIDTH,
+        baseNodeHeight: BASE_NODE_HEIGHT,
+        zoomScale: this.#zoom.zoomScale,
+        maxLiveTabs: this.#maxLiveTabs,
+      });
+      this.#applyTabPositions(posFrame);
+    }
+  }
+
+  /**
+   * Apply tab positioning from a TabPositioner frame to browser DOM elements.
+   * Sets CSS transforms, visibility, opacity, and pointer-events.
+   *
+   * @param {import('./TabPositioner.mjs').TabPositionFrame} posFrame
+   */
+  #applyTabPositions(posFrame) {
+    if (!this.#tabBridge) return;
+    const visibleNodeIds = new Set();
+
+    // Position focused tab (fills viewport)
+    if (posFrame.focusedTab) {
+      const tab = this.#tabBridge.getTabForNode(posFrame.focusedTab.nodeId);
+      if (tab?.linkedBrowser) {
+        const b = tab.linkedBrowser;
+        b.style.transform = "";
+        b.style.width = `${posFrame.focusedTab.width}px`;
+        b.style.height = `${posFrame.focusedTab.height}px`;
+        b.style.visibility = "visible";
+        b.style.pointerEvents = posFrame.inputMode === "tab" ? "auto" : "none";
+        const fadeOpacity = posFrame.crossFades.get(posFrame.focusedTab.nodeId);
+        b.style.opacity = fadeOpacity !== undefined ? String(fadeOpacity) : "1";
+      }
+      visibleNodeIds.add(posFrame.focusedTab.nodeId);
+    }
+
+    // Position live tabs at tree coordinates
+    for (const lt of posFrame.liveTabs) {
+      const tab = this.#tabBridge.getTabForNode(lt.nodeId);
+      if (tab?.linkedBrowser) {
+        const b = tab.linkedBrowser;
+        b.style.transform = `translate(${lt.x}px, ${lt.y}px)`;
+        b.style.width = `${lt.width}px`;
+        b.style.height = `${lt.height}px`;
+        b.style.visibility = "visible";
+        b.style.pointerEvents = posFrame.inputMode === "tab" && lt.nodeId === posFrame.focusedTab?.nodeId ? "auto" : "none";
+        const fadeOpacity = posFrame.crossFades.get(lt.nodeId);
+        b.style.opacity = fadeOpacity !== undefined ? String(fadeOpacity) : "1";
+      }
+      visibleNodeIds.add(lt.nodeId);
+    }
+
+    // Hide all other tabs with mapped nodes (unless mid cross-fade)
+    for (const [nodeId] of this.#tabBridge.nodeToTab) {
+      if (visibleNodeIds.has(nodeId)) continue;
+      const tab = this.#tabBridge.getTabForNode(nodeId);
+      if (!tab?.linkedBrowser) continue;
+
+      // Keep element visible during to-screenshot cross-fade
+      const fadeOpacity = posFrame.crossFades.get(nodeId);
+      if (fadeOpacity !== undefined) {
+        tab.linkedBrowser.style.visibility = "visible";
+        tab.linkedBrowser.style.pointerEvents = "none";
+        tab.linkedBrowser.style.opacity = String(fadeOpacity);
+      } else {
+        tab.linkedBrowser.style.visibility = "hidden";
+        tab.linkedBrowser.style.pointerEvents = "none";
+      }
+    }
+
+    // Toggle canvas pointer-events
+    if (this.#canvas) {
+      this.#canvas.style.pointerEvents = posFrame.inputMode === "canvas" ? "auto" : "none";
+    }
   }
 
   /**
@@ -820,6 +934,9 @@ export class LimbTreeView {
     this.#titles = new Map();
     this.#lastFrameTime = 0;
     this.#screenshotManager = null;
+    this.#tabPositioner = null;
+    this.#tabBridge = null;
+    this.#maxLiveTabs = 8;
     this.#lastFrameNodes = [];
     this.#animation = null;
     this.#animationLastTime = 0;
