@@ -11,7 +11,15 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      "chrome://browser/content/limb/tree/LimbTreeView.mjs",
 +      { global: "current" }
 +    );
-+    const { buildTestTreeData } = ChromeUtils.importESModule(
++    const { BrowsingTree } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/BrowsingTree.ts",
++      { global: "current" }
++    );
++    const { computeLayout } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/TreeLayout.ts",
++      { global: "current" }
++    );
++    ChromeUtils.importESModule(
 +      "chrome://browser/content/limb/tree/testTreeData.mjs",
 +      { global: "current" }
 +    );
@@ -23,6 +31,31 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      "chrome://browser/content/limb/tree/AddressBarAdapter.mjs",
 +      { global: "current" }
 +    );
++    const { TreeNavigator } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/TreeNavigator.ts",
++      { global: "current" }
++    );
++    const { KeyboardNavigationAdapter } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/KeyboardNavigationAdapter.mjs",
++      { global: "current" }
++    );
++    const browsingTree = new BrowsingTree("https://example.com");
++    const a = browsingTree.addChild(browsingTree.rootId, "https://a.example.com");
++    const b = browsingTree.addChild(browsingTree.rootId, "https://b.example.com");
++    browsingTree.addChild(a.id, "https://a1.example.com");
++    browsingTree.addChild(a.id, "https://a2.example.com");
++    browsingTree.addChild(b.id, "https://b1.example.com");
++    const positions = computeLayout(browsingTree);
++    const parentMap = new Map();
++    for (const [nodeId, node] of browsingTree.nodes) {
++      if (node.parentId) parentMap.set(nodeId, node.parentId);
++    }
++    let maxX = 0, maxY = 0;
++    for (const pos of positions.values()) {
++      if (pos.x > maxX) maxX = pos.x;
++      if (pos.y > maxY) maxY = pos.y;
++    }
++    const treeExtent = { width: maxX + 2, height: maxY + 2 };
 +    window.gLimbTreeView = new LimbTreeView();
 +    const navBar = document.getElementById("nav-bar");
 +    const addressBarAdapter = new AddressBarAdapter(navBar, window.gLimbTreeView);
@@ -30,8 +63,10 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    const animationProbe = { animationStarted(from, to) { console.debug("Zoom anim:", from, "->", to); }, animationCompleted() { console.debug("Zoom anim complete"); }, animationCancelled() { console.debug("Zoom anim cancelled"); } };
 +    window.gLimbTreeView.init(document.getElementById("limb-tree-canvas"), addressBarAdapter.zoomProbe, lodProbe, { animationProbe });
 +    addressBarAdapter.attach();
-+    const testTree = buildTestTreeData();
-+    window.gLimbTreeView.setTreeData(testTree.positions, testTree.parentMap, testTree.treeExtent);
++    window.gLimbTreeView.setTreeData(positions, parentMap, treeExtent, browsingTree.focusedNodeId);
++    const treeNav = new TreeNavigator(browsingTree);
++    const keyNavAdapter = new KeyboardNavigationAdapter(treeNav, window.gLimbTreeView, gURLBar);
++    keyNavAdapter.install(window);
      gBrowser.addEventListener("DOMUpdateBlockedPopups", e =>
        PopupAndRedirectBlockerObserver.handleEvent(e)
      );

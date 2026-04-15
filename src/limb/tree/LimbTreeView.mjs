@@ -172,6 +172,18 @@ export class LimbTreeView {
   }
 
   /**
+   * Center the viewport on the given node without changing zoom level.
+   * @param {string} nodeId
+   */
+  centerOnNode(nodeId) {
+    if (!this.#zoom || !this.#positions) return;
+    const pos = this.#positions.get(nodeId);
+    if (!pos) return;
+    this.#zoom.focusPoint = { x: pos.x, y: pos.y };
+    this.#paint();
+  }
+
+  /**
    * Set the tree data for rendering.
    * @param {Map<string, { x: number, y: number }>} positions - Logical node positions from TreeLayout
    * @param {Map<string, string>} parentMap - childId -> parentId mapping
