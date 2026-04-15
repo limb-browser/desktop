@@ -30,6 +30,8 @@ function createFakeWindow(): {
 function createFakeTreeView(initialLevel = 0.5) {
   let level = initialLevel;
   const centerCalls: string[] = [];
+  const setFocusedNodeIdCalls: string[] = [];
+  const animateToNodeCalls: { nodeId: string; level: number }[] = [];
   return {
     get zoomLevel() {
       return level;
@@ -37,10 +39,19 @@ function createFakeTreeView(initialLevel = 0.5) {
     setZoomLevel(newLevel: number) {
       level = newLevel;
     },
+    setFocusedNodeId(nodeId: string) {
+      setFocusedNodeIdCalls.push(nodeId);
+    },
     centerOnNode(nodeId: string) {
       centerCalls.push(nodeId);
     },
+    animateToNode(nodeId: string, targetLevel: number) {
+      animateToNodeCalls.push({ nodeId, level: targetLevel });
+      level = targetLevel;
+    },
     centerCalls,
+    setFocusedNodeIdCalls,
+    animateToNodeCalls,
   };
 }
 
@@ -200,7 +211,51 @@ describe('KeyboardNavigationAdapter', () => {
     });
   });
 
-  describe('post-navigation viewport centering', () => {
+  describe('post-navigation state sync and centering', () => {
+    it('syncs focused node ID to tree view after navigation', () => {
+      const child = tree.addChild(tree.rootId, 'https://child.com');
+      tree.focusNode(child.id);
+
+      dispatchKeydown(win, 'ArrowUp', { altKey: true });
+
+      expect(treeView.setFocusedNodeIdCalls).toContain(tree.rootId);
+    });
+
+    it('syncs focused node ID for all navigation directions', () => {
+      const c1 = tree.addChild(tree.rootId, 'https://a.com');
+      const c2 = tree.addChild(tree.rootId, 'https://b.com');
+
+      // Alt+Down: root -> c1
+      dispatchKeydown(win, 'ArrowDown', { altKey: true });
+      expect(treeView.setFocusedNodeIdCalls).toContain(c1.id);
+
+      // Alt+Right: c1 -> c2
+      dispatchKeydown(win, 'ArrowRight', { altKey: true });
+      expect(treeView.setFocusedNodeIdCalls).toContain(c2.id);
+
+      // Alt+Left: c2 -> c1
+      dispatchKeydown(win, 'ArrowLeft', { altKey: true });
+      expect(treeView.setFocusedNodeIdCalls.filter((id) => id === c1.id)).toHaveLength(2);
+    });
+
+    it('does not sync focused node ID when navigation is a no-op', () => {
+      dispatchKeydown(win, 'ArrowUp', { altKey: true }); // root, no parent
+
+      expect(treeView.setFocusedNodeIdCalls).toHaveLength(0);
+    });
+
+    it('syncs focused node ID before centering', () => {
+      treeView.setZoomLevel(0.95);
+      const child = tree.addChild(tree.rootId, 'https://child.com');
+      tree.focusNode(child.id);
+
+      dispatchKeydown(win, 'ArrowUp', { altKey: true });
+
+      // setFocusedNodeId should be called, and centerOnNode should be called after
+      expect(treeView.setFocusedNodeIdCalls).toContain(tree.rootId);
+      expect(treeView.centerCalls).toContain(tree.rootId);
+    });
+
     it('centers viewport on new node when zoom level >= 0.9', () => {
       treeView.setZoomLevel(0.95);
       const child = tree.addChild(tree.rootId, 'https://child.com');
@@ -258,18 +313,20 @@ describe('KeyboardNavigationAdapter', () => {
   });
 
   describe('Ctrl+1 - zoom to 100% on focused node', () => {
-    it('sets zoom level to 1.0', () => {
+    it('animates to zoom level 1.0 centered on focused node', () => {
       treeView.setZoomLevel(0.5);
 
       dispatchKeydown(win, '1', { ctrlKey: true });
 
-      expect(treeView.zoomLevel).toBe(1);
+      expect(treeView.animateToNodeCalls).toEqual([
+        { nodeId: tree.focusedNodeId, level: 1 },
+      ]);
     });
 
-    it('centers on focused node', () => {
+    it('syncs focused node ID to tree view', () => {
       dispatchKeydown(win, '1', { ctrlKey: true });
 
-      expect(treeView.centerCalls).toContain(tree.focusedNodeId);
+      expect(treeView.setFocusedNodeIdCalls).toContain(tree.focusedNodeId);
     });
 
     it('prevents default and stops propagation', () => {
@@ -289,13 +346,22 @@ describe('KeyboardNavigationAdapter', () => {
       expect(urlBar.blurCalled).toBe(true);
     });
 
-    it('zooms to focused node when zoomed out (level < 0.9)', () => {
+    it('animates to focused node when zoomed out (level < 0.9)', () => {
       treeView.setZoomLevel(0.5);
 
       dispatchKeydown(win, 'Escape', {});
 
-      expect(treeView.zoomLevel).toBe(1);
-      expect(treeView.centerCalls).toContain(tree.focusedNodeId);
+      expect(treeView.animateToNodeCalls).toEqual([
+        { nodeId: tree.focusedNodeId, level: 1 },
+      ]);
+    });
+
+    it('syncs focused node ID when zooming to focused node', () => {
+      treeView.setZoomLevel(0.5);
+
+      dispatchKeydown(win, 'Escape', {});
+
+      expect(treeView.setFocusedNodeIdCalls).toContain(tree.focusedNodeId);
     });
 
     it('address bar blur takes priority over zoom', () => {

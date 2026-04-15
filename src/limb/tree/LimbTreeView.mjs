@@ -50,6 +50,9 @@ const FOCUS_RING_WIDTH = 2;
 // Hover visual offset (pixels upward)
 const HOVER_OFFSET_Y = 2;
 
+// Viewport animation duration in milliseconds
+const ANIMATION_DURATION_MS = 300;
+
 // Ease-out for hover interpolation: t => 1 - (1 - t)^2
 function easeOut(t) {
   return 1 - (1 - t) * (1 - t);
@@ -99,6 +102,10 @@ export class LimbTreeView {
   #titles = new Map();
   /** @type {number} */
   #lastFrameTime = 0;
+
+  // Animation state for pan-only viewport transitions (centerOnNode)
+  /** @type {{ startFocus: { x: number, y: number }, endFocus: { x: number, y: number }, startLevel: number, endLevel: number, startTime: number, duration: number } | null} */
+  #animation = null;
 
   /** @type {((e: WheelEvent) => void) | null} */
   #wheelHandler = null;
@@ -172,15 +179,47 @@ export class LimbTreeView {
   }
 
   /**
-   * Center the viewport on the given node without changing zoom level.
+   * Update the focused node ID for LOD and focus ring computation.
+   * Call this before centerOnNode when the focused node changes
+   * outside of setTreeData (e.g., keyboard navigation).
+   * @param {string} nodeId
+   */
+  setFocusedNodeId(nodeId) {
+    this.#focusedNodeId = nodeId;
+    this.#paint();
+  }
+
+  /**
+   * Animate the viewport to center on the given node without changing zoom level.
+   * Uses requestAnimationFrame with ease-out interpolation.
    * @param {string} nodeId
    */
   centerOnNode(nodeId) {
     if (!this.#zoom || !this.#positions) return;
     const pos = this.#positions.get(nodeId);
     if (!pos) return;
-    this.#zoom.focusPoint = { x: pos.x, y: pos.y };
-    this.#paint();
+    this.#startAnimation({ x: pos.x, y: pos.y }, this.#zoom.level);
+  }
+
+  /**
+   * Animate both zoom level and viewport focus to a node.
+   * Used for Ctrl+1 and Escape zoom-to-focused-node.
+   * @param {string} nodeId
+   * @param {number} targetLevel
+   */
+  animateToNode(nodeId, targetLevel) {
+    if (!this.#zoom || !this.#positions || !this.#zoomAnimator) return;
+    const pos = this.#positions.get(nodeId);
+    if (!pos) return;
+
+    this.#zoomAnimator.start(
+      this.#zoom.level,
+      targetLevel,
+      { ...this.#zoom.focusPoint },
+      { x: pos.x, y: pos.y },
+    );
+
+    this.#startAnimationLoop();
   }
 
   /**
@@ -300,6 +339,7 @@ export class LimbTreeView {
     if (this.#animationFrameId !== null) {
       cancelAnimationFrame(this.#animationFrameId);
     }
+    this.#animation = null;
     this.#animationLastTime = performance.now();
 
     const tick = (now) => {
@@ -471,6 +511,57 @@ export class LimbTreeView {
     );
   }
 
+  /**
+   * Start an animated transition to the target focus point and zoom level.
+   * @param {{ x: number, y: number }} targetFocus
+   * @param {number} targetLevel
+   */
+  #startAnimation(targetFocus, targetLevel) {
+    if (!this.#zoom) return;
+    // Cancel any in-progress animation
+    if (this.#animationFrameId !== null) {
+      cancelAnimationFrame(this.#animationFrameId);
+      this.#animationFrameId = null;
+    }
+    this.#zoomAnimator?.cancel();
+    this.#animation = {
+      startFocus: { ...this.#zoom.focusPoint },
+      endFocus: targetFocus,
+      startLevel: this.#zoom.level,
+      endLevel: targetLevel,
+      startTime: performance.now(),
+      duration: ANIMATION_DURATION_MS,
+    };
+    this.#animationFrameId = requestAnimationFrame((ts) => this.#animationTick(ts));
+  }
+
+  /** @param {number} timestamp */
+  #animationTick(timestamp) {
+    if (!this.#animation || !this.#zoom) return;
+    const elapsed = timestamp - this.#animation.startTime;
+    const rawT = Math.min(1, elapsed / this.#animation.duration);
+    const t = easeOut(rawT);
+
+    this.#zoom.focusPoint = {
+      x: this.#animation.startFocus.x + (this.#animation.endFocus.x - this.#animation.startFocus.x) * t,
+      y: this.#animation.startFocus.y + (this.#animation.endFocus.y - this.#animation.startFocus.y) * t,
+    };
+    if (this.#animation.startLevel !== this.#animation.endLevel) {
+      this.#zoom.setLevel(
+        this.#animation.startLevel + (this.#animation.endLevel - this.#animation.startLevel) * t,
+      );
+    }
+
+    this.#paint();
+
+    if (rawT < 1) {
+      this.#animationFrameId = requestAnimationFrame((ts) => this.#animationTick(ts));
+    } else {
+      this.#animation = null;
+      this.#animationFrameId = null;
+    }
+  }
+
   destroy() {
     if (this.#resizeHandler) {
       window.removeEventListener("resize", this.#resizeHandler);
@@ -509,6 +600,7 @@ export class LimbTreeView {
     this.#titles = new Map();
     this.#lastFrameTime = 0;
     this.#lastFrameNodes = [];
+    this.#animation = null;
     this.#animationFrameId = null;
     this.#animationLastTime = 0;
     this.#onNodeClicked = null;

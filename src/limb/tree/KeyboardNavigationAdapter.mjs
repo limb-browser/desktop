@@ -20,7 +20,7 @@ import { TreeNavigator } from "./TreeNavigator.ts";
 export class KeyboardNavigationAdapter {
   /** @type {TreeNavigator} */
   #navigator;
-  /** @type {{ zoomLevel: number, setZoomLevel(level: number): void, centerOnNode(nodeId: string): void }} */
+  /** @type {{ zoomLevel: number, setZoomLevel(level: number): void, setFocusedNodeId(nodeId: string): void, centerOnNode(nodeId: string): void, animateToNode(nodeId: string, level: number): void }} */
   #treeView;
   /** @type {{ focused: boolean, blur(): void }} */
   #urlBar;
@@ -31,7 +31,7 @@ export class KeyboardNavigationAdapter {
 
   /**
    * @param {TreeNavigator} navigator
-   * @param {{ zoomLevel: number, setZoomLevel(level: number): void, centerOnNode(nodeId: string): void }} treeView
+   * @param {{ zoomLevel: number, setZoomLevel(level: number): void, setFocusedNodeId(nodeId: string): void, centerOnNode(nodeId: string): void, animateToNode(nodeId: string, level: number): void }} treeView
    * @param {{ focused: boolean, blur(): void }} urlBar
    */
   constructor(navigator, treeView, urlBar) {
@@ -100,8 +100,11 @@ export class KeyboardNavigationAdapter {
     e.preventDefault();
     e.stopPropagation();
 
-    if (newNodeId !== null && this.#treeView.zoomLevel >= 0.9) {
-      this.#treeView.centerOnNode(newNodeId);
+    if (newNodeId !== null) {
+      this.#treeView.setFocusedNodeId(newNodeId);
+      if (this.#treeView.zoomLevel >= 0.9) {
+        this.#treeView.centerOnNode(newNodeId);
+      }
     }
   }
 
@@ -114,8 +117,9 @@ export class KeyboardNavigationAdapter {
     } else if (e.key === "1") {
       e.preventDefault();
       e.stopPropagation();
-      this.#treeView.setZoomLevel(1);
-      this.#treeView.centerOnNode(this.#navigator.focusedNodeId);
+      const focusedId = this.#navigator.focusedNodeId;
+      this.#treeView.setFocusedNodeId(focusedId);
+      this.#treeView.animateToNode(focusedId, 1);
     }
   }
 
@@ -131,8 +135,9 @@ export class KeyboardNavigationAdapter {
     if (this.#treeView.zoomLevel < 0.9) {
       e.preventDefault();
       e.stopPropagation();
-      this.#treeView.setZoomLevel(1);
-      this.#treeView.centerOnNode(this.#navigator.focusedNodeId);
+      const focusedId = this.#navigator.focusedNodeId;
+      this.#treeView.setFocusedNodeId(focusedId);
+      this.#treeView.animateToNode(focusedId, 1);
     }
   }
 }
