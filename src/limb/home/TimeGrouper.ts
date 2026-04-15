@@ -10,6 +10,16 @@ function startOfDayUTC(ms: number): number {
   return d.getTime();
 }
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+export function assignMonthLabel(timestamp: number): string {
+  const d = new Date(timestamp);
+  return `${MONTH_NAMES[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
 export function assignTimeGroup(timestamp: number, now: number): TimeGroup {
   const todayStart = startOfDayUTC(now);
   const tsDay = startOfDayUTC(timestamp);

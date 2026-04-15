@@ -76,6 +76,23 @@ describe('getLauncherData', () => {
       const data = getLauncherData(tree, NOW);
       expect(data.groups[0].branches[0].id).toBe(branch.id);
     });
+
+    it('includes screenshot as null when not available on node', () => {
+      const branch = tree.addChild(tree.rootId, 'https://example.com');
+      branch.lastVisitedAt = NOW;
+
+      const data = getLauncherData(tree, NOW);
+      expect(data.groups[0].branches[0].screenshot).toBeNull();
+    });
+
+    it('includes screenshot data URL when available on node', () => {
+      const branch = tree.addChild(tree.rootId, 'https://example.com');
+      branch.lastVisitedAt = NOW;
+      branch.screenshot = 'data:image/jpeg;base64,/9j/...';
+
+      const data = getLauncherData(tree, NOW);
+      expect(data.groups[0].branches[0].screenshot).toBe('data:image/jpeg;base64,/9j/...');
+    });
   });
 
   describe('time grouping', () => {
@@ -112,7 +129,7 @@ describe('getLauncherData', () => {
 
       const data = getLauncherData(tree, NOW);
       const labels = data.groups.map(g => g.label);
-      expect(labels).toEqual(['Today', 'This Week', 'Older']);
+      expect(labels).toEqual(['Today', 'This Week', 'February 2026']);
     });
 
     it('hides empty groups', () => {
@@ -141,13 +158,13 @@ describe('getLauncherData', () => {
   });
 
   describe('group ordering', () => {
-    it('orders groups chronologically: Today, Yesterday, This Week, This Month, Older', () => {
+    it('orders groups chronologically: Today, Yesterday, This Week, This Month, then month labels', () => {
       const times = [
         { offset: 0, label: 'Today' },
         { offset: 1, label: 'Yesterday' },
         { offset: 3, label: 'This Week' },
         { offset: 10, label: 'This Month' },
-        { offset: 45, label: 'Older' },
+        { offset: 45, label: 'March 2026' },
       ];
 
       for (const t of times) {
@@ -158,7 +175,72 @@ describe('getLauncherData', () => {
 
       const data = getLauncherData(tree, NOW);
       const labels = data.groups.map(g => g.label);
-      expect(labels).toEqual(['Today', 'Yesterday', 'This Week', 'This Month', 'Older']);
+      expect(labels).toEqual(['Today', 'Yesterday', 'This Week', 'This Month', 'March 2026']);
+    });
+  });
+
+  describe('older month sub-grouping', () => {
+    it('sub-groups older branches by month', () => {
+      // Two branches in February 2026, one in January 2026
+      const feb1 = tree.addChild(tree.rootId, 'https://feb1.com');
+      feb1.title = 'Feb Branch 1';
+      feb1.lastVisitedAt = Date.UTC(2026, 1, 15, 12, 0, 0);
+
+      const feb2 = tree.addChild(tree.rootId, 'https://feb2.com');
+      feb2.title = 'Feb Branch 2';
+      feb2.lastVisitedAt = Date.UTC(2026, 1, 10, 12, 0, 0);
+
+      const jan = tree.addChild(tree.rootId, 'https://jan.com');
+      jan.title = 'Jan Branch';
+      jan.lastVisitedAt = Date.UTC(2026, 0, 20, 12, 0, 0);
+
+      const data = getLauncherData(tree, NOW);
+      const labels = data.groups.map(g => g.label);
+      expect(labels).toEqual(['February 2026', 'January 2026']);
+    });
+
+    it('orders month sub-groups most recent first', () => {
+      const jan = tree.addChild(tree.rootId, 'https://jan.com');
+      jan.lastVisitedAt = Date.UTC(2026, 0, 15, 12, 0, 0);
+
+      const dec = tree.addChild(tree.rootId, 'https://dec.com');
+      dec.lastVisitedAt = Date.UTC(2025, 11, 15, 12, 0, 0);
+
+      const nov = tree.addChild(tree.rootId, 'https://nov.com');
+      nov.lastVisitedAt = Date.UTC(2025, 10, 15, 12, 0, 0);
+
+      const data = getLauncherData(tree, NOW);
+      const labels = data.groups.map(g => g.label);
+      expect(labels).toEqual(['January 2026', 'December 2025', 'November 2025']);
+    });
+
+    it('sorts branches within a month sub-group by lastVisitedAt descending', () => {
+      const earlier = tree.addChild(tree.rootId, 'https://earlier.com');
+      earlier.title = 'Earlier';
+      earlier.lastVisitedAt = Date.UTC(2026, 1, 5, 12, 0, 0);
+
+      const later = tree.addChild(tree.rootId, 'https://later.com');
+      later.title = 'Later';
+      later.lastVisitedAt = Date.UTC(2026, 1, 20, 12, 0, 0);
+
+      const data = getLauncherData(tree, NOW);
+      expect(data.groups[0].label).toBe('February 2026');
+      expect(data.groups[0].branches[0].name).toBe('Later');
+      expect(data.groups[0].branches[1].name).toBe('Earlier');
+    });
+
+    it('places month sub-groups after the fixed time groups', () => {
+      const today = tree.addChild(tree.rootId, 'https://today.com');
+      today.title = 'Today';
+      today.lastVisitedAt = NOW - 3600_000;
+
+      const old = tree.addChild(tree.rootId, 'https://old.com');
+      old.title = 'Old';
+      old.lastVisitedAt = Date.UTC(2026, 1, 15, 12, 0, 0);
+
+      const data = getLauncherData(tree, NOW);
+      const labels = data.groups.map(g => g.label);
+      expect(labels).toEqual(['Today', 'February 2026']);
     });
   });
 

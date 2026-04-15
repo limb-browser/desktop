@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import { describe, it, expect } from 'vitest';
-import { assignTimeGroup } from './TimeGrouper';
+import { assignTimeGroup, assignMonthLabel } from './TimeGrouper';
 
 // Use a fixed "now" for deterministic tests: 2026-04-15 14:00:00 UTC (Wednesday)
 const NOW = Date.UTC(2026, 3, 15, 14, 0, 0);
@@ -82,5 +82,28 @@ describe('assignTimeGroup', () => {
     // 2026-04-08 00:00:00 — "This Month" (7 days ago)
     const startOfSeventhDay = Date.UTC(2026, 3, 8, 0, 0, 0);
     expect(assignTimeGroup(startOfSeventhDay, NOW)).toBe('This Month');
+  });
+});
+
+describe('assignMonthLabel', () => {
+  it('returns full month name and year for a timestamp', () => {
+    const march2026 = Date.UTC(2026, 2, 15, 12, 0, 0);
+    expect(assignMonthLabel(march2026)).toBe('March 2026');
+  });
+
+  it('returns correct label for January', () => {
+    const jan2026 = Date.UTC(2026, 0, 10, 12, 0, 0);
+    expect(assignMonthLabel(jan2026)).toBe('January 2026');
+  });
+
+  it('returns correct label for December of previous year', () => {
+    const dec2025 = Date.UTC(2025, 11, 25, 12, 0, 0);
+    expect(assignMonthLabel(dec2025)).toBe('December 2025');
+  });
+
+  it('uses UTC month to avoid timezone ambiguity', () => {
+    // 2026-06-01 00:00:00 UTC — should be June, not May
+    const juneStart = Date.UTC(2026, 5, 1, 0, 0, 0);
+    expect(assignMonthLabel(juneStart)).toBe('June 2026');
   });
 });

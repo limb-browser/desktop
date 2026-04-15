@@ -11,6 +11,7 @@ export interface TreeNode {
   url: string;
   title: string;
   favicon: string | null;
+  screenshot: string | null;
   parentId: string | null;
   childIds: string[];
   status: NodeStatus;
@@ -35,6 +36,7 @@ export class BrowsingTree {
       url: rootUrl,
       title: '',
       favicon: null,
+      screenshot: null,
       parentId: null,
       childIds: [],
       status: 'culled',
@@ -62,6 +64,7 @@ export class BrowsingTree {
       url,
       title: '',
       favicon: null,
+      screenshot: null,
       parentId,
       childIds: [],
       status: 'culled',

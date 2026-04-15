@@ -67,6 +67,7 @@ export class TreeRestorer {
         url: tab.url,
         title: tab.title,
         favicon: tab.favicon,
+        screenshot: null,
         parentId: tab.nodeId === rootData.nodeId ? null : parentId,
         childIds: [],
         status: 'culled',

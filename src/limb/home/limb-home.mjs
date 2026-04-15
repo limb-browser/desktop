@@ -68,6 +68,14 @@ function createBranchCard(branch) {
   meta.appendChild(count);
   meta.appendChild(time);
 
+  if (branch.screenshot) {
+    const thumbnail = document.createElement("img");
+    thumbnail.className = "branch-thumbnail";
+    thumbnail.src = branch.screenshot;
+    thumbnail.alt = "";
+    card.appendChild(thumbnail);
+  }
+
   card.appendChild(header);
   card.appendChild(meta);
 

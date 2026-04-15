@@ -137,6 +137,14 @@ body {
   white-space: nowrap;
 }
 
+.branch-thumbnail {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: calc(var(--radius) - 2px);
+  margin-bottom: 10px;
+}
+
 .branch-meta {
   display: flex;
   justify-content: space-between;
