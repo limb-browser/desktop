@@ -3,7 +3,7 @@ title: "Add gZenMediaController to Zen global stubs"
 spec_ref: "chrome-integration.md S1.1 S5.3"
 depends_on:
   - task-002
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []

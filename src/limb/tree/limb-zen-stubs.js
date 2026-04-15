@@ -36,6 +36,7 @@ for (const name of [
   "gZenCompactModeManager",
   "gZenFolders",
   "gZenGlanceManager",
+  "gZenMediaController",
   "gZenPinnedTabManager",
   "gZenSessionStore",
   "gZenSiteDataPanel",
