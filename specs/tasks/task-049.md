@@ -2,8 +2,8 @@
 title: "Fix launcher branch card click to zoom into tree view"
 spec_ref: "unified-tree.md S2.2"
 depends_on: []
-progress: ready-for-review
-review: ""
+progress: complete
+review: "specs/reviews/review-task-049-R1.md"
 coverage_sections: []
 commits: []
 ---
