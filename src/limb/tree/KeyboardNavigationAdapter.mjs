@@ -113,7 +113,8 @@ export class KeyboardNavigationAdapter {
     if (e.key === "0") {
       e.preventDefault();
       e.stopPropagation();
-      this.#treeView.setZoomLevel(0);
+      const focusedId = this.#navigator.focusedNodeId;
+      this.#treeView.animateToNode(focusedId, 0);
     } else if (e.key === "1") {
       e.preventDefault();
       e.stopPropagation();

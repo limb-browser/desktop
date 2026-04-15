@@ -296,12 +296,14 @@ describe('KeyboardNavigationAdapter', () => {
   });
 
   describe('Ctrl+0 - reset zoom to fit tree', () => {
-    it('sets zoom level to 0', () => {
+    it('animates zoom to level 0 centered on focused node', () => {
       treeView.setZoomLevel(0.8);
 
       dispatchKeydown(win, '0', { ctrlKey: true });
 
-      expect(treeView.zoomLevel).toBe(0);
+      expect(treeView.animateToNodeCalls).toEqual([
+        { nodeId: tree.focusedNodeId, level: 0 },
+      ]);
     });
 
     it('prevents default and stops propagation', () => {
