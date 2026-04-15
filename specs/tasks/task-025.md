@@ -4,8 +4,8 @@ spec_ref: "unified-tree.md S1 S2"
 depends_on:
   - task-002
   - task-003
-progress: ready-for-review
-review: "specs/reviews/review-task-025-R1.md"
+progress: complete
+review: "specs/reviews/review-task-025-R2.md"
 coverage_sections: []
 commits: []
 ---
