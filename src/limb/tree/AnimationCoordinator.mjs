@@ -59,8 +59,17 @@ export class AnimationCoordinator {
       this.#probe?.animationCancelled(property);
     }
 
+    // Only reset the time anchor when the coordinator was idle or when
+    // replacing the sole active animation. If other animations are already
+    // ticking, #lastTickTime is maintained by tick() and resetting it
+    // would steal time from those animations (S7.4 shared-time-source).
+    const wasIdle = this.#animations.size === 0 ||
+      (this.#animations.size === 1 && existing);
+
     this.#animations.set(property, { animation, priority });
-    this.#lastTickTime = this.#now();
+    if (wasIdle) {
+      this.#lastTickTime = this.#now();
+    }
     this.#probe?.animationRegistered(property, priority);
     this.#markDirty?.();
   }

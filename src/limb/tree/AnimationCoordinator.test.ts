@@ -356,6 +356,32 @@ describe('AnimationCoordinator', () => {
       expect(anim.receivedDeltas[0]).toBe(16);
     });
 
+    it('preserves correct deltas when a second animation registers between ticks', () => {
+      const { coordinator, clock } = setup();
+      const animA = createFakeAnimation({ duration: 500 });
+      const animB = createFakeAnimation({ duration: 500 });
+
+      // Register A at t=0
+      coordinator.register('zoom', animA.animation, 'programmatic');
+
+      // Tick at t=16: A gets 16ms
+      clock.advance(16);
+      coordinator.tick();
+      expect(animA.receivedDeltas[0]).toBe(16);
+
+      // Register B at t=20 (between ticks, while A is running)
+      clock.advance(4);
+      coordinator.register('layout', animB.animation, 'programmatic');
+
+      // Tick at t=36: A should get 20ms (36-16), not 16ms (36-20)
+      clock.advance(16);
+      coordinator.tick();
+
+      expect(animA.receivedDeltas[1]).toBe(20);
+      // B gets the same shared delta
+      expect(animB.receivedDeltas[0]).toBe(20);
+    });
+
     it('now() returns the shared time source value', () => {
       const { coordinator, clock } = setup();
 
