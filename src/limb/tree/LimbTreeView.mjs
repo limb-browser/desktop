@@ -18,9 +18,15 @@
  */
 
 import { ZoomState } from "./ZoomState.mjs";
+import { TreeRenderer } from "./TreeRenderer.mjs";
 
 // Zoom level change per 100px of wheel deltaY
 const ZOOM_SENSITIVITY = 0.05;
+
+// Default node sizing in logical units
+const BASE_NODE_WIDTH = 0.8;
+const BASE_NODE_HEIGHT = 0.6;
+const NODE_CORNER_RADIUS_RATIO = 0.05; // fraction of node width
 
 export class LimbTreeView {
   /** @type {HTMLCanvasElement | null} */
@@ -32,6 +38,13 @@ export class LimbTreeView {
 
   /** @type {ZoomState | null} */
   #zoom = null;
+  /** @type {TreeRenderer | null} */
+  #renderer = null;
+
+  /** @type {Map<string, { x: number, y: number }> | null} */
+  #positions = null;
+  /** @type {Map<string, string> | null} */
+  #parentMap = null;
 
   /** @type {((e: WheelEvent) => void) | null} */
   #wheelHandler = null;
@@ -54,6 +67,8 @@ export class LimbTreeView {
       probe,
     );
 
+    this.#renderer = new TreeRenderer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT);
+
     this.#resizeHandler = () => this.#resize();
     this.#wheelHandler = (e) => this.#onWheel(e);
 
@@ -62,6 +77,21 @@ export class LimbTreeView {
 
     window.addEventListener("resize", this.#resizeHandler);
     this.#canvas.addEventListener("wheel", this.#wheelHandler, { passive: false });
+  }
+
+  /**
+   * Set the tree data for rendering.
+   * @param {Map<string, { x: number, y: number }>} positions - Logical node positions from TreeLayout
+   * @param {Map<string, string>} parentMap - childId -> parentId mapping
+   * @param {{ width: number, height: number }} treeExtent - Bounding extent of the tree
+   */
+  setTreeData(positions, parentMap, treeExtent) {
+    this.#positions = positions;
+    this.#parentMap = parentMap;
+    if (this.#zoom) {
+      this.#zoom.treeExtent = { ...treeExtent };
+    }
+    this.#paint();
   }
 
   #resize() {
@@ -88,18 +118,8 @@ export class LimbTreeView {
     this.#paint();
   }
 
-  /**
-   * Update the tree extent (called when the tree changes).
-   * @param {{ width: number, height: number }} extent
-   */
-  setTreeExtent(extent) {
-    if (!this.#zoom) return;
-    this.#zoom.treeExtent = { ...extent };
-    this.#paint();
-  }
-
   #paint() {
-    if (!this.#ctx || !this.#canvas || !this.#zoom) return;
+    if (!this.#ctx || !this.#canvas || !this.#zoom || !this.#renderer) return;
     const ctx = this.#ctx;
     const w = this.#canvas.width;
     const h = this.#canvas.height;
@@ -110,32 +130,45 @@ export class LimbTreeView {
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(0, 0, w, h);
 
-    // Apply zoom transform: logical coordinates → screen coordinates
-    ctx.save();
-    const scale = this.#zoom.zoomScale;
-    const cx = w / 2 - this.#zoom.focusPoint.x * scale;
-    const cy = h / 2 - this.#zoom.focusPoint.y * scale;
-    ctx.translate(cx, cy);
-    ctx.scale(scale, scale);
+    if (this.#positions && this.#parentMap) {
+      const zoom = this.#zoom;
+      const frame = this.#renderer.computeFrame(
+        this.#positions,
+        this.#parentMap,
+        (lx, ly) => zoom.logicalToScreen(lx, ly),
+        zoom.zoomScale,
+        w,
+        h,
+      );
 
-    // Placeholder: draw grid lines at logical integer positions
-    ctx.strokeStyle = "#2a2a2a";
-    ctx.lineWidth = 1 / scale;
-    const ext = this.#zoom.treeExtent;
-    for (let x = 0; x < ext.width; x++) {
-      ctx.beginPath();
-      ctx.moveTo(x, -0.5);
-      ctx.lineTo(x, ext.height - 0.5);
-      ctx.stroke();
-    }
-    for (let y = 0; y < ext.height; y++) {
-      ctx.beginPath();
-      ctx.moveTo(-0.5, y);
-      ctx.lineTo(ext.width - 0.5, y);
-      ctx.stroke();
-    }
+      // Paint edges as cubic Bezier curves
+      ctx.strokeStyle = "#666";
+      ctx.lineWidth = Math.max(1, Math.min(2, zoom.zoomScale * 0.01));
+      for (const edge of frame.edges) {
+        const midY = (edge.startY + edge.endY) / 2;
+        ctx.beginPath();
+        ctx.moveTo(edge.startX, edge.startY);
+        ctx.bezierCurveTo(
+          edge.startX, midY,
+          edge.endX, midY,
+          edge.endX, edge.endY,
+        );
+        ctx.stroke();
+      }
 
-    ctx.restore();
+      // Paint node rectangles
+      const cornerRadius = Math.max(2, frame.nodes[0]?.width * NODE_CORNER_RADIUS_RATIO || 2);
+      ctx.fillStyle = "#2a2a2a";
+      ctx.strokeStyle = "#444";
+      ctx.lineWidth = 1;
+      for (const node of frame.nodes) {
+        const r = Math.min(cornerRadius, node.width / 2, node.height / 2);
+        ctx.beginPath();
+        ctx.roundRect(node.x, node.y, node.width, node.height, r);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
 
     // HUD: zoom level indicator
     ctx.fillStyle = "#555";
@@ -159,6 +192,9 @@ export class LimbTreeView {
     this.#ctx = null;
     this.#initialized = false;
     this.#zoom = null;
+    this.#renderer = null;
+    this.#positions = null;
+    this.#parentMap = null;
     this.#resizeHandler = null;
     this.#wheelHandler = null;
   }

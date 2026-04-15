@@ -3,4 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
         content/browser/limb/tree/LimbTreeView.mjs                     (../../limb/tree/LimbTreeView.mjs)
+        content/browser/limb/tree/TreeRenderer.mjs                     (../../limb/tree/TreeRenderer.mjs)
+        content/browser/limb/tree/ZoomState.mjs                        (../../limb/tree/ZoomState.mjs)
+        content/browser/limb/tree/testTreeData.mjs                     (../../limb/tree/testTreeData.mjs)
         content/browser/limb/tree/limb-tree-canvas.css                 (../../limb/tree/limb-tree-canvas.css)

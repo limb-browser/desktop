@@ -11,8 +11,14 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      "chrome://browser/content/limb/tree/LimbTreeView.mjs",
 +      { global: "current" }
 +    );
++    const { buildTestTreeData } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/testTreeData.mjs",
++      { global: "current" }
++    );
 +    window.gLimbTreeView = new LimbTreeView();
 +    window.gLimbTreeView.init(document.getElementById("limb-tree-canvas"));
++    const testTree = buildTestTreeData();
++    window.gLimbTreeView.setTreeData(testTree.positions, testTree.parentMap, testTree.treeExtent);
      gBrowser.addEventListener("DOMUpdateBlockedPopups", e =>
        PopupAndRedirectBlockerObserver.handleEvent(e)
      );
