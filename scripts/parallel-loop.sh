@@ -172,20 +172,26 @@ merge_worker() {
     msg=$(git log --format='%s' -1 "$commit")
 
     if ! git cherry-pick "$commit" --no-commit 2>/dev/null; then
-      # Auto-resolve stale task file conflicts: keep dev's versions
+      # Auto-resolve stale spec file conflicts: keep dev's versions
       git checkout HEAD -- specs/tasks/ 2>/dev/null
       git checkout "$commit" -- "specs/tasks/$task_name.md" 2>/dev/null
-      git add specs/tasks/ 2>/dev/null
+      git checkout HEAD -- specs/reviews/ 2>/dev/null
+      git checkout "$commit" -- specs/reviews/ 2>/dev/null
+      git add specs/ 2>/dev/null
 
       # Check for remaining unresolved conflicts in source files
-      if [ -n "$(git diff --name-only --diff-filter=U 2>/dev/null)" ]; then
-        log "    !!! Unresolvable source conflict in $task_name -- re-spawning"
+      local conflict_files
+      conflict_files=$(git diff --name-only --diff-filter=U 2>/dev/null)
+      if [ -n "$conflict_files" ]; then
+        log "    !!! Unresolvable conflict in $task_name on commit $msg"
+        log "    !!! Conflicting files: $(echo "$conflict_files" | tr '\n' ' ')"
         git cherry-pick --abort 2>/dev/null
+        git reset --hard HEAD 2>/dev/null
         pick_ok=0
         break
       fi
     else
-      # Clean pick -- still reset stale task files
+      # Clean pick -- still reset stale task/review files
       git checkout HEAD -- specs/tasks/ 2>/dev/null
       git checkout "$commit" -- "specs/tasks/$task_name.md" 2>/dev/null
     fi
