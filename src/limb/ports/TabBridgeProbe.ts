@@ -8,5 +8,5 @@ export interface TabBridgeProbe {
   focusSynced(nodeId: string): void;
   locationChanged(nodeId: string, url: string): void;
   titleChanged(nodeId: string, title: string): void;
-  faviconChanged(nodeId: string, favicon: string): void;
+  faviconChanged(nodeId: string, favicon: string | null): void;
 }

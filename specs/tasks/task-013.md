@@ -3,8 +3,8 @@ title: "Implement same-tab navigation tracking"
 spec_ref: "navigation.md S1.2 S1.4"
 depends_on:
   - task-008
-progress: ready-for-review
-review: ""
+progress: complete
+review: "specs/reviews/review-task-013-R1.md"
 coverage_sections: []
 commits: []
 ---

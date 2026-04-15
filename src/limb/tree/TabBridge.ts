@@ -107,7 +107,7 @@ export class TabBridge<TTab> {
 
   onTabFaviconChanged(
     tab: TTab,
-    newFavicon: string,
+    newFavicon: string | null,
     updateNode: (nodeId: string) => void
   ): void {
     const nodeId = this.tabToNode.get(tab);

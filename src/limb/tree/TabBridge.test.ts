@@ -30,7 +30,7 @@ function createFakeProbe(): TabBridgeProbe & {
     titleChanged(nodeId: string, title: string) {
       calls.push({ method: 'titleChanged', args: [nodeId, title] });
     },
-    faviconChanged(nodeId: string, favicon: string) {
+    faviconChanged(nodeId: string, favicon: string | null) {
       calls.push({ method: 'faviconChanged', args: [nodeId, favicon] });
     },
   };
