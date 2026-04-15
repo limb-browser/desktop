@@ -6,6 +6,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { KeyboardNavigationAdapter } from './KeyboardNavigationAdapter.mjs';
 import { TreeNavigator } from './TreeNavigator';
 import { BrowsingTree } from './BrowsingTree';
+import { BranchCommandRouter } from './BranchCommandRouter';
+import { TabBridge } from './TabBridge';
+import { InMemoryTabPort } from './InMemoryTabPort';
+import { InMemoryConfirmationPort } from './InMemoryConfirmationPort';
+import { AutoSaveTrigger } from './AutoSaveTrigger';
+import type { TimerPort } from '../ports/TimerPort';
 
 function createFakeWindow(): {
   addEventListener(type: string, fn: EventListener, capture?: boolean): void;
@@ -413,6 +419,87 @@ describe('KeyboardNavigationAdapter', () => {
       dispatchKeydown(win, 'ArrowUp', {});
 
       expect(tree.focusedNodeId).toBe(child.id);
+    });
+  });
+
+  describe('Ctrl+N - create new branch', () => {
+    function createFakeTimer(): TimerPort {
+      return {
+        setTimeout: (cb: () => void) => { cb(); return 1; },
+        clearTimeout: () => {},
+        setInterval: () => 1,
+        clearInterval: () => {},
+      };
+    }
+
+    function setupWithBranchRouter() {
+      const branchTree = new BrowsingTree('about:limb-home');
+      const branchNav = new TreeNavigator(branchTree);
+      const tabPort = new InMemoryTabPort();
+      const bridge = new TabBridge(tabPort);
+      const confirmPort = new InMemoryConfirmationPort();
+      const autoSave = new AutoSaveTrigger(() => {}, createFakeTimer());
+      const branchRouter = new BranchCommandRouter(
+        branchTree,
+        bridge,
+        autoSave,
+        confirmPort,
+        'https://home.com',
+      );
+      const branchTreeView = createFakeTreeView();
+      const branchUrlBar = createFakeUrlBar();
+      const branchWin = createFakeWindow();
+      const branchAdapter = new KeyboardNavigationAdapter(
+        branchNav,
+        branchTreeView,
+        branchUrlBar,
+        branchRouter,
+      );
+      branchAdapter.install(branchWin as unknown as Window);
+      return { branchTree, branchTreeView, branchWin, tabPort, bridge };
+    }
+
+    it('creates a new branch on Ctrl+N', async () => {
+      const { branchTree, branchWin } = setupWithBranchRouter();
+
+      dispatchKeydown(branchWin, 'n', { ctrlKey: true });
+
+      // Branch creation is async, wait for it
+      await new Promise((r) => setTimeout(r, 0));
+
+      const root = branchTree.nodes.get(branchTree.rootId)!;
+      expect(root.childIds).toHaveLength(1);
+    });
+
+    it('zooms to the new branch node', async () => {
+      const { branchTreeView, branchWin } = setupWithBranchRouter();
+
+      dispatchKeydown(branchWin, 'n', { ctrlKey: true });
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(branchTreeView.animateToNodeCalls).toHaveLength(1);
+      expect(branchTreeView.animateToNodeCalls[0].level).toBe(1);
+    });
+
+    it('prevents default and stops propagation', () => {
+      setupWithBranchRouter();
+      const { branchWin } = setupWithBranchRouter();
+
+      const { defaultPrevented, propagationStopped } = dispatchKeydown(
+        branchWin,
+        'n',
+        { ctrlKey: true },
+      );
+
+      expect(defaultPrevented).toBe(true);
+      expect(propagationStopped).toBe(true);
+    });
+
+    it('is a no-op when no branchRouter is provided', () => {
+      // The default adapter from beforeEach has no branchRouter
+      const { defaultPrevented } = dispatchKeydown(win, 'n', { ctrlKey: true });
+
+      expect(defaultPrevented).toBe(false);
     });
   });
 

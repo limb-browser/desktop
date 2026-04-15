@@ -36,6 +36,14 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      "chrome://browser/content/limb/tree/KeyboardNavigationAdapter.mjs",
 +      { global: "current" }
 +    );
++    const { BranchCommandRouter } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/BranchCommandRouter.ts",
++      { global: "current" }
++    );
++    const { BrowserConfirmationPort } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/BrowserConfirmationPort.mjs",
++      { global: "current" }
++    );
 +    const { restoreTreeFromTabs } = ChromeUtils.importESModule(
 +      "chrome://browser/content/limb/tree/TreeRestorerAdapter.mjs",
 +      { global: "current" }
@@ -67,14 +75,30 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    window.gLimbTreeView.init(document.getElementById("limb-tree-canvas"), addressBarAdapter.zoomProbe, lodProbe, { animationProbe, frameSchedulerProbe });
 +    addressBarAdapter.attach();
 +    window.gLimbTreeView.setTreeData(positions, parentMap, treeExtent, browsingTree.focusedNodeId);
-+    const treeNav = new TreeNavigator(browsingTree);
-+    const keyNavAdapter = new KeyboardNavigationAdapter(treeNav, window.gLimbTreeView, gURLBar);
-+    keyNavAdapter.install(window);
 +    const autoSaveProbe = { saveTriggered(reason) { console.debug("Auto-save:", reason); }, saveDebounced(n) { console.debug("Auto-save debounced:", n); }, periodicFlushStarted() { console.debug("Periodic flush started"); }, periodicFlushStopped() { console.debug("Periodic flush stopped"); } };
 +    const { TabStateFlusher } = ChromeUtils.importESModule("resource:///modules/sessionstore/TabStateFlusher.sys.mjs");
 +    const autoSaveAdapter = new AutoSaveAdapter(() => { TabStateFlusher.flushWindow(window); }, autoSaveProbe);
 +    autoSaveAdapter.install(browsingTree, gBrowser.tabContainer);
 +    window.gLimbAutoSaveAdapter = autoSaveAdapter;
++    const { TabBridge } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/TabBridge.ts",
++      { global: "current" }
++    );
++    const { FirefoxTabPort } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/FirefoxTabPort.mjs",
++      { global: "current" }
++    );
++    const tabBridgeProbe = { tabCreated(id) { console.debug("Tab created:", id); }, tabClosed(id) { console.debug("Tab closed:", id); }, focusSynced(id) { console.debug("Focus synced:", id); }, locationChanged(id, url) { console.debug("Location:", id, url); }, titleChanged(id, t) { console.debug("Title:", id, t); }, faviconChanged(id, f) { console.debug("Favicon:", id, f); } };
++    const tabBridge = new TabBridge(new FirefoxTabPort(gBrowser), tabBridgeProbe);
++    window.gLimbTabBridge = tabBridge;
++    const confirmPort = new BrowserConfirmationPort(window);
++    const homeUrl = Services.prefs.getStringPref("limb.home.url", "about:blank");
++    const branchProbe = { branchCreated(id) { console.debug("Branch created:", id); }, branchDeleted(id) { console.debug("Branch deleted:", id); }, branchDeletionCancelled(id) { console.debug("Branch deletion cancelled:", id); } };
++    const branchRouter = new BranchCommandRouter(browsingTree, tabBridge, autoSaveAdapter, confirmPort, homeUrl, branchProbe);
++    window.gLimbBranchRouter = branchRouter;
++    const treeNav = new TreeNavigator(browsingTree);
++    const keyNavAdapter = new KeyboardNavigationAdapter(treeNav, window.gLimbTreeView, gURLBar, branchRouter);
++    keyNavAdapter.install(window);
      gBrowser.addEventListener("DOMUpdateBlockedPopups", e =>
        PopupAndRedirectBlockerObserver.handleEvent(e)
      );

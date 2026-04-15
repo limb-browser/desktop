@@ -28,6 +28,8 @@ function formatRelativeTime(timestamp) {
   return `${months}mo ago`;
 }
 
+const DELETE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="11" y2="11"/><line x1="11" y1="3" x2="3" y2="11"/></svg>`;
+
 function createBranchCard(branch) {
   const card = document.createElement("div");
   card.className = "branch-card";
@@ -53,8 +55,15 @@ function createBranchCard(branch) {
   name.className = "branch-name";
   name.textContent = branch.name || "Untitled";
 
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "branch-delete";
+  deleteBtn.title = "Delete branch";
+  deleteBtn.innerHTML = DELETE_SVG;
+  deleteBtn.dataset.branchId = branch.id;
+
   header.appendChild(favicon);
   header.appendChild(name);
+  header.appendChild(deleteBtn);
 
   const meta = document.createElement("div");
   meta.className = "branch-meta";
@@ -138,10 +147,26 @@ function init() {
     return;
   }
 
-  const data = getLauncherData(tree, Date.now());
-  renderLauncher(data, container, emptyState);
+  const branchRouter = chromeWindow.gLimbBranchRouter;
+
+  function refresh() {
+    const data = getLauncherData(tree, Date.now());
+    renderLauncher(data, container, emptyState);
+  }
+
+  refresh();
 
   container.addEventListener("click", (e) => {
+    const deleteBtn = e.target.closest(".branch-delete");
+    if (deleteBtn) {
+      e.stopPropagation();
+      const branchId = deleteBtn.dataset.branchId;
+      if (branchId && branchRouter) {
+        branchRouter.deleteBranch(branchId).then(refresh);
+      }
+      return;
+    }
+
     const card = e.target.closest(".branch-card");
     if (!card) return;
     const nodeId = card.dataset.nodeId;
@@ -151,8 +176,14 @@ function init() {
   });
 
   function createNewBranch() {
-    const branch = tree.addChild(tree.rootId, "about:blank");
-    tree.focusNode(branch.id);
+    if (branchRouter) {
+      branchRouter.createBranch().then(refresh);
+    } else {
+      const homeUrl = Services.prefs.getStringPref("limb.home.url", "about:blank");
+      const branch = tree.addChild(tree.rootId, homeUrl);
+      tree.focusNode(branch.id);
+      refresh();
+    }
   }
 
   newBranchBtn.addEventListener("click", createNewBranch);

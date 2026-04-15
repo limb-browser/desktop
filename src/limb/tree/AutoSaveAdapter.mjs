@@ -73,6 +73,10 @@ export class AutoSaveAdapter {
     this.#trigger.startPeriodicFlush();
   }
 
+  saveNow() {
+    this.#trigger.saveNow();
+  }
+
   /**
    * nsIObserver interface for quit-application-requested.
    * @param {*} _subject
@@ -80,7 +84,7 @@ export class AutoSaveAdapter {
    */
   observe(_subject, topic) {
     if (topic === "quit-application-requested") {
-      this.#trigger.saveNow();
+      this.saveNow();
     }
   }
 
