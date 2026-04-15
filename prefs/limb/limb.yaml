@@ -1,0 +1,12 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+- name: limb.home.url
+  value: about:blank
+
+- name: limb.screenshots.retention-days
+  value: 7
+
+- name: limb.tree.max-live-tabs
+  value: 8
