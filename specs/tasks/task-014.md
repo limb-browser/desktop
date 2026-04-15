@@ -1,6 +1,6 @@
 ---
 title: "Implement click-to-focus with zoom animation"
-spec_ref: "zoom-lod.md S3.1 S4.1"
+spec_ref: "zoom-lod.md S3.1 S4.1; interaction-feel.md S5.1"
 depends_on:
   - task-006
   - task-007

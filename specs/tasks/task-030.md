@@ -1,6 +1,6 @@
 ---
 title: "Implement node add/remove layout animations"
-spec_ref: "interaction-feel.md S4"
+spec_ref: "interaction-feel.md S4; zoom-lod.md S4.2"
 depends_on:
   - task-006
   - task-004
