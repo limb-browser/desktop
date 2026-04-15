@@ -27,7 +27,8 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    const navBar = document.getElementById("nav-bar");
 +    const addressBarAdapter = new AddressBarAdapter(navBar, window.gLimbTreeView);
 +    const lodProbe = { tierChanged(nodeId, prev, next) { console.debug("LOD tier:", nodeId, prev, "->", next); } };
-+    window.gLimbTreeView.init(document.getElementById("limb-tree-canvas"), addressBarAdapter.zoomProbe, lodProbe);
++    const animationProbe = { animationStarted(from, to) { console.debug("Zoom anim:", from, "->", to); }, animationCompleted() { console.debug("Zoom anim complete"); }, animationCancelled() { console.debug("Zoom anim cancelled"); } };
++    window.gLimbTreeView.init(document.getElementById("limb-tree-canvas"), addressBarAdapter.zoomProbe, lodProbe, { animationProbe });
 +    addressBarAdapter.attach();
 +    const testTree = buildTestTreeData();
 +    window.gLimbTreeView.setTreeData(testTree.positions, testTree.parentMap, testTree.treeExtent);
