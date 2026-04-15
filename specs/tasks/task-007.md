@@ -3,7 +3,7 @@ title: "Implement ZoomState and Ctrl+Scroll zoom interaction"
 spec_ref: "zoom-lod.md S1"
 depends_on:
   - task-005
-progress: needs-revision
+progress: ready-for-review
 review: "specs/reviews/review-TASK_007-R1.md"
 coverage_sections: []
 commits: []

@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import { describe, it, expect } from 'vitest';
-import { ZoomState } from './ZoomState';
+import { ZoomState } from './ZoomState.mjs';
 import type { ZoomProbe } from '../ports/ZoomProbe';
 
 const viewport = { width: 1000, height: 800 };
