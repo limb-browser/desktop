@@ -42,6 +42,7 @@ function init() {
     const raw = parseInt(maxLiveTabsInput.value, 10);
     if (Number.isNaN(raw)) return;
     controller.maxLiveTabs = raw;
+    maxLiveTabsInput.value = controller.maxLiveTabs;
   });
 }
 
