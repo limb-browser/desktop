@@ -12,7 +12,7 @@
  */
 
 const { SettingsController } = ChromeUtils.importESModule(
-  "chrome://browser/content/limb/settings/SettingsController.ts",
+  "chrome://browser/content/limb/settings/SettingsController.mjs",
   { global: "current" }
 );
 

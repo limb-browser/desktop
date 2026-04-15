@@ -18,7 +18,7 @@
  * See spec navigation.md S4.1, S4.2, S4.3; navigation.md S5.2.
  */
 
-import { TreeNavigator } from "./TreeNavigator.ts";
+import { TreeNavigator } from "./TreeNavigator.mjs";
 
 export class KeyboardNavigationAdapter {
   /** @type {TreeNavigator} */

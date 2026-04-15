@@ -191,8 +191,8 @@ function init() {
     return;
   }
 
-  const getLauncherData = ChromeUtils.importESModule("chrome://browser/content/limb/home/LauncherDataSource.ts", { global: "current" }).getLauncherData;
-  const { SearchService } = ChromeUtils.importESModule("chrome://browser/content/limb/search/SearchService.ts", { global: "current" });
+  const getLauncherData = ChromeUtils.importESModule("chrome://browser/content/limb/home/LauncherDataSource.mjs", { global: "current" }).getLauncherData;
+  const { SearchService } = ChromeUtils.importESModule("chrome://browser/content/limb/search/SearchService.mjs", { global: "current" });
 
   const tree = chromeWindow.gLimbBrowsingTree;
   if (!tree) {

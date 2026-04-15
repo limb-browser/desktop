@@ -21,7 +21,7 @@
  * Loaded as a chrome ES module from browser-init-js.patch.
  */
 
-import { UrlEntryRouter } from "./UrlEntryRouter.ts";
+import { UrlEntryRouter } from "./UrlEntryRouter.mjs";
 
 export class UrlEntryAdapter {
   /** @type {UrlEntryRouter<*>} */

@@ -11,7 +11,7 @@
  * See spec persistence.md S4.2, performance.md S5.1.
  */
 
-import { ScreenshotEvictor } from "./ScreenshotEvictor.ts";
+import { ScreenshotEvictor } from "./ScreenshotEvictor.mjs";
 
 /**
  * Create and start a ScreenshotEvictor that runs on startup and hourly.

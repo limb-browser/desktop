@@ -12,7 +12,7 @@
  * See spec persistence.md S3.
  */
 
-import { AutoSaveTrigger } from "./AutoSaveTrigger.ts";
+import { AutoSaveTrigger } from "./AutoSaveTrigger.mjs";
 
 const windowTimers = {
   setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms),

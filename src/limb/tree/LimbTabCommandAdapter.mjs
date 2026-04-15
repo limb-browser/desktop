@@ -16,7 +16,7 @@
  * See spec tab-bridge.md S4.3, S4.4.
  */
 
-import { TabCommandRouter } from "./TabCommandRouter.ts";
+import { TabCommandRouter } from "./TabCommandRouter.mjs";
 
 export class LimbTabCommandAdapter {
   /** @type {TabCommandRouter<*>} */

@@ -89,7 +89,7 @@ function init() {
   if (!chromeWindow) return;
 
   const { SearchService } = ChromeUtils.importESModule(
-    "chrome://browser/content/limb/search/SearchService.ts",
+    "chrome://browser/content/limb/search/SearchService.mjs",
     { global: "current" }
   );
 

@@ -13,21 +13,21 @@
  * See spec unified-tree.md S4.
  */
 
-import { BranchFolder } from "./BranchFolder.ts";
-import { computeFoldedLayout, buildFoldedParentMap } from "./FoldedTreeLayout.ts";
+import { BranchFolder } from "./BranchFolder.mjs";
+import { computeFoldedLayout, buildFoldedParentMap } from "./FoldedTreeLayout.mjs";
 
 export class BranchFoldAdapter {
-  /** @type {import('./BranchFolder.ts').BranchFolder} */
+  /** @type {import('./BranchFolder.mjs').BranchFolder} */
   #branchFolder;
   /** @type {import('./LimbTreeView.mjs').LimbTreeView} */
   #treeView;
-  /** @type {import('./BrowsingTree.ts').BrowsingTree} */
+  /** @type {import('./BrowsingTree.mjs').BrowsingTree} */
   #tree;
 
   /**
-   * @param {import('./BrowsingTree.ts').BrowsingTree} tree
+   * @param {import('./BrowsingTree.mjs').BrowsingTree} tree
    * @param {import('./LimbTreeView.mjs').LimbTreeView} treeView
-   * @param {import('../ports/BranchFoldProbe.ts').BranchFoldProbe} [probe]
+   * @param {import('../ports/BranchFoldProbe').BranchFoldProbe} [probe]
    */
   constructor(tree, treeView, probe) {
     this.#branchFolder = new BranchFolder(probe);

@@ -12,7 +12,7 @@
  * See spec persistence.md S1.3.
  */
 
-import { TreeRestorer as TreeRestorerDomain } from "./TreeRestorer.ts";
+import { TreeRestorer as TreeRestorerDomain } from "./TreeRestorer.mjs";
 
 /**
  * Read tree metadata from all restored tabs and rebuild the BrowsingTree.

@@ -2,7 +2,7 @@ diff --git a/browser/base/content/browser-init.js b/browser/base/content/browser
 index 86294fe79cd30b2a24b20738c9cd1f5114e8e669..fd81d985a9855c14e5cc073929dd4b3047a69ea7 100644
 --- a/browser/base/content/browser-init.js
 +++ b/browser/base/content/browser-init.js
-@@ -248,6 +248,152 @@ var gBrowserInit = {
+@@ -248,6 +248,154 @@ var gBrowserInit = {
  
    onLoad() {
      Services.scriptloader.loadSubScript("chrome://browser/content/zenThemeModifier.js", window);
@@ -24,7 +24,7 @@ index 86294fe79cd30b2a24b20738c9cd1f5114e8e669..fd81d985a9855c14e5cc073929dd4b30
 +      { global: "current" }
 +    );
 +    const { TabCommandRouter } = ChromeUtils.importESModule(
-+      "chrome://browser/content/limb/tree/TabCommandRouter.ts",
++      "chrome://browser/content/limb/tree/TabCommandRouter.mjs",
 +      { global: "current" }
 +    );
 +    const { AddressBarAdapter } = ChromeUtils.importESModule(
@@ -32,7 +32,7 @@ index 86294fe79cd30b2a24b20738c9cd1f5114e8e669..fd81d985a9855c14e5cc073929dd4b30
 +      { global: "current" }
 +    );
 +    const { TreeNavigator } = ChromeUtils.importESModule(
-+      "chrome://browser/content/limb/tree/TreeNavigator.ts",
++      "chrome://browser/content/limb/tree/TreeNavigator.mjs",
 +      { global: "current" }
 +    );
 +    const { KeyboardNavigationAdapter } = ChromeUtils.importESModule(
@@ -40,7 +40,7 @@ index 86294fe79cd30b2a24b20738c9cd1f5114e8e669..fd81d985a9855c14e5cc073929dd4b30
 +      { global: "current" }
 +    );
 +    const { BranchCommandRouter } = ChromeUtils.importESModule(
-+      "chrome://browser/content/limb/tree/BranchCommandRouter.ts",
++      "chrome://browser/content/limb/tree/BranchCommandRouter.mjs",
 +      { global: "current" }
 +    );
 +    const { BrowserConfirmationPort } = ChromeUtils.importESModule(
@@ -81,7 +81,7 @@ index 86294fe79cd30b2a24b20738c9cd1f5114e8e669..fd81d985a9855c14e5cc073929dd4b30
 +    autoSaveAdapter.install(browsingTree, gBrowser.tabContainer);
 +    window.gLimbAutoSaveAdapter = autoSaveAdapter;
 +    const { TabBridge } = ChromeUtils.importESModule(
-+      "chrome://browser/content/limb/tree/TabBridge.ts",
++      "chrome://browser/content/limb/tree/TabBridge.mjs",
 +      { global: "current" }
 +    );
 +    const { FirefoxTabPort } = ChromeUtils.importESModule(
@@ -96,7 +96,7 @@ index 86294fe79cd30b2a24b20738c9cd1f5114e8e669..fd81d985a9855c14e5cc073929dd4b30
 +    }
 +    window.gLimbTabBridge = tabBridge;
 +    const { UrlEntryRouter } = ChromeUtils.importESModule(
-+      "chrome://browser/content/limb/tree/UrlEntryRouter.ts",
++      "chrome://browser/content/limb/tree/UrlEntryRouter.mjs",
 +      { global: "current" }
 +    );
 +    const { UrlEntryAdapter } = ChromeUtils.importESModule(
