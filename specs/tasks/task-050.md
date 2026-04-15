@@ -2,8 +2,8 @@
 title: "Implement tab preloading budget"
 spec_ref: "performance.md S4.2"
 depends_on: []
-progress: ready-for-review
-review: ""
+progress: needs-revision
+review: "specs/reviews/review-task-050-R1.md"
 coverage_sections: []
 commits: []
 ---
