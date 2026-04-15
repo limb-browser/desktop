@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { ZoomMomentum } from './ZoomMomentum.mjs';
+import { ZoomState } from './ZoomState.mjs';
 import type { ZoomMomentumProbe } from '../ports/ZoomMomentumProbe';
 
 function createProbe() {
@@ -186,31 +187,54 @@ describe('ZoomMomentum', () => {
   });
 
   describe('zoom level remains clamped during momentum', () => {
-    it('returns zoom delta clamped to keep level in [0.0, 1.0] when near max', () => {
+    it('clamps zoom level to 1.0 when momentum pushes past maximum', () => {
       const momentum = new ZoomMomentum();
+      const zoom = new ZoomState({ width: 800, height: 600 }, { width: 10, height: 10 });
 
-      // Positive velocity (zooming in)
-      momentum.onScroll(0.1, 0);
-      momentum.onScroll(0.1, 30);
-      momentum.onScroll(0.1, 60);
+      // Start near max zoom
+      zoom.setLevel(0.95);
+
+      // Strong positive velocity (zooming in)
+      momentum.onScroll(0.3, 0);
+      momentum.onScroll(0.3, 30);
+      momentum.onScroll(0.3, 60);
       momentum.onRelease(210);
 
-      // Update returns the delta to apply to zoom level
-      const delta = momentum.update(16);
-      expect(delta).toBeGreaterThan(0);
+      // Run multiple momentum frames, applying delta to ZoomState
+      for (let i = 0; i < 20; i++) {
+        const delta = momentum.update(16);
+        if (delta !== 0) {
+          zoom.setLevel(zoom.level + delta);
+        }
+      }
+
+      expect(zoom.level).toBeLessThanOrEqual(1.0);
+      expect(zoom.level).toBe(1.0);
     });
 
-    it('returns negative delta for negative velocity (zooming out)', () => {
+    it('clamps zoom level to 0.0 when momentum pushes past minimum', () => {
       const momentum = new ZoomMomentum();
+      const zoom = new ZoomState({ width: 800, height: 600 }, { width: 10, height: 10 });
 
-      // Negative velocity (zooming out)
-      momentum.onScroll(-0.1, 0);
-      momentum.onScroll(-0.1, 30);
-      momentum.onScroll(-0.1, 60);
+      // Start near min zoom
+      zoom.setLevel(0.05);
+
+      // Strong negative velocity (zooming out)
+      momentum.onScroll(-0.3, 0);
+      momentum.onScroll(-0.3, 30);
+      momentum.onScroll(-0.3, 60);
       momentum.onRelease(210);
 
-      const delta = momentum.update(16);
-      expect(delta).toBeLessThan(0);
+      // Run multiple momentum frames, applying delta to ZoomState
+      for (let i = 0; i < 20; i++) {
+        const delta = momentum.update(16);
+        if (delta !== 0) {
+          zoom.setLevel(zoom.level + delta);
+        }
+      }
+
+      expect(zoom.level).toBeGreaterThanOrEqual(0.0);
+      expect(zoom.level).toBe(0.0);
     });
   });
 

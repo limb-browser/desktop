@@ -541,6 +541,7 @@ export class LimbTreeView {
       if (this.#zoomMomentum) {
         this.#zoomMomentum.onRelease(performance.now());
         if (this.#zoomMomentum.isActive) {
+          this.#animationLastTime = performance.now();
           this.#frameScheduler?.markDirty();
         }
       }
