@@ -41,6 +41,8 @@ Flaws include:
 - **UI completeness:** If a task specifies user-visible behavior (notifications, dialogs, buttons, visual indicators), verify that adapters or handlers exist to produce that behavior — not just domain probes. A probe that fires with no subscriber is missing required behavior.
 - **Module integration:** Run `scripts/check-dead-exports.sh`. If a task creates a domain module AND says to wire it into another module, the domain module must be imported and used — not re-implemented inline with private methods. A tested module that is never imported in production code is dead code.
 - **Event target precision:** When a task specifies an event target (e.g., "on the canvas"), verify the `addEventListener` call uses that exact element. Attaching to `window` or `document` instead of the specified target is a spec violation.
+- **Chrome wiring:** Run `scripts/check-chrome-wiring.sh`. If a task adds CSS or entry-point `.mjs` modules to `src/limb/`, verify they appear in the browser chrome loading mechanism (`zen-assets.inc.xhtml` or `browser-init-js.patch`). A file that exists on disk but is never loaded by the browser is not functional. Tests that only verify file contents on disk (e.g., `fs.readFileSync` + assertions on CSS content) do not prove the file is loaded in the running browser.
+- **Async-sync event races:** When a port method wraps a browser API that fires synchronous events (e.g., `gBrowser.addTab()` fires `TabOpen` synchronously), verify that any state the caller sets *after* awaiting that method is not read by a synchronous event handler before the `await` completes. Use `InMemoryTabPort.onTabCreated` (or equivalent fake callback) to write a test that exercises this timing.
 
 ## Workflow
 
@@ -50,7 +52,7 @@ Flaws include:
 4. Read the task's referenced spec sections.
 5. Read all code files the task added or modified (check git diff).
 6. Run `npx vitest run` -- failures are automatic findings.
-7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, and `scripts/check-dead-exports.sh` -- failures are automatic findings.
+7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, `scripts/check-dead-exports.sh`, and `scripts/check-chrome-wiring.sh` -- failures are automatic findings.
 8. Apply verification targets systematically.
 9. Write findings to `specs/reviews/review-TASK_NNN-RN.md`:
    ```markdown

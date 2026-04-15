@@ -58,13 +58,15 @@ Before marking a task `ready-for-review`:
 7. **Task traceability:** Every acceptance criterion has corresponding code. Re-read the task's "What To Build" numbered list and its test requirements — each item must have a corresponding test. If the task says "write tests for X", the test must exist.
 8. **No invented behavior:** Every code path traces to a spec statement.
 9. **SQL safety:** No `${...}` interpolation in SQL strings. Always use parameterized binding (`:param`). Run `scripts/check-sql-interpolation.sh`.
-10. **Test double fidelity:** In-memory fakes must enforce the same invariants as production implementations. If production validates a parameter or enforces a consistency rule, the fake must too. The test double should diverge from production only in I/O mechanism, never in observable behavior.
+10. **Test double fidelity:** In-memory fakes must enforce the same invariants as production implementations. If production validates a parameter or enforces a consistency rule, the fake must too. The test double should diverge from production only in I/O mechanism, never in observable behavior. If the production API fires synchronous events during a method call (e.g., Firefox's `TabOpen` fires synchronously during `gBrowser.addTab()`), the fake must expose a callback hook (e.g., `onTabCreated`) so tests can simulate that timing. Without this, race conditions between synchronous events and post-`await` state updates are invisible to tests.
 11. **Transaction consistency:** If one multi-statement mutation uses a transaction, all similar multi-statement mutations must too.
 12. **Test naming accuracy:** Test file names and `describe` blocks must name the actual SUT being tested (e.g., if tests instantiate `InMemoryFoo`, the describe block should say `InMemoryFoo`, not `Foo`).
 13. **Boundary precision:** When specs use "exceeds", "above", or "over", implement as strict `>`. When specs use "below" or "under", implement as strict `<`. Only use `>=` / `<=` when specs say "at least", "at most", "reaches", or "or more". Get the comparison operator right — off-by-one at thresholds is a spec violation.
 14. **UI completeness:** If a task specifies user-visible behavior (notifications, dialogs, visual indicators, buttons), domain probes alone are not sufficient. There must be a port interface, an adapter or handler that subscribes to the probe and produces the required browser UI. Probes fire events; something must listen and act.
 15. **Module integration:** If you created a new module AND the task says to wire it into another module, verify the new module is `import`-ed and used in the target — not re-implemented inline. Run `scripts/check-dead-exports.sh` and confirm your new modules are not in the FAIL list. A tested module that is never imported in production is dead code.
 16. **Event target precision:** When a task specifies an event target (e.g., "on the canvas", "on the sidebar"), verify your `addEventListener` call uses that exact element, not a broader target like `window` or `document`. Broader targets capture events from unrelated UI areas.
+17. **Chrome wiring:** If you add a `.css` file or a new entry-point `.mjs` module in `src/limb/`, it must be loaded by the browser chrome. CSS needs a `<link>` in `zen-assets.inc.xhtml`. Entry-point `.mjs` modules (not imported by another `.mjs`) need `ChromeUtils.importESModule` in `browser-init-js.patch` or a `<script>` tag in `zen-assets.inc.xhtml`. Run `scripts/check-chrome-wiring.sh` and confirm your new files are not in the FAIL list.
+18. **Async-sync event races:** When calling an async port method that wraps a browser API, consider whether the browser API fires synchronous events during execution. If it does, any state you set *after* `await`-ing that call is not yet visible to synchronous event handlers. Either set state before the `await`, or use a guard flag so the event handler knows the tab was expected.
 
 ## Workflow
 
@@ -74,7 +76,7 @@ Before marking a task `ready-for-review`:
 4. Read the referenced spec sections.
 5. Implement using TDD: test -> fail -> implement -> pass -> refactor.
 6. Run `npx vitest run`. All tests must pass.
-7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, and `scripts/check-dead-exports.sh`. Fix any failures. For `check-dead-exports.sh`, verify that modules you created in this task are NOT in the FAIL list (pre-existing failures from other tasks are acceptable).
+7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, `scripts/check-dead-exports.sh`, and `scripts/check-chrome-wiring.sh`. Fix any failures. For `check-dead-exports.sh` and `check-chrome-wiring.sh`, verify that modules you created in this task are NOT in the FAIL list (pre-existing failures from other tasks are acceptable).
 8. Run through the Self-Verification Checklist.
 9. Update the task's `progress` field to `ready-for-review`.
 10. Commit using conventional commits, author: "Implementation <jsell-rh.implementation@agents.redhat.com>"

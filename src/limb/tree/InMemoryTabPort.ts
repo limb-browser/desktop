@@ -15,9 +15,19 @@ export class InMemoryTabPort implements TabPort<FakeTab> {
   tabs: FakeTab[] = [];
   selectedTab: FakeTab | null = null;
 
+  /**
+   * Optional synchronous callback fired when a tab is created, before
+   * openTab resolves. Simulates Firefox's synchronous TabOpen event
+   * that fires during gBrowser.addTab(). Tests should set this to
+   * exercise code paths that react to TabOpen during tab creation
+   * (e.g., orphan detection racing with tabToNode mapping).
+   */
+  onTabCreated: ((tab: FakeTab) => void) | null = null;
+
   async openTab(url: string, nodeId: string): Promise<FakeTab> {
     const tab: FakeTab = { url, nodeId, closed: false, suspended: false };
     this.tabs.push(tab);
+    this.onTabCreated?.(tab);
     return tab;
   }
 

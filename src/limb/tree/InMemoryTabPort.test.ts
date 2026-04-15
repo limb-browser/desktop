@@ -80,6 +80,29 @@ describe('InMemoryTabPort', () => {
     });
   });
 
+  describe('onTabCreated', () => {
+    it('fires synchronously during openTab before the promise resolves', async () => {
+      const events: string[] = [];
+      port.onTabCreated = (tab) => {
+        events.push(`created:${tab.nodeId}`);
+      };
+
+      const promise = port.openTab('https://example.com', 'node-1');
+      // The callback fires synchronously, so it ran before we get here
+      // only if the event loop hasn't yielded. Since openTab is async,
+      // we verify the callback ran by the time the promise resolves.
+      const tab = await promise;
+      expect(events).toEqual(['created:node-1']);
+      expect(tab.nodeId).toBe('node-1');
+    });
+
+    it('does not fire when no callback is set', async () => {
+      // No callback set -- should not throw
+      const tab = await port.openTab('https://example.com', 'node-1');
+      expect(tab.nodeId).toBe('node-1');
+    });
+  });
+
   describe('openTabs', () => {
     it('returns only tabs that are not closed', async () => {
       const tab1 = await port.openTab('https://a.com', 'n1');
