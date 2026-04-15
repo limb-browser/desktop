@@ -30,6 +30,7 @@ import { LayoutAnimator } from "./LayoutAnimator.mjs";
 import { RevealAnimator } from "./RevealAnimator.mjs";
 import { computeFoldNodeFrame, formatFoldLabel } from "./FoldNodeRenderer.mjs";
 import { TabPositioner } from "./TabPositioner.mjs";
+import { ZoomOutAndBackAnimator, computeIntermediateZoomLevel } from "./ZoomOutAndBackAnimator.mjs";
 
 // Zoom level change per 100px of wheel deltaY
 const ZOOM_SENSITIVITY = 0.05;
@@ -111,6 +112,8 @@ export class LimbTreeView {
   #layoutAnimatedFrame = null;
   /** @type {RevealAnimator | null} */
   #revealAnimator = null;
+  /** @type {ZoomOutAndBackAnimator | null} */
+  #zoomOutAndBackAnimator = null;
   /** @type {FrameScheduler | null} */
   #frameScheduler = null;
 
@@ -166,7 +169,7 @@ export class LimbTreeView {
    * @param {HTMLCanvasElement} canvas
    * @param {{ zoomChanged(level: number, zoomScale: number): void }} [probe]
    * @param {{ tierChanged(nodeId: string, previousTier: string, newTier: string): void }} [lodProbe]
-   * @param {{ onNodeClicked?: (nodeId: string) => void, onFoldToggled?: (foldId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe, performanceProbe?: import('../ports/PerformanceProbe').PerformanceProbe, revealAnimationProbe?: import('../ports/RevealAnimationProbe').RevealAnimationProbe }} [options]
+   * @param {{ onNodeClicked?: (nodeId: string) => void, onFoldToggled?: (foldId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe, performanceProbe?: import('../ports/PerformanceProbe').PerformanceProbe, revealAnimationProbe?: import('../ports/RevealAnimationProbe').RevealAnimationProbe, zoomOutAndBackProbe?: import('../ports/ZoomOutAndBackProbe').ZoomOutAndBackProbe }} [options]
    */
   init(canvas, probe, lodProbe, options) {
     this.#canvas = canvas;
@@ -187,6 +190,7 @@ export class LimbTreeView {
     this.#zoomAnimator = new ZoomAnimator(options?.animationProbe);
     this.#layoutAnimator = new LayoutAnimator(options?.layoutAnimationProbe);
     this.#revealAnimator = new RevealAnimator(options?.revealAnimationProbe);
+    this.#zoomOutAndBackAnimator = new ZoomOutAndBackAnimator(options?.zoomOutAndBackProbe);
     this.#onNodeClicked = options?.onNodeClicked ?? null;
     this.#onFoldToggled = options?.onFoldToggled ?? null;
     this.#frameScheduler = new FrameScheduler(
@@ -314,6 +318,49 @@ export class LimbTreeView {
   }
 
   /**
+   * Play a zoom-out-and-back animation to reveal new branch creation.
+   *
+   * If zoomLevel >= 0.9, animates: zoom out to show parent+child, hold,
+   * then zoom into the new child at level 1.0.
+   * If zoomLevel < 0.9, does nothing (the tree is already visible).
+   *
+   * Called after addChild creates a new node. The layout must already
+   * contain the child's position (call setTreeData first).
+   *
+   * @param {string} parentId - ID of the parent node
+   * @param {string} childId - ID of the newly created child node
+   */
+  playZoomOutAndBack(parentId, childId) {
+    if (!this.#zoom || !this.#positions || !this.#zoomOutAndBackAnimator) return;
+    if (this.#zoom.level < 0.9) return;
+
+    const parentPos = this.#positions.get(parentId);
+    const childPos = this.#positions.get(childId);
+    if (!parentPos || !childPos) return;
+
+    // Cancel any in-progress zoom or pan animation
+    this.#zoomAnimator?.cancel();
+    this.#animation = null;
+
+    const holdLevel = computeIntermediateZoomLevel(
+      parentPos, childPos,
+      this.#zoom.viewportSize, this.#zoom.treeExtent,
+      BASE_NODE_WIDTH, BASE_NODE_HEIGHT,
+    );
+    const holdFocus = {
+      x: (parentPos.x + childPos.x) / 2,
+      y: (parentPos.y + childPos.y) / 2,
+    };
+
+    this.#zoomOutAndBackAnimator.start(
+      this.#zoom.level, holdLevel, 1.0,
+      { ...this.#zoom.focusPoint }, holdFocus, { x: childPos.x, y: childPos.y },
+    );
+
+    this.#startAnimationLoop();
+  }
+
+  /**
    * Set the tree data for rendering.
    * @param {Map<string, { x: number, y: number }>} positions - Logical node positions from TreeLayout
    * @param {Map<string, string>} parentMap - childId -> parentId mapping
@@ -357,6 +404,8 @@ export class LimbTreeView {
     if (!e.ctrlKey || !this.#zoom) return;
     e.preventDefault();
 
+    this.#cancelZoomOutAndBack();
+
     const deltaLevel = -(e.deltaY / 100) * ZOOM_SENSITIVITY;
     this.#zoom.zoomAtCursor(deltaLevel, e.clientX, e.clientY);
     this.#updateCursor();
@@ -366,6 +415,7 @@ export class LimbTreeView {
   /** @param {MouseEvent} e */
   #onMouseDown(e) {
     if (!this.#panInteraction) return;
+    this.#cancelZoomOutAndBack();
     this.#panInteraction.onMouseDown(e.clientX, e.clientY);
     this.#updateCursor();
   }
@@ -433,6 +483,19 @@ export class LimbTreeView {
   }
 
   /**
+   * Cancel the zoom-out-and-back animation and jump to the final state
+   * (zoomed into the new child at level 1.0).
+   */
+  #cancelZoomOutAndBack() {
+    if (!this.#zoomOutAndBackAnimator?.isAnimating || !this.#zoom) return;
+    const final = this.#zoomOutAndBackAnimator.finalState;
+    this.#zoomOutAndBackAnimator.cancel();
+    this.#zoom.setLevel(final.level);
+    this.#zoom.focusPoint = { ...final.focusPoint };
+    this.#frameScheduler?.markDirty();
+  }
+
+  /**
    * Start a zoom animation via the ZoomAnimator.
    * Cancels any in-progress pan animation and kicks the frame scheduler.
    */
@@ -454,8 +517,19 @@ export class LimbTreeView {
   #onFrame() {
     const now = performance.now();
 
-    // Advance ZoomAnimator if active
-    if (this.#zoomAnimator?.isAnimating && this.#zoom) {
+    // Advance ZoomOutAndBackAnimator if active (mutually exclusive with ZoomAnimator)
+    if (this.#zoomOutAndBackAnimator?.isAnimating && this.#zoom) {
+      const deltaMs = now - this.#animationLastTime;
+      const frame = this.#zoomOutAndBackAnimator.update(deltaMs);
+      if (frame) {
+        this.#zoom.setLevel(frame.level);
+        this.#zoom.focusPoint = { ...frame.focusPoint };
+        if (!frame.done) {
+          this.#frameScheduler?.markDirty();
+        }
+      }
+    } else if (this.#zoomAnimator?.isAnimating && this.#zoom) {
+      // Advance ZoomAnimator if active
       const deltaMs = now - this.#animationLastTime;
       const frame = this.#zoomAnimator.update(deltaMs);
       if (frame) {
@@ -929,6 +1003,7 @@ export class LimbTreeView {
     this.#layoutAnimator = null;
     this.#layoutAnimatedFrame = null;
     this.#revealAnimator = null;
+    this.#zoomOutAndBackAnimator = null;
     this.#frameScheduler = null;
     this.#positions = null;
     this.#parentMap = null;
