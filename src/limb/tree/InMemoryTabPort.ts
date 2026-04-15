@@ -53,7 +53,12 @@ export class InMemoryTabPort implements TabPort<FakeTab> {
   }
 
   setTreeAttributes(tab: FakeTab, parentId: string | null, createdAt: number): void {
-    tab.parentId = parentId;
+    // DOM setAttribute(name, null) serializes null to the string "null",
+    // which corrupts root-node identification on restore.  Model correct
+    // behaviour: only set parentId when it carries a real value.
+    if (parentId !== null) {
+      tab.parentId = parentId;
+    }
     tab.createdAt = createdAt;
   }
 
