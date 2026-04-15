@@ -83,6 +83,39 @@ export class TabBridge<TTab> {
     }
   }
 
+  onTabLocationChanged(
+    tab: TTab,
+    newUrl: string,
+    updateNode: (nodeId: string) => void
+  ): void {
+    const nodeId = this.tabToNode.get(tab);
+    if (!nodeId) return;
+    updateNode(nodeId);
+    this.#probe?.locationChanged(nodeId, newUrl);
+  }
+
+  onTabTitleChanged(
+    tab: TTab,
+    newTitle: string,
+    updateNode: (nodeId: string) => void
+  ): void {
+    const nodeId = this.tabToNode.get(tab);
+    if (!nodeId) return;
+    updateNode(nodeId);
+    this.#probe?.titleChanged(nodeId, newTitle);
+  }
+
+  onTabFaviconChanged(
+    tab: TTab,
+    newFavicon: string,
+    updateNode: (nodeId: string) => void
+  ): void {
+    const nodeId = this.tabToNode.get(tab);
+    if (!nodeId) return;
+    updateNode(nodeId);
+    this.#probe?.faviconChanged(nodeId, newFavicon);
+  }
+
   async closeOrphanTab(tab: TTab): Promise<void> {
     if (this.tabToNode.has(tab)) {
       return;

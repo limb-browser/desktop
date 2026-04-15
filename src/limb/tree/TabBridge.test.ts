@@ -24,6 +24,15 @@ function createFakeProbe(): TabBridgeProbe & {
     focusSynced(nodeId: string) {
       calls.push({ method: 'focusSynced', args: [nodeId] });
     },
+    locationChanged(nodeId: string, url: string) {
+      calls.push({ method: 'locationChanged', args: [nodeId, url] });
+    },
+    titleChanged(nodeId: string, title: string) {
+      calls.push({ method: 'titleChanged', args: [nodeId, title] });
+    },
+    faviconChanged(nodeId: string, favicon: string) {
+      calls.push({ method: 'faviconChanged', args: [nodeId, favicon] });
+    },
   };
 }
 
@@ -421,6 +430,234 @@ describe('TabBridge', () => {
     });
   });
 
+  describe('onTabLocationChanged', () => {
+    it('updates the node url via the callback', async () => {
+      const tree = new BrowsingTree('https://root.com');
+      const root = tree.nodes.get(tree.rootId)!;
+      await bridge.createTabForNode({ id: root.id, url: root.url });
+      const tab = bridge.getTabForNode(root.id)!;
+
+      bridge.onTabLocationChanged(tab, 'https://new-page.com', (nodeId) => {
+        const node = tree.nodes.get(nodeId);
+        if (node) node.url = 'https://new-page.com';
+      });
+
+      expect(root.url).toBe('https://new-page.com');
+    });
+
+    it('fires locationChanged probe', async () => {
+      await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
+      const tab = bridge.getTabForNode('node-1')!;
+      probe.calls.length = 0;
+
+      bridge.onTabLocationChanged(tab, 'https://navigated.com', () => {});
+
+      expect(probe.calls).toContainEqual({
+        method: 'locationChanged',
+        args: ['node-1', 'https://navigated.com'],
+      });
+    });
+
+    it('is a no-op for an unknown tab', () => {
+      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', closed: false, suspended: false };
+      const updateCalls: string[] = [];
+      bridge.onTabLocationChanged(unknownTab, 'https://new.com', (nodeId) => updateCalls.push(nodeId));
+      expect(updateCalls).toHaveLength(0);
+      expect(probe.calls).toHaveLength(0);
+    });
+
+    it('does not modify tree structure', async () => {
+      const tree = new BrowsingTree('https://root.com');
+      const root = tree.nodes.get(tree.rootId)!;
+      const child = tree.addChild(tree.rootId, 'https://child.com');
+      await bridge.createTabForNode({ id: root.id, url: root.url });
+      await bridge.createTabForNode({ id: child.id, url: child.url });
+      const tab = bridge.getTabForNode(child.id)!;
+
+      const nodeCountBefore = tree.nodes.size;
+      const childIdsBefore = [...root.childIds];
+
+      bridge.onTabLocationChanged(tab, 'https://navigated.com', (nodeId) => {
+        const node = tree.nodes.get(nodeId);
+        if (node) node.url = 'https://navigated.com';
+      });
+
+      expect(tree.nodes.size).toBe(nodeCountBefore);
+      expect(root.childIds).toEqual(childIdsBefore);
+      expect(child.parentId).toBe(tree.rootId);
+    });
+  });
+
+  describe('onTabTitleChanged', () => {
+    it('updates the node title via the callback', async () => {
+      const tree = new BrowsingTree('https://root.com');
+      const root = tree.nodes.get(tree.rootId)!;
+      await bridge.createTabForNode({ id: root.id, url: root.url });
+      const tab = bridge.getTabForNode(root.id)!;
+
+      bridge.onTabTitleChanged(tab, 'New Page Title', (nodeId) => {
+        const node = tree.nodes.get(nodeId);
+        if (node) node.title = 'New Page Title';
+      });
+
+      expect(root.title).toBe('New Page Title');
+    });
+
+    it('fires titleChanged probe', async () => {
+      await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
+      const tab = bridge.getTabForNode('node-1')!;
+      probe.calls.length = 0;
+
+      bridge.onTabTitleChanged(tab, 'Updated Title', () => {});
+
+      expect(probe.calls).toContainEqual({
+        method: 'titleChanged',
+        args: ['node-1', 'Updated Title'],
+      });
+    });
+
+    it('is a no-op for an unknown tab', () => {
+      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', closed: false, suspended: false };
+      const updateCalls: string[] = [];
+      bridge.onTabTitleChanged(unknownTab, 'Title', (nodeId) => updateCalls.push(nodeId));
+      expect(updateCalls).toHaveLength(0);
+      expect(probe.calls).toHaveLength(0);
+    });
+
+    it('does not modify tree structure', async () => {
+      const tree = new BrowsingTree('https://root.com');
+      const root = tree.nodes.get(tree.rootId)!;
+      const child = tree.addChild(tree.rootId, 'https://child.com');
+      await bridge.createTabForNode({ id: child.id, url: child.url });
+      const tab = bridge.getTabForNode(child.id)!;
+
+      const nodeCountBefore = tree.nodes.size;
+      const childIdsBefore = [...root.childIds];
+
+      bridge.onTabTitleChanged(tab, 'New Title', (nodeId) => {
+        const node = tree.nodes.get(nodeId);
+        if (node) node.title = 'New Title';
+      });
+
+      expect(tree.nodes.size).toBe(nodeCountBefore);
+      expect(root.childIds).toEqual(childIdsBefore);
+      expect(child.parentId).toBe(tree.rootId);
+    });
+  });
+
+  describe('onTabFaviconChanged', () => {
+    it('updates the node favicon via the callback', async () => {
+      const tree = new BrowsingTree('https://root.com');
+      const root = tree.nodes.get(tree.rootId)!;
+      await bridge.createTabForNode({ id: root.id, url: root.url });
+      const tab = bridge.getTabForNode(root.id)!;
+
+      bridge.onTabFaviconChanged(tab, 'https://root.com/favicon.ico', (nodeId) => {
+        const node = tree.nodes.get(nodeId);
+        if (node) node.favicon = 'https://root.com/favicon.ico';
+      });
+
+      expect(root.favicon).toBe('https://root.com/favicon.ico');
+    });
+
+    it('fires faviconChanged probe', async () => {
+      await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
+      const tab = bridge.getTabForNode('node-1')!;
+      probe.calls.length = 0;
+
+      bridge.onTabFaviconChanged(tab, 'https://example.com/icon.png', () => {});
+
+      expect(probe.calls).toContainEqual({
+        method: 'faviconChanged',
+        args: ['node-1', 'https://example.com/icon.png'],
+      });
+    });
+
+    it('is a no-op for an unknown tab', () => {
+      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', closed: false, suspended: false };
+      const updateCalls: string[] = [];
+      bridge.onTabFaviconChanged(unknownTab, 'icon.png', (nodeId) => updateCalls.push(nodeId));
+      expect(updateCalls).toHaveLength(0);
+      expect(probe.calls).toHaveLength(0);
+    });
+
+    it('does not modify tree structure', async () => {
+      const tree = new BrowsingTree('https://root.com');
+      const root = tree.nodes.get(tree.rootId)!;
+      const child = tree.addChild(tree.rootId, 'https://child.com');
+      await bridge.createTabForNode({ id: child.id, url: child.url });
+      const tab = bridge.getTabForNode(child.id)!;
+
+      const nodeCountBefore = tree.nodes.size;
+      const childIdsBefore = [...root.childIds];
+
+      bridge.onTabFaviconChanged(tab, 'https://child.com/icon.png', (nodeId) => {
+        const node = tree.nodes.get(nodeId);
+        if (node) node.favicon = 'https://child.com/icon.png';
+      });
+
+      expect(tree.nodes.size).toBe(nodeCountBefore);
+      expect(root.childIds).toEqual(childIdsBefore);
+      expect(child.parentId).toBe(tree.rootId);
+    });
+  });
+
+  describe('same-tab navigation integration', () => {
+    it('navigating to a new URL updates node url without changing tree', async () => {
+      const tree = new BrowsingTree('https://root.com');
+      const root = tree.nodes.get(tree.rootId)!;
+      const child = tree.addChild(tree.rootId, 'https://original.com');
+      await bridge.createTabForNode({ id: root.id, url: root.url });
+      await bridge.createTabForNode({ id: child.id, url: child.url });
+      const tab = bridge.getTabForNode(child.id)!;
+
+      const structureBefore = {
+        nodeCount: tree.nodes.size,
+        rootChildIds: [...root.childIds],
+        childParent: child.parentId,
+        childChildren: [...child.childIds],
+      };
+
+      bridge.onTabLocationChanged(tab, 'https://navigated.com', (nodeId) => {
+        const node = tree.nodes.get(nodeId);
+        if (node) node.url = 'https://navigated.com';
+      });
+      bridge.onTabTitleChanged(tab, 'Navigated Page', (nodeId) => {
+        const node = tree.nodes.get(nodeId);
+        if (node) node.title = 'Navigated Page';
+      });
+      bridge.onTabFaviconChanged(tab, 'https://navigated.com/favicon.ico', (nodeId) => {
+        const node = tree.nodes.get(nodeId);
+        if (node) node.favicon = 'https://navigated.com/favicon.ico';
+      });
+
+      expect(child.url).toBe('https://navigated.com');
+      expect(child.title).toBe('Navigated Page');
+      expect(child.favicon).toBe('https://navigated.com/favicon.ico');
+      expect(tree.nodes.size).toBe(structureBefore.nodeCount);
+      expect(root.childIds).toEqual(structureBefore.rootChildIds);
+      expect(child.parentId).toBe(structureBefore.childParent);
+      expect(child.childIds).toEqual(structureBefore.childChildren);
+    });
+
+    it('multiple navigations on the same tab update properties in place', async () => {
+      const tree = new BrowsingTree('https://root.com');
+      const root = tree.nodes.get(tree.rootId)!;
+      await bridge.createTabForNode({ id: root.id, url: root.url });
+      const tab = bridge.getTabForNode(root.id)!;
+
+      bridge.onTabLocationChanged(tab, 'https://page2.com', (nodeId) => {
+        tree.nodes.get(nodeId)!.url = 'https://page2.com';
+      });
+      bridge.onTabLocationChanged(tab, 'https://page3.com', (nodeId) => {
+        tree.nodes.get(nodeId)!.url = 'https://page3.com';
+      });
+
+      expect(root.url).toBe('https://page3.com');
+      expect(tree.nodes.size).toBe(1);
+    });
+  });
+
   describe('without probe', () => {
     it('works when no probe is provided', async () => {
       const noProbeBridge = new TabBridge(tabPort);
@@ -452,6 +689,42 @@ describe('TabBridge', () => {
       const focusCalls: string[] = [];
       noProbeBridge.onExternalTabSelected(tab, (nodeId) => focusCalls.push(nodeId));
       expect(focusCalls).toEqual(['node-1']);
+    });
+
+    it('onTabLocationChanged works without a probe', async () => {
+      const noProbeBridge = new TabBridge(tabPort);
+      await noProbeBridge.createTabForNode({
+        id: 'node-1',
+        url: 'https://example.com',
+      });
+      const tab = noProbeBridge.getTabForNode('node-1')!;
+      const updateCalls: string[] = [];
+      noProbeBridge.onTabLocationChanged(tab, 'https://new.com', (nodeId) => updateCalls.push(nodeId));
+      expect(updateCalls).toEqual(['node-1']);
+    });
+
+    it('onTabTitleChanged works without a probe', async () => {
+      const noProbeBridge = new TabBridge(tabPort);
+      await noProbeBridge.createTabForNode({
+        id: 'node-1',
+        url: 'https://example.com',
+      });
+      const tab = noProbeBridge.getTabForNode('node-1')!;
+      const updateCalls: string[] = [];
+      noProbeBridge.onTabTitleChanged(tab, 'Title', (nodeId) => updateCalls.push(nodeId));
+      expect(updateCalls).toEqual(['node-1']);
+    });
+
+    it('onTabFaviconChanged works without a probe', async () => {
+      const noProbeBridge = new TabBridge(tabPort);
+      await noProbeBridge.createTabForNode({
+        id: 'node-1',
+        url: 'https://example.com',
+      });
+      const tab = noProbeBridge.getTabForNode('node-1')!;
+      const updateCalls: string[] = [];
+      noProbeBridge.onTabFaviconChanged(tab, 'icon.png', (nodeId) => updateCalls.push(nodeId));
+      expect(updateCalls).toEqual(['node-1']);
     });
   });
 });
