@@ -103,6 +103,8 @@ export class LimbTreeView {
   #titles = new Map();
   /** @type {number} */
   #lastFrameTime = 0;
+  /** @type {import('./ScreenshotManager.mjs').ScreenshotManager | null} */
+  #screenshotManager = null;
 
   // Animation state for pan-only viewport transitions (centerOnNode)
   /** @type {{ startFocus: { x: number, y: number }, endFocus: { x: number, y: number }, startLevel: number, endLevel: number, startTime: number, duration: number } | null} */
@@ -191,6 +193,14 @@ export class LimbTreeView {
   setFocusedNodeId(nodeId) {
     this.#focusedNodeId = nodeId;
     this.#frameScheduler?.markDirty();
+  }
+
+  /**
+   * Set the screenshot manager for drawing screenshots on screenshot-tier nodes.
+   * @param {import('./ScreenshotManager.mjs').ScreenshotManager} screenshotManager
+   */
+  setScreenshotManager(screenshotManager) {
+    this.#screenshotManager = screenshotManager;
   }
 
   /**
@@ -471,9 +481,30 @@ export class LimbTreeView {
         const progress = easeOut(rawProgress);
         const offsetY = -HOVER_OFFSET_Y * progress;
 
+        const r = Math.min(cornerRadius, node.width / 2, node.height / 2);
+
+        // Draw screenshot for screenshot-tier nodes
+        if ((tier === "screenshot-low" || tier === "screenshot-high") && this.#screenshotManager) {
+          const resolution = tier === "screenshot-low" ? "low" : "high";
+          const screenshot = this.#screenshotManager.getScreenshot(node.nodeId, resolution)
+            ?? this.#screenshotManager.getScreenshot(node.nodeId, resolution === "low" ? "high" : "low");
+          if (screenshot) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(node.x, node.y + offsetY, node.width, node.height, r);
+            ctx.clip();
+            ctx.drawImage(/** @type {CanvasImageSource} */ (screenshot), node.x, node.y + offsetY, node.width, node.height);
+            ctx.restore();
+            ctx.strokeStyle = "#444";
+            ctx.beginPath();
+            ctx.roundRect(node.x, node.y + offsetY, node.width, node.height, r);
+            ctx.stroke();
+            continue;
+          }
+        }
+
         ctx.fillStyle = TIER_COLORS[tier] ?? "#2a2a2a";
         ctx.strokeStyle = tier === "focused" ? "#88f" : "#444";
-        const r = Math.min(cornerRadius, node.width / 2, node.height / 2);
         ctx.beginPath();
         ctx.roundRect(node.x, node.y + offsetY, node.width, node.height, r);
         ctx.fill();
@@ -595,6 +626,7 @@ export class LimbTreeView {
     this.#tiers = null;
     this.#titles = new Map();
     this.#lastFrameTime = 0;
+    this.#screenshotManager = null;
     this.#lastFrameNodes = [];
     this.#animation = null;
     this.#animationLastTime = 0;

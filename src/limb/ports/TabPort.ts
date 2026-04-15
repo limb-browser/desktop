@@ -6,6 +6,7 @@ export interface TabPort<TTab> {
   openTab(url: string, nodeId: string): Promise<TTab>;
   closeTab(tab: TTab): Promise<void>;
   selectTab(tab: TTab): Promise<void>;
+  suspendTab(tab: TTab): Promise<void>;
   restoreTab(tab: TTab): Promise<void>;
   isTabSuspended(tab: TTab): Promise<boolean>;
   setTreeAttributes(tab: TTab, parentId: string | null, createdAt: number): void;

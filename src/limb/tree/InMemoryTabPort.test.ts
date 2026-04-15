@@ -58,6 +58,14 @@ describe('InMemoryTabPort', () => {
     });
   });
 
+  describe('suspendTab', () => {
+    it('marks a tab as suspended', async () => {
+      const tab = await port.openTab('https://example.com', 'node-1');
+      await port.suspendTab(tab);
+      expect(tab.suspended).toBe(true);
+    });
+  });
+
   describe('restoreTab', () => {
     it('marks a suspended tab as no longer suspended', async () => {
       const tab = await port.openTab('https://example.com', 'node-1');

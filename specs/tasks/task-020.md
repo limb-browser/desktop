@@ -4,7 +4,7 @@ spec_ref: "tree-rendering.md S3.3; tab-bridge.md S3.2 S3.3; zoom-lod.md S2.1; pe
 depends_on:
   - task-011
   - task-008
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []

@@ -44,6 +44,10 @@ export class InMemoryTabPort implements TabPort<FakeTab> {
     this.selectedTab = tab;
   }
 
+  async suspendTab(tab: FakeTab): Promise<void> {
+    tab.suspended = true;
+  }
+
   async restoreTab(tab: FakeTab): Promise<void> {
     tab.suspended = false;
   }
