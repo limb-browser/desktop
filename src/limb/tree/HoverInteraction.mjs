@@ -23,8 +23,6 @@ export class HoverInteraction {
   #mouseY = -1;
   /** @type {Map<string, number>} nodeId -> progress (0-1) */
   #hoverProgress = new Map();
-  /** @type {string | null} */
-  #hoveredNodeId = null;
 
   /**
    * Set the current mouse position.
@@ -64,7 +62,6 @@ export class HoverInteraction {
    */
   update(nodeRects, deltaMs) {
     const hoveredNodeId = this.hitTest(nodeRects);
-    this.#hoveredNodeId = hoveredNodeId;
 
     const rate = deltaMs / TRANSITION_DURATION;
 
@@ -90,10 +87,5 @@ export class HoverInteraction {
       hoveredNodeId,
       hoverProgress: new Map(this.#hoverProgress),
     };
-  }
-
-  /** @returns {string | null} */
-  get hoveredNodeId() {
-    return this.#hoveredNodeId;
   }
 }
