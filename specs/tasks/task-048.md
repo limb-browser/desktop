@@ -2,8 +2,8 @@
 title: "Remove testTreeData.mjs import from production bootstrap"
 spec_ref: "chrome-integration.md S3.1"
 depends_on: []
-progress: ready-for-review
-review: ""
+progress: complete
+review: "specs/reviews/review-TASK_048-R1.md"
 coverage_sections: []
 commits: []
 ---
