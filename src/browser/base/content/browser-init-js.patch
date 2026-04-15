@@ -24,6 +24,10 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      "chrome://browser/content/limb/tree/LimbTabCommandAdapter.mjs",
 +      { global: "current" }
 +    );
++    const { TabCommandRouter } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/TabCommandRouter.ts",
++      { global: "current" }
++    );
 +    const { AddressBarAdapter } = ChromeUtils.importESModule(
 +      "chrome://browser/content/limb/tree/AddressBarAdapter.mjs",
 +      { global: "current" }
@@ -114,6 +118,11 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    window.gLimbTreeView.setMaxLiveTabs(Services.prefs.getIntPref("limb.tree.max-live-tabs", 8));
 +    const confirmPort = new BrowserConfirmationPort(window);
 +    const homeUrl = Services.prefs.getStringPref("limb.home.url", "about:blank");
++    const tabCommandProbe = { newTabRouted(pId, cId) { console.debug("New tab routed:", pId, "->", cId); }, closeTabRouted(id) { console.debug("Tab close routed:", id); }, orphanTabBlocked() { console.debug("Orphan tab blocked"); }, linkIntercepted(pId, cId) { console.debug("Link intercepted:", pId, "->", cId); } };
++    const tabCommandRouter = new TabCommandRouter(browsingTree, tabBridge, homeUrl, tabCommandProbe);
++    const tabCommandAdapter = new LimbTabCommandAdapter(tabCommandRouter);
++    tabCommandAdapter.install(window, gBrowser.tabContainer);
++    window.gLimbTabCommandAdapter = tabCommandAdapter;
 +    const branchProbe = { branchCreated(id) { console.debug("Branch created:", id); }, branchDeleted(id) { console.debug("Branch deleted:", id); }, branchDeletionCancelled(id) { console.debug("Branch deletion cancelled:", id); } };
 +    const branchRouter = new BranchCommandRouter(browsingTree, tabBridge, autoSaveAdapter, confirmPort, homeUrl, branchProbe);
 +    window.gLimbBranchRouter = branchRouter;
@@ -142,7 +151,7 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    window.gLimbScreenshotEvictor = startScreenshotEviction(treeStorage, browsingTree, Services.prefs, evictorProbe);
 +    const perfMonitor = new PerformanceMonitor(performanceProbe, async () => ({ heapMB: Services.memory.heapAllocated / (1024 * 1024), screenshotsMB: (await treeStorage.getScreenshotMemoryUsage()) / (1024 * 1024), tabCount: gBrowser.tabs.length }));
 +    perfMonitor.install();
-+    window.addEventListener("unload", () => perfMonitor.uninstall());
++    window.addEventListener("unload", () => { tabCommandAdapter.uninstall(); perfMonitor.uninstall(); });
 +    window.gLimbPerformanceMonitor = perfMonitor;
      gBrowser.addEventListener("DOMUpdateBlockedPopups", e =>
        PopupAndRedirectBlockerObserver.handleEvent(e)

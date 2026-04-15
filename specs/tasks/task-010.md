@@ -3,7 +3,7 @@ title: "Hide tab bar and route Ctrl+T/Ctrl+W through tree model"
 spec_ref: "tab-bridge.md S4.3 S4.4"
 depends_on:
   - task-008
-progress: needs-revision
+progress: ready-for-review
 review: "specs/reviews/review-TASK_010-R1.md"
 coverage_sections: []
 commits: []
@@ -17,17 +17,25 @@ commits: []
 
 ## Current State
 
-Review R1 found three issues. Two have been resolved by subsequent tasks:
-
-- **F2 (adapter wiring)**: Fixed during task-012. `LimbTabCommandAdapter` is now imported via `ChromeUtils.importESModule` in `browser-init-js.patch:23-24`.
-- **F3 (race condition)**: Fixed. `TabCommandRouter` uses a `#creatingTab` flag (line 14) to prevent `handleExternalTabOpen` from closing tree-initiated tabs as orphans.
-- **F1 (CSS not loaded)**: STILL UNFIXED. `limb-hide-tabbar.css` exists at `src/limb/tree/limb-hide-tabbar.css` with correct rules (`display: none !important` on `#tabbrowser-tabs`, `#TabsToolbar`, `#zen-sidebar-tabs-wrapper`), but is never loaded in the browser. The tab bar remains visible.
+Firefox's tab bar is visible (Zen's vertical tab bar). Ctrl+T opens a standard Firefox tab. Ctrl+W closes a tab directly. TabBridge (task-008) exists but doesn't intercept these actions.
 
 ## What To Build
 
-1. Register `limb-hide-tabbar.css` in the resource manifest (`src/limb/jar.inc.mn`) so it is packaged as a chrome resource.
-2. Add a `<link>` tag for `limb-hide-tabbar.css` in `src/browser/base/content/zen-assets.inc.xhtml` (same pattern as line 26 which loads `limb-tree-canvas.css`).
-3. Verify the tab bar is hidden in the running browser after `npm run build:ui`.
-4. Write or update tests verifying:
-   - The CSS file is registered in `jar.inc.mn`.
-   - The CSS file is linked in `zen-assets.inc.xhtml`.
+1. Hide the tab bar:
+   - Add CSS to hide `#tabbrowser-tabs` (or Zen's vertical tab strip) via a Limb stylesheet.
+   - Ensure the tab bar is fully hidden, not just collapsed (prevent accidental interaction).
+2. Override Ctrl+T:
+   - Intercept the `cmd_newNavigatorTab` command (or equivalent key binding).
+   - Instead of default behavior: call `BrowsingTree.addChild(focusedNodeId, homepage)`.
+   - TabBridge creates the tab automatically.
+3. Override Ctrl+W:
+   - Intercept tab close command.
+   - Instead of closing the tab directly: call `BrowsingTree.removeNode(focusedNodeId)`.
+   - TabBridge closes the tab as part of removal.
+   - Focus moves to the parent node.
+4. Prevent other tab creation paths (Firefox menu "New Tab", etc.) from bypassing the tree.
+5. Write tests verifying:
+   - Tab bar is not visible.
+   - Ctrl+T creates a child node in the tree.
+   - Ctrl+W removes the focused node and its tab.
+   - Cannot create orphan tabs.
