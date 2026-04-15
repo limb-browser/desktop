@@ -4,8 +4,8 @@ spec_ref: "chrome-integration.md S2.3; tree-rendering.md S3.1"
 depends_on:
   - task-036
   - task-007
-progress: ready-for-review
-review: ""
+progress: complete
+review: "specs/reviews/review-task-047-R1.md"
 coverage_sections: []
 commits: []
 ---
