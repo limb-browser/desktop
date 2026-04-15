@@ -529,7 +529,7 @@ export class LimbTreeView {
       // Compute LOD tiers for all nodes
       if (this.#lodComputer) {
         this.#tiers = this.#lodComputer.computeTiers(
-          { focusedNodeId: this.#focusedNodeId },
+          { focusedNodeId: this.#focusedNodeId, parentMap: this.#parentMap },
           this.#positions,
           zoom,
         );

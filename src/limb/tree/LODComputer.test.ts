@@ -718,13 +718,13 @@ describe('LODComputer', () => {
 
     it('reports lodComputationTime after each computeTiers call', () => {
       const { perfProbe, calls } = createPerfProbe();
-      let nowCallCount = 0;
+      let isStartCall = true;
       const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
         performanceProbe: perfProbe,
         now: () => {
-          nowCallCount++;
-          // First call returns 100, second returns 103 (3ms elapsed)
-          return nowCallCount % 2 === 1 ? 100 : 103;
+          // First call (start) returns 100; all subsequent return 103 → elapsed = 3ms
+          if (isStartCall) { isStartCall = false; return 100; }
+          return 103;
         },
       });
 
@@ -802,6 +802,302 @@ describe('LODComputer', () => {
 
       const tiers = stabilize(comp, tree, positions, zoom);
       expect(tiers.get('n1')).toBe('screenshot-low');
+    });
+  });
+
+  describe('dirty flags', () => {
+    it('retains tier when width stays in stable band (no boundary crossing)', () => {
+      const positions = new Map([['n1', { x: 0, y: 0 }]]);
+      const tree = createFakeTree('other');
+
+      // Stabilize at screenshot-low (80px)
+      stabilize(computer, tree, positions, createFakeZoomState({ zoomScale: scaleForWidth(80) }));
+      probe.calls.length = 0;
+
+      // Width changes to 150px — still in screenshot-low stable band [60, 300)
+      const tiers = computer.computeTiers(
+        tree, positions,
+        createFakeZoomState({ zoomScale: scaleForWidth(150) }),
+      );
+
+      expect(tiers.get('n1')).toBe('screenshot-low');
+      expect(probe.calls.length).toBe(0);
+    });
+
+    it('sets dirty when width crosses enter threshold upward', () => {
+      const positions = new Map([['n1', { x: 0, y: 0 }]]);
+      const tree = createFakeTree('other');
+
+      // Stabilize at screenshot-low (200px)
+      stabilize(computer, tree, positions, createFakeZoomState({ zoomScale: scaleForWidth(200) }));
+      probe.calls.length = 0;
+
+      // Width jumps to 300px (crosses screenshot-high enter threshold)
+      const tiers = computer.computeTiers(
+        tree, positions,
+        createFakeZoomState({ zoomScale: scaleForWidth(300) }),
+      );
+
+      expect(tiers.get('n1')).toBe('screenshot-high');
+      expect(probe.calls.length).toBe(1);
+    });
+
+    it('sets dirty when width crosses exit threshold downward', () => {
+      const positions = new Map([['n1', { x: 0, y: 0 }]]);
+      const tree = createFakeTree('other');
+
+      // Stabilize at screenshot-low (100px)
+      stabilize(computer, tree, positions, createFakeZoomState({ zoomScale: scaleForWidth(100) }));
+      probe.calls.length = 0;
+
+      // Width drops below exit threshold of screenshot-low (< 60)
+      const tiers = computer.computeTiers(
+        tree, positions,
+        createFakeZoomState({ zoomScale: scaleForWidth(59) }),
+      );
+
+      expect(tiers.get('n1')).toBe('favicon');
+      expect(probe.calls.length).toBe(1);
+    });
+
+    it('clears dirty flag after processing (node stabilizes)', () => {
+      const positions = new Map([['n1', { x: 0, y: 0 }]]);
+      const tree = createFakeTree('other');
+
+      // Stabilize at screenshot-low
+      stabilize(computer, tree, positions, createFakeZoomState({ zoomScale: scaleForWidth(100) }));
+
+      // Cross threshold to screenshot-high range (300px)
+      const finalTiers = stabilize(
+        computer, tree, positions,
+        createFakeZoomState({ zoomScale: scaleForWidth(300) }),
+      );
+
+      expect(finalTiers.get('n1')).toBe('screenshot-high');
+    });
+  });
+
+  describe('frame budget and priority ordering', () => {
+    it('defers low-priority nodes when budget is exceeded', () => {
+      let budgetActive = false;
+      let callCount = 0;
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
+        now: () => budgetActive ? callCount++ : 0,
+        frameBudgetMs: 4,
+      });
+
+      // Positions close together so all stay visible at both zoom levels
+      const positions = new Map([
+        ['focused', { x: 0, y: 0 }],
+        ['n1', { x: 0.1, y: 0 }],
+        ['n2', { x: 0.2, y: 0 }],
+        ['n3', { x: 0.3, y: 0 }],
+        ['n4', { x: 0.4, y: 0 }],
+        ['n5', { x: 0.5, y: 0 }],
+        ['n6', { x: 0.6, y: 0 }],
+      ]);
+      const tree = { focusedNodeId: 'focused' };
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100) });
+
+      // Stabilize with unlimited budget
+      stabilize(comp, tree, positions, zoom);
+
+      // Now exceed budget
+      budgetActive = true;
+      callCount = 0;
+      const tiers = comp.computeTiers(
+        tree, positions,
+        createFakeZoomState({ zoomScale: scaleForWidth(400) }),
+      );
+
+      // Focused should be processed
+      expect(tiers.get('focused')).toBe('live');
+      // Some nodes should be deferred (retain previous tier screenshot-low)
+      const deferred = [...tiers.entries()].filter(
+        ([id, tier]) => id !== 'focused' && tier === 'screenshot-low',
+      );
+      expect(deferred.length).toBeGreaterThan(0);
+    });
+
+    it('focused node is always processed regardless of budget', () => {
+      let callCount = 0;
+      // Each now() call returns 10ms more — budget exceeded immediately
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
+        now: () => callCount++ * 10,
+        frameBudgetMs: 4,
+      });
+
+      const positions = new Map([
+        ['focused', { x: 0, y: 0 }],
+        ['n1', { x: 1, y: 0 }],
+      ]);
+      const tree = { focusedNodeId: 'focused' };
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100), level: 0.5 });
+
+      const tiers = comp.computeTiers(tree, positions, zoom);
+
+      expect(tiers.get('focused')).toBe('live');
+    });
+
+    it('processes nodes in priority order: ancestors before distant', () => {
+      let budgetActive = false;
+      let callCount = 0;
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
+        now: () => budgetActive ? callCount++ : 0,
+        frameBudgetMs: 4,
+      });
+
+      // Positions close together so all stay visible at both zoom levels
+      const positions = new Map([
+        ['grandparent', { x: 0.1, y: 0 }],
+        ['parent', { x: 0.1, y: 0.1 }],
+        ['focused', { x: 0, y: 0.2 }],
+        ['sibling', { x: 0.2, y: 0.2 }],
+        ['child', { x: 0, y: 0.3 }],
+        ['distant1', { x: 0.4, y: 0.1 }],
+        ['distant2', { x: 0.6, y: 0.1 }],
+      ]);
+      const parentMap = new Map([
+        ['parent', 'grandparent'],
+        ['focused', 'parent'],
+        ['sibling', 'parent'],
+        ['child', 'focused'],
+      ]);
+      const tree = { focusedNodeId: 'focused', parentMap };
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100) });
+
+      // Stabilize with unlimited budget
+      stabilize(comp, tree, positions, zoom);
+
+      // Make all dirty by crossing threshold
+      budgetActive = true;
+      callCount = 0;
+      const tiers = comp.computeTiers(
+        tree, positions,
+        createFakeZoomState({ zoomScale: scaleForWidth(400) }),
+      );
+
+      // Ancestors should be processed before distant nodes.
+      // If any distant node is deferred, ancestors must not be.
+      const distantDeferred = tiers.get('distant1') === 'screenshot-low'
+        || tiers.get('distant2') === 'screenshot-low';
+      if (distantDeferred) {
+        expect(tiers.get('grandparent')).not.toBe('screenshot-low');
+        expect(tiers.get('parent')).not.toBe('screenshot-low');
+      }
+    });
+
+    it('deferred nodes retain their previous non-culled tier', () => {
+      let budgetActive = false;
+      let callCount = 0;
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
+        now: () => budgetActive ? callCount++ : 0,
+        frameBudgetMs: 4,
+      });
+
+      // Positions close together so all stay visible at both zoom levels
+      const positions = new Map([
+        ['focused', { x: 0, y: 0 }],
+        ['n1', { x: 0.1, y: 0 }],
+        ['n2', { x: 0.2, y: 0 }],
+        ['n3', { x: 0.3, y: 0 }],
+        ['n4', { x: 0.4, y: 0 }],
+        ['n5', { x: 0.5, y: 0 }],
+        ['n6', { x: 0.6, y: 0 }],
+      ]);
+      const tree = { focusedNodeId: 'focused' };
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100) });
+
+      // Stabilize: all at screenshot-low
+      stabilize(comp, tree, positions, zoom);
+
+      // Cross threshold with tight budget
+      budgetActive = true;
+      callCount = 0;
+      const tiers = comp.computeTiers(
+        tree, positions,
+        createFakeZoomState({ zoomScale: scaleForWidth(400) }),
+      );
+
+      // Deferred nodes should retain screenshot-low (not culled or undefined)
+      for (const [nodeId, tier] of tiers) {
+        if (nodeId !== 'focused') {
+          expect(tier === 'screenshot-high' || tier === 'screenshot-low').toBe(true);
+        }
+      }
+    });
+
+    it('all nodes have defined tiers even when budget exceeded (no visual artifacts)', () => {
+      let callCount = 0;
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
+        now: () => callCount++,
+        frameBudgetMs: 4,
+      });
+
+      const positions = new Map([
+        ['focused', { x: 0, y: 0 }],
+        ['n1', { x: 1, y: 0 }],
+        ['n2', { x: 2, y: 0 }],
+        ['n3', { x: 3, y: 0 }],
+      ]);
+      const tree = { focusedNodeId: 'focused' };
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100) });
+
+      const tiers = comp.computeTiers(tree, positions, zoom);
+
+      for (const [nodeId] of positions) {
+        expect(tiers.get(nodeId)).toBeDefined();
+      }
+    });
+
+    it('deferred nodes are processed on the next frame', () => {
+      let budgetActive = false;
+      let callCount = 0;
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
+        now: () => budgetActive ? callCount++ : 0,
+        frameBudgetMs: 4,
+      });
+
+      // Positions close together so all stay visible at both zoom levels
+      const positions = new Map([
+        ['focused', { x: 0, y: 0 }],
+        ['n1', { x: 0.1, y: 0 }],
+        ['n2', { x: 0.2, y: 0 }],
+        ['n3', { x: 0.3, y: 0 }],
+        ['n4', { x: 0.4, y: 0 }],
+        ['n5', { x: 0.5, y: 0 }],
+        ['n6', { x: 0.6, y: 0 }],
+      ]);
+      const tree = { focusedNodeId: 'focused' };
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100) });
+
+      stabilize(comp, tree, positions, zoom);
+
+      // First frame: budget exceeded, some deferred
+      budgetActive = true;
+      callCount = 0;
+      const tiers1 = comp.computeTiers(
+        tree, positions,
+        createFakeZoomState({ zoomScale: scaleForWidth(400) }),
+      );
+
+      const deferredIds = [...tiers1.entries()]
+        .filter(([id, tier]) => id !== 'focused' && tier === 'screenshot-low')
+        .map(([id]) => id);
+      expect(deferredIds.length).toBeGreaterThan(0);
+
+      // Second frame: deferred nodes should be processed
+      callCount = 0;
+      const tiers2 = comp.computeTiers(
+        tree, positions,
+        createFakeZoomState({ zoomScale: scaleForWidth(400) }),
+      );
+
+      let promoted = 0;
+      for (const id of deferredIds) {
+        if (tiers2.get(id) !== 'screenshot-low') promoted++;
+      }
+      expect(promoted).toBeGreaterThan(0);
     });
   });
 });
