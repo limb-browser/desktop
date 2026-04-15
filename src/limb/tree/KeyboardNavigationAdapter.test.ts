@@ -482,7 +482,6 @@ describe('KeyboardNavigationAdapter', () => {
     });
 
     it('prevents default and stops propagation', () => {
-      setupWithBranchRouter();
       const { branchWin } = setupWithBranchRouter();
 
       const { defaultPrevented, propagationStopped } = dispatchKeydown(

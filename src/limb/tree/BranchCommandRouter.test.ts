@@ -10,7 +10,6 @@ import { InMemoryTabPort } from './InMemoryTabPort';
 import { InMemoryConfirmationPort } from './InMemoryConfirmationPort';
 import type { FakeTab } from './InMemoryTabPort';
 import type { BranchCommandRouterProbe } from '../ports/BranchCommandRouterProbe';
-import type { AutoSaveProbe } from '../ports/AutoSaveProbe';
 import type { TimerPort } from '../ports/TimerPort';
 import { AutoSaveTrigger } from './AutoSaveTrigger';
 

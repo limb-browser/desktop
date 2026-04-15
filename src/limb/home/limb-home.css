@@ -121,6 +121,31 @@ body {
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
+  position: relative;
+}
+
+.branch-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 100ms ease-out;
+}
+
+.branch-card:hover .branch-delete {
+  opacity: 1;
+}
+
+.branch-delete:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .branch-favicon {

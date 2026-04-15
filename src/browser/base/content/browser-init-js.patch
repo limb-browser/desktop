@@ -53,7 +53,7 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      { global: "current" }
 +    );
 +    const treeRestorerProbe = { treeRestored(n) { console.debug("Tree restored:", n, "nodes"); }, orphanedNodeReparented(id) { console.debug("Orphan reparented:", id); }, preLimbTabAdopted(id) { console.debug("Pre-Limb tab adopted:", id); } };
-+    const { tree: browsingTree } = restoreTreeFromTabs(gBrowser, treeRestorerProbe);
++    const { tree: browsingTree, tabMap: restoredTabMap } = restoreTreeFromTabs(gBrowser, treeRestorerProbe);
 +    window.gLimbBrowsingTree = browsingTree; // about:limb-home loads limb/home/limb-home.mjs via <script>
 +    const positions = computeLayout(browsingTree);
 +    const parentMap = new Map();
@@ -90,6 +90,10 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    );
 +    const tabBridgeProbe = { tabCreated(id) { console.debug("Tab created:", id); }, tabClosed(id) { console.debug("Tab closed:", id); }, focusSynced(id) { console.debug("Focus synced:", id); }, locationChanged(id, url) { console.debug("Location:", id, url); }, titleChanged(id, t) { console.debug("Title:", id, t); }, faviconChanged(id, f) { console.debug("Favicon:", id, f); } };
 +    const tabBridge = new TabBridge(new FirefoxTabPort(gBrowser), tabBridgeProbe);
++    for (const [nodeId, tab] of restoredTabMap) {
++      const node = browsingTree.nodes.get(nodeId);
++      if (node) tabBridge.registerExistingTab(tab, nodeId, node.parentId, node.createdAt);
++    }
 +    window.gLimbTabBridge = tabBridge;
 +    const confirmPort = new BrowserConfirmationPort(window);
 +    const homeUrl = Services.prefs.getStringPref("limb.home.url", "about:blank");
