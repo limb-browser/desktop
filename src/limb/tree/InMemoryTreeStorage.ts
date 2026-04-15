@@ -176,6 +176,31 @@ export class InMemoryTreeStorage implements TreeStoragePort {
     this.#probe?.screenshotsDeleted(nodeIds);
   }
 
+  async searchNodes(query: string): Promise<StoredNode[]> {
+    const lowerQuery = query.toLowerCase();
+    const results: StoredNode[] = [];
+    for (const node of this.#nodes.values()) {
+      if (
+        node.title.toLowerCase().includes(lowerQuery) ||
+        node.url.toLowerCase().includes(lowerQuery)
+      ) {
+        results.push({
+          id: node.id,
+          url: node.url,
+          title: node.title,
+          favicon: node.favicon,
+          parentId: node.parentId,
+          childIds: [...node.childIds],
+          createdAt: node.createdAt,
+          lastVisitedAt: node.lastVisitedAt,
+          descendantCount: node.descendantCount,
+          branchRootId: node.branchRootId,
+        });
+      }
+    }
+    return results;
+  }
+
   async getScreenshotMemoryUsage(): Promise<number> {
     let total = 0;
     for (const screenshot of this.#screenshots.values()) {

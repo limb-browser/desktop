@@ -1,0 +1,24 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Limb Search</title>
+  <link rel="stylesheet" href="chrome://browser/content/limb/search/limb-search.css" />
+</head>
+<body>
+  <div id="search-page">
+    <div id="search-input-container">
+      <input id="search-input" type="text" placeholder="Search history..." autocomplete="off" autofocus />
+    </div>
+
+    <div id="results-container"></div>
+
+    <div id="no-results" hidden>No results found.</div>
+  </div>
+
+  <script type="module" src="chrome://browser/content/limb/search/limb-search.mjs"></script>
+</body>
+</html>

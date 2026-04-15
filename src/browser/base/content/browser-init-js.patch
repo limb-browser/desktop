@@ -94,6 +94,8 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    const treeNav = new TreeNavigator(browsingTree);
 +    const keyNavAdapter = new KeyboardNavigationAdapter(treeNav, window.gLimbTreeView, gURLBar, branchRouter, () => {
 +      gBrowser.selectedBrowser.loadURI(Services.io.newURI("about:limb-settings"), { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });
++    }, () => {
++      gBrowser.selectedBrowser.loadURI(Services.io.newURI("about:limb-search"), { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });
 +    });
 +    keyNavAdapter.install(window);
 +    const { TreeStorage } = ChromeUtils.importESModule(

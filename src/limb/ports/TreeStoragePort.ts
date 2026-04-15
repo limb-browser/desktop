@@ -49,6 +49,7 @@ export interface TreeStoragePort {
     resolution: ScreenshotResolution
   ): Promise<Uint8Array | null>;
   deleteScreenshots(nodeIds: string[]): Promise<void>;
+  searchNodes(query: string): Promise<StoredNode[]>;
   getScreenshotMemoryUsage(): Promise<number>;
   getScreenshotEntries(): Promise<ScreenshotEntry[]>;
   close(): Promise<void>;

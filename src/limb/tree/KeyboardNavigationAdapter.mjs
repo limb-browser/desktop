@@ -12,6 +12,7 @@
  * - Ctrl+1: zoom to 100% centered on focused node
  * - Ctrl+N: create new branch (when branchRouter provided)
  * - Ctrl+,: open settings (when openSettings provided)
+ * - Ctrl+K: open search (when openSearch provided)
  * - Escape: blur address bar or zoom to focused node
  *
  * See spec navigation.md S4.1, S4.2, S4.3; navigation.md S5.2.
@@ -30,6 +31,8 @@ export class KeyboardNavigationAdapter {
   #branchRouter;
   /** @type {(() => void) | null} */
   #openSettings;
+  /** @type {(() => void) | null} */
+  #openSearch;
   /** @type {((e: KeyboardEvent) => void) | null} */
   #keyHandler = null;
   /** @type {Window | null} */
@@ -41,13 +44,15 @@ export class KeyboardNavigationAdapter {
    * @param {{ focused: boolean, blur(): void }} urlBar
    * @param {{ createBranch(): Promise<string> } | null} [branchRouter]
    * @param {(() => void) | null} [openSettings]
+   * @param {(() => void) | null} [openSearch]
    */
-  constructor(navigator, treeView, urlBar, branchRouter = null, openSettings = null) {
+  constructor(navigator, treeView, urlBar, branchRouter = null, openSettings = null, openSearch = null) {
     this.#navigator = navigator;
     this.#treeView = treeView;
     this.#urlBar = urlBar;
     this.#branchRouter = branchRouter;
     this.#openSettings = openSettings;
+    this.#openSearch = openSearch;
   }
 
   /**
@@ -142,6 +147,10 @@ export class KeyboardNavigationAdapter {
       e.preventDefault();
       e.stopPropagation();
       this.#openSettings();
+    } else if (e.key === "k" && this.#openSearch) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.#openSearch();
     }
   }
 

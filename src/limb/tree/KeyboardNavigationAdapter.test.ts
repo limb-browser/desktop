@@ -538,6 +538,42 @@ describe('KeyboardNavigationAdapter', () => {
     });
   });
 
+  describe('Ctrl+K — open search', () => {
+    it('calls openSearch callback on Ctrl+K', () => {
+      let called = false;
+      const searchAdapter = new KeyboardNavigationAdapter(
+        nav, treeView, urlBar, null, null, () => { called = true; },
+      );
+      const searchWin = createFakeWindow();
+      searchAdapter.install(searchWin as unknown as Window);
+
+      dispatchKeydown(searchWin, 'k', { ctrlKey: true });
+
+      expect(called).toBe(true);
+    });
+
+    it('prevents default and stops propagation', () => {
+      const searchAdapter = new KeyboardNavigationAdapter(
+        nav, treeView, urlBar, null, null, () => {},
+      );
+      const searchWin = createFakeWindow();
+      searchAdapter.install(searchWin as unknown as Window);
+
+      const { defaultPrevented, propagationStopped } = dispatchKeydown(
+        searchWin, 'k', { ctrlKey: true },
+      );
+
+      expect(defaultPrevented).toBe(true);
+      expect(propagationStopped).toBe(true);
+    });
+
+    it('is a no-op when no openSearch callback is provided', () => {
+      const { defaultPrevented } = dispatchKeydown(win, 'k', { ctrlKey: true });
+
+      expect(defaultPrevented).toBe(false);
+    });
+  });
+
   describe('install / uninstall', () => {
     it('registers a keydown listener on install', () => {
       const newWin = createFakeWindow();

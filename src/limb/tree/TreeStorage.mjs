@@ -358,6 +358,36 @@ export class TreeStorage {
   }
 
   /**
+   * Search stored nodes by title or URL substring match.
+   * @param {string} query
+   * @returns {Promise<Array<object>>} Array of StoredNode objects
+   */
+  async searchNodes(query) {
+    const db = await this.#getDb();
+    // LIKE pattern built via concatenation, bound as a parameter
+    const pattern = "%" + query + "%";
+
+    const rows = await db.execute(
+      `SELECT * FROM limb_nodes
+       WHERE title LIKE :pattern OR url LIKE :pattern`,
+      { pattern }
+    );
+
+    return rows.map((row) => ({
+      id: row.getResultByName("id"),
+      url: row.getResultByName("url"),
+      title: row.getResultByName("title"),
+      favicon: row.getResultByName("favicon"),
+      parentId: row.getResultByName("parent_id"),
+      childIds: JSON.parse(row.getResultByName("child_ids")),
+      createdAt: row.getResultByName("created_at"),
+      lastVisitedAt: row.getResultByName("last_visited_at"),
+      descendantCount: row.getResultByName("descendant_count"),
+      branchRootId: row.getResultByName("branch_root_id"),
+    }));
+  }
+
+  /**
    * Return total byte size of stored screenshots.
    * @returns {Promise<number>}
    */
