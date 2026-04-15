@@ -46,7 +46,7 @@ export class BrowsingTree {
     this.nodes = new Map([[rootId, root]]);
   }
 
-  setProbe(probe: BrowsingTreeProbe): void {
+  setProbe(probe: BrowsingTreeProbe | null): void {
     this.#probe = probe;
   }
 

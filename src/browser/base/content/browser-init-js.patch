@@ -72,7 +72,7 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    const autoSaveProbe = { saveTriggered(reason) { console.debug("Auto-save:", reason); }, saveDebounced(n) { console.debug("Auto-save debounced:", n); }, periodicFlushStarted() { console.debug("Periodic flush started"); }, periodicFlushStopped() { console.debug("Periodic flush stopped"); } };
 +    const { TabStateFlusher } = ChromeUtils.importESModule("resource:///modules/sessionstore/TabStateFlusher.sys.mjs");
 +    const autoSaveAdapter = new AutoSaveAdapter(() => { TabStateFlusher.flushWindow(window); }, autoSaveProbe);
-+    autoSaveAdapter.install(browsingTree);
++    autoSaveAdapter.install(browsingTree, gBrowser.tabContainer);
 +    window.gLimbAutoSaveAdapter = autoSaveAdapter;
      gBrowser.addEventListener("DOMUpdateBlockedPopups", e =>
        PopupAndRedirectBlockerObserver.handleEvent(e)

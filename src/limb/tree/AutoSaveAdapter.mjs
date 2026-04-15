@@ -4,7 +4,7 @@
 
 /**
  * Browser chrome adapter that wires AutoSaveTrigger to BrowsingTree
- * probes, TabBridge probes, periodic flush, and browser quit events.
+ * probes, TabAttrModified events, periodic flush, and browser quit events.
  *
  * Triggers a SessionStore flush on tree mutations, URL/title changes,
  * periodically (30 s), and before shutdown.
@@ -26,6 +26,10 @@ export class AutoSaveAdapter {
   #trigger;
   /** @type {object | null} */
   #browsingTree = null;
+  /** @type {EventTarget | null} */
+  #tabContainer = null;
+  /** @type {((e: Event) => void) | null} */
+  #attrHandler = null;
   /** @type {boolean} */
   #installed = false;
 
@@ -41,15 +45,18 @@ export class AutoSaveAdapter {
    * Install auto-save hooks on the given tree and start periodic flush.
    *
    * Sets a BrowsingTreeProbe on the tree that triggers saves on
-   * addChild, removeNode, and focusNode. Also registers a
-   * quit-application-requested observer for shutdown save.
+   * addChild, removeNode, and focusNode. Listens for TabAttrModified
+   * on tabContainer to trigger saves on URL/title/favicon changes.
+   * Also registers a quit-application-requested observer for shutdown save.
    *
    * @param {object} browsingTree - the BrowsingTree instance
+   * @param {EventTarget} tabContainer - gBrowser.tabContainer for TabAttrModified events
    */
-  install(browsingTree) {
+  install(browsingTree, tabContainer) {
     if (this.#installed) return;
     this.#installed = true;
     this.#browsingTree = browsingTree;
+    this.#tabContainer = tabContainer;
 
     browsingTree.setProbe({
       childAdded: () => this.#trigger.notifyChange(),
@@ -59,17 +66,11 @@ export class AutoSaveAdapter {
       treeSizeSuggestion: () => {},
     });
 
+    this.#attrHandler = () => this.#trigger.notifyChange();
+    tabContainer.addEventListener("TabAttrModified", this.#attrHandler);
+
     Services.obs.addObserver(this, "quit-application-requested");
     this.#trigger.startPeriodicFlush();
-  }
-
-  /**
-   * Notify the trigger that URL or title data changed.
-   * Call this from wherever TabBridge location/title/favicon changes
-   * are handled.
-   */
-  notifyDataChange() {
-    this.#trigger.notifyChange();
   }
 
   /**
@@ -88,6 +89,16 @@ export class AutoSaveAdapter {
     this.#installed = false;
     this.#trigger.dispose();
     Services.obs.removeObserver(this, "quit-application-requested");
-    this.#browsingTree = null;
+
+    if (this.#browsingTree) {
+      this.#browsingTree.setProbe(null);
+      this.#browsingTree = null;
+    }
+
+    if (this.#attrHandler && this.#tabContainer) {
+      this.#tabContainer.removeEventListener("TabAttrModified", this.#attrHandler);
+      this.#attrHandler = null;
+      this.#tabContainer = null;
+    }
   }
 }
