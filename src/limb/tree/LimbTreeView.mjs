@@ -156,6 +156,9 @@ export class LimbTreeView {
   /** @type {{ startFocus: { x: number, y: number }, endFocus: { x: number, y: number }, startLevel: number, endLevel: number, startTime: number, duration: number } | null} */
   #animation = null;
 
+  /** @type {boolean} */
+  #wasDegraded = false;
+
   /** @type {((e: WheelEvent) => void) | null} */
   #wheelHandler = null;
   /** @type {(() => void) | null} */
@@ -517,9 +520,24 @@ export class LimbTreeView {
   /**
    * Unified frame callback invoked by the FrameScheduler.
    * Advances any active animations, then paints.
+   * In degraded mode, skips animations running >2 frames and adjusts LOD thresholds.
    */
   #onFrame() {
     const now = performance.now();
+    const isDegraded = this.#frameScheduler?.isDegraded ?? false;
+
+    // Detect degraded mode transitions and adjust LOD thresholds
+    if (isDegraded && !this.#wasDegraded) {
+      this.#lodComputer?.setThresholdMultiplier(1.5);
+    } else if (!isDegraded && this.#wasDegraded) {
+      this.#lodComputer?.setThresholdMultiplier(1.0);
+    }
+    this.#wasDegraded = isDegraded;
+
+    // In degraded mode, skip animations running more than 2 frames
+    if (isDegraded && this.#frameScheduler && this.#frameScheduler.degradedFrameCount > 2) {
+      this.#skipAllAnimations();
+    }
 
     // Advance ZoomOutAndBackAnimator if active (mutually exclusive with ZoomAnimator)
     if (this.#zoomOutAndBackAnimator?.isAnimating && this.#zoom) {
@@ -581,6 +599,36 @@ export class LimbTreeView {
 
     this.#animationLastTime = now;
     this.#paint();
+  }
+
+  /**
+   * Skip all running animations to their final state.
+   * Used in degraded mode to reduce frame cost.
+   */
+  #skipAllAnimations() {
+    if (this.#zoomAnimator?.isAnimating && this.#zoom) {
+      const finalFrame = this.#zoomAnimator.skipToEnd();
+      if (finalFrame) {
+        this.#zoom.setLevel(finalFrame.level);
+        this.#zoom.focusPoint = { ...finalFrame.focusPoint };
+      }
+    }
+    if (this.#layoutAnimator?.isAnimating) {
+      this.#layoutAnimator.skipToEnd();
+      this.#layoutAnimatedFrame = null;
+    }
+    if (this.#revealAnimator?.isAnimating) {
+      this.#revealAnimator.skipToEnd();
+    }
+    if (this.#animation) {
+      if (this.#zoom) {
+        this.#zoom.focusPoint = { ...this.#animation.endFocus };
+        if (this.#animation.startLevel !== this.#animation.endLevel) {
+          this.#zoom.setLevel(this.#animation.endLevel);
+        }
+      }
+      this.#animation = null;
+    }
   }
 
   #paint() {
@@ -1026,6 +1074,7 @@ export class LimbTreeView {
     this.#onNodeClicked = null;
     this.#onFoldToggled = null;
     this.#foldNodes = new Map();
+    this.#wasDegraded = false;
     this.#resizeHandler = null;
     this.#wheelHandler = null;
     this.#mousedownHandler = null;

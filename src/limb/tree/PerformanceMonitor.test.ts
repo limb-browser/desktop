@@ -18,6 +18,12 @@ function createPerfProbe() {
     memorySnapshot(heapMB, screenshotsMB, tabCount) {
       calls.push({ method: 'memorySnapshot', args: [heapMB, screenshotsMB, tabCount] });
     },
+    degradedModeEntered() {
+      calls.push({ method: 'degradedModeEntered', args: [] });
+    },
+    degradedModeExited() {
+      calls.push({ method: 'degradedModeExited', args: [] });
+    },
   };
   return { probe, calls };
 }

@@ -13,6 +13,8 @@
  * See performance.md S3.3.
  */
 
+import { DegradedModeController } from './DegradedModeController.mjs';
+
 const IDLE_FRAME_LIMIT = 30;
 const FRAME_BUDGET_MS = 16;
 
@@ -37,6 +39,10 @@ export class FrameScheduler {
   #performanceProbe;
   /** @type {() => number} */
   #now;
+  /** @type {DegradedModeController} */
+  #degradedMode;
+  /** @type {number} */
+  #degradedFrameCount = 0;
 
   /**
    * @param {() => void} paint - The paint callback to invoke each frame.
@@ -50,6 +56,17 @@ export class FrameScheduler {
     this.#cancelFrame = options?.cancelFrame ?? cancelAnimationFrame;
     this.#performanceProbe = options?.performanceProbe ?? null;
     this.#now = options?.now ?? (() => performance.now());
+    this.#degradedMode = new DegradedModeController(options?.performanceProbe);
+  }
+
+  /** @returns {boolean} */
+  get isDegraded() {
+    return this.#degradedMode.isDegraded;
+  }
+
+  /** @returns {number} Number of paint frames since entering degraded mode. */
+  get degradedFrameCount() {
+    return this.#degradedFrameCount;
   }
 
   /**
@@ -76,11 +93,19 @@ export class FrameScheduler {
     if (this.#dirty) {
       this.#dirty = false;
       this.#idleFrameCount = 0;
+      const wasDegraded = this.#degradedMode.isDegraded;
       const start = this.#now();
       this.#paint();
       const elapsed = this.#now() - start;
       if (elapsed > FRAME_BUDGET_MS) {
         this.#performanceProbe?.frameBudgetExceeded(elapsed, FRAME_BUDGET_MS);
+      }
+      this.#degradedMode.recordFrameDuration(elapsed);
+      if (this.#degradedMode.isDegraded) {
+        this.#degradedFrameCount++;
+      } else if (wasDegraded) {
+        // Just exited degraded mode
+        this.#degradedFrameCount = 0;
       }
       this.#probe?.framePainted();
     } else {

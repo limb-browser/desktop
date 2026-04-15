@@ -83,6 +83,8 @@ export class LODComputer {
   #lastLayout = null;
   /** @type {number} */
   #frameBudgetMs;
+  /** @type {number} */
+  #thresholdMultiplier = 1.0;
 
   /**
    * @param {number} baseNodeWidth - Logical node width (same unit as layout positions)
@@ -98,6 +100,17 @@ export class LODComputer {
     this.#now = options?.now ?? (() => performance.now());
     this.#spatialIndex = new SpatialIndex();
     this.#frameBudgetMs = options?.frameBudgetMs ?? FRAME_BUDGET_MS;
+  }
+
+  /**
+   * Set a multiplier for all LOD tier entry thresholds.
+   * In degraded mode, set to 1.5 to raise thresholds by 50%.
+   * Set back to 1.0 to restore original thresholds.
+   *
+   * @param {number} multiplier
+   */
+  setThresholdMultiplier(multiplier) {
+    this.#thresholdMultiplier = multiplier;
   }
 
   /**
@@ -176,7 +189,7 @@ export class LODComputer {
       }
 
       // Check if nodeScreenWidth crossed a tier boundary for this node's current tier
-      if (isDirtyNode(previousTier, nodeScreenWidth)) {
+      if (isDirtyNode(previousTier, nodeScreenWidth, this.#thresholdMultiplier)) {
         dirtyNodes.push(nodeId);
         continue;
       }
@@ -216,11 +229,11 @@ export class LODComputer {
       }
 
       // Compute raw tier from standard (enter) thresholds
-      const rawTier = rawTierFromWidth(nodeScreenWidth);
+      const rawTier = rawTierFromWidth(nodeScreenWidth, this.#thresholdMultiplier);
 
       // Apply hysteresis
       const previousTier = this.#previousTiers.get(nodeId) ?? 'culled';
-      const hystTier = applyHysteresis(rawTier, previousTier, nodeScreenWidth);
+      const hystTier = applyHysteresis(rawTier, previousTier, nodeScreenWidth, this.#thresholdMultiplier);
 
       // Apply monotonic constraint: at most one tier step from previous
       const finalTier = applyMonotonic(hystTier, previousTier);
@@ -246,14 +259,16 @@ export class LODComputer {
 }
 
 /**
- * Determine tier from nodeScreenWidth using standard (enter) thresholds.
+ * Determine tier from nodeScreenWidth using standard (enter) thresholds,
+ * scaled by a multiplier for degraded mode.
  * @param {number} width
+ * @param {number} [multiplier]
  * @returns {string}
  */
-function rawTierFromWidth(width) {
-  if (width >= 600) return 'live';
-  if (width >= 300) return 'screenshot-high';
-  if (width >= 80) return 'screenshot-low';
+function rawTierFromWidth(width, multiplier = 1.0) {
+  if (width >= 600 * multiplier) return 'live';
+  if (width >= 300 * multiplier) return 'screenshot-high';
+  if (width >= 80 * multiplier) return 'screenshot-low';
   return 'favicon';
 }
 
@@ -267,10 +282,11 @@ function rawTierFromWidth(width) {
  *
  * @param {string} currentTier - The node's tier from the previous frame
  * @param {number} nodeScreenWidth - The current nodeScreenWidth
+ * @param {number} [multiplier]
  * @returns {boolean} true if the node needs recomputation
  */
-function isDirtyNode(currentTier, nodeScreenWidth) {
-  const rawTier = rawTierFromWidth(nodeScreenWidth);
+function isDirtyNode(currentTier, nodeScreenWidth, multiplier = 1.0) {
+  const rawTier = rawTierFromWidth(nodeScreenWidth, multiplier);
   const rawOrd = TIER_ORDINAL[rawTier];
   const curOrd = TIER_ORDINAL[currentTier];
 
@@ -282,7 +298,7 @@ function isDirtyNode(currentTier, nodeScreenWidth) {
 
   // Demoting: check exit threshold (deadband)
   const exitThresh = EXIT_THRESHOLD[currentTier];
-  if (exitThresh !== undefined && nodeScreenWidth >= exitThresh) return false;
+  if (exitThresh !== undefined && nodeScreenWidth >= exitThresh * multiplier) return false;
 
   return true;
 }
@@ -294,9 +310,10 @@ function isDirtyNode(currentTier, nodeScreenWidth) {
  * @param {string} rawTier - Tier from standard thresholds
  * @param {string} previousTier - Previous frame's tier
  * @param {number} nodeScreenWidth
+ * @param {number} [multiplier]
  * @returns {string}
  */
-function applyHysteresis(rawTier, previousTier, nodeScreenWidth) {
+function applyHysteresis(rawTier, previousTier, nodeScreenWidth, multiplier = 1.0) {
   const rawOrd = TIER_ORDINAL[rawTier];
   const prevOrd = TIER_ORDINAL[previousTier];
 
@@ -307,7 +324,7 @@ function applyHysteresis(rawTier, previousTier, nodeScreenWidth) {
 
   // Demoting: check exit threshold of the previous tier
   const exitThresh = EXIT_THRESHOLD[previousTier];
-  if (exitThresh !== undefined && nodeScreenWidth >= exitThresh) {
+  if (exitThresh !== undefined && nodeScreenWidth >= exitThresh * multiplier) {
     // Width is in the deadband — stay at previous tier
     return previousTier;
   }

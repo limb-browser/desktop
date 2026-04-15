@@ -196,6 +196,15 @@ export class LayoutAnimator {
   }
 
   /**
+   * Skip the current transition to its final state.
+   * No-op if not animating.
+   */
+  skipToEnd() {
+    if (!this.#active) return;
+    this.#finishTransition();
+  }
+
+  /**
    * Advance animations by deltaMs and return the current animated frame.
    *
    * When not animating, returns the settled (previous) positions with

@@ -573,6 +573,96 @@ describe('LayoutAnimator', () => {
     });
   });
 
+  describe('skipToEnd', () => {
+    it('immediately applies final positions and stops animating', () => {
+      const animator = new LayoutAnimator();
+      animator.beginTransition(
+        new Map([['A', pos(0, 0)], ['B', pos(1, 0)]]),
+        new Map(),
+      );
+      animator.beginTransition(
+        new Map([['A', pos(0, 0)], ['B', pos(5, 0)]]),
+        new Map(),
+      );
+
+      animator.tick(50); // partway
+      expect(animator.isAnimating).toBe(true);
+
+      animator.skipToEnd();
+      expect(animator.isAnimating).toBe(false);
+
+      const frame = animator.tick(0);
+      expect(frame.positions.get('B')!.x).toBeCloseTo(5);
+      expect(frame.isAnimating).toBe(false);
+    });
+
+    it('added nodes have full opacity after skipToEnd', () => {
+      const animator = new LayoutAnimator();
+      animator.beginTransition(
+        new Map([['A', pos(0, 0)]]),
+        new Map(),
+      );
+      animator.beginTransition(
+        new Map([['A', pos(0, 0)], ['B', pos(1, 0)]]),
+        new Map([['B', 'A']]),
+      );
+
+      animator.tick(0); // opacity 0 for B
+      animator.skipToEnd();
+
+      const frame = animator.tick(0);
+      // B should not be in opacity map (fully opaque = default)
+      expect(frame.opacity.has('B')).toBe(false);
+    });
+
+    it('removed nodes are gone after skipToEnd', () => {
+      const animator = new LayoutAnimator();
+      animator.beginTransition(
+        new Map([['A', pos(0, 0)], ['B', pos(1, 0)]]),
+        new Map([['B', 'A']]),
+      );
+      animator.beginTransition(
+        new Map([['A', pos(0, 0)]]),
+        new Map(),
+      );
+
+      animator.tick(0); // B fading out
+      animator.skipToEnd();
+
+      const frame = animator.tick(0);
+      expect(frame.positions.has('B')).toBe(false);
+    });
+
+    it('fires transitionCompleted probe event', () => {
+      const { probe, calls } = createProbe();
+      const animator = new LayoutAnimator(probe);
+      animator.beginTransition(
+        new Map([['A', pos(0, 0)]]),
+        new Map(),
+      );
+      animator.beginTransition(
+        new Map([['A', pos(1, 0)]]),
+        new Map(),
+      );
+
+      animator.skipToEnd();
+
+      expect(calls.filter(c => c.type === 'completed')).toHaveLength(1);
+    });
+
+    it('is a no-op when not animating', () => {
+      const { probe, calls } = createProbe();
+      const animator = new LayoutAnimator(probe);
+      animator.beginTransition(
+        new Map([['A', pos(0, 0)]]),
+        new Map(),
+      );
+
+      animator.skipToEnd(); // not animating, should not fire events
+      expect(calls).toHaveLength(0);
+    });
+  });
+
   describe('no animation when positions unchanged', () => {
     it('does not animate if positions are the same', () => {
       const { probe, calls } = createProbe();

@@ -6,4 +6,6 @@ export interface PerformanceProbe {
   frameBudgetExceeded(actualMs: number, budgetMs: number): void;
   lodComputationTime(ms: number): void;
   memorySnapshot(heapMB: number, screenshotsMB: number, tabCount: number): void;
+  degradedModeEntered(): void;
+  degradedModeExited(): void;
 }

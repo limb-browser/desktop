@@ -165,6 +165,25 @@ export class ZoomAnimator {
   }
 
   /**
+   * Skip the current animation to its final state.
+   * Returns the final frame or null if not animating.
+   *
+   * @returns {AnimationFrame | null}
+   */
+  skipToEnd() {
+    if (!this.#active) return null;
+
+    this.#active = false;
+    this.#probe?.animationCompleted();
+
+    return {
+      level: this.#endLevel,
+      focusPoint: { x: this.#endFocusX, y: this.#endFocusY },
+      done: true,
+    };
+  }
+
+  /**
    * Advance the animation by deltaMs milliseconds.
    *
    * @param {number} deltaMs

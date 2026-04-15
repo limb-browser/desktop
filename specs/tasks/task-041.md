@@ -5,7 +5,7 @@ depends_on:
   - task-022
   - task-011
   - task-034
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []

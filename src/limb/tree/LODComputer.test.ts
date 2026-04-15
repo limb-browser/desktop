@@ -712,6 +712,12 @@ describe('LODComputer', () => {
         memorySnapshot(heapMB, screenshotsMB, tabCount) {
           calls.push({ method: 'memorySnapshot', args: [heapMB, screenshotsMB, tabCount] });
         },
+        degradedModeEntered() {
+          calls.push({ method: 'degradedModeEntered', args: [] });
+        },
+        degradedModeExited() {
+          calls.push({ method: 'degradedModeExited', args: [] });
+        },
       };
       return { perfProbe, calls };
     }
@@ -1098,6 +1104,76 @@ describe('LODComputer', () => {
         if (tiers2.get(id) !== 'screenshot-low') promoted++;
       }
       expect(promoted).toBeGreaterThan(0);
+    });
+  });
+
+  describe('threshold multiplier for degraded mode', () => {
+    it('raises tier entry thresholds by the given factor', () => {
+      // With multiplier 1.5: live threshold goes from 600 to 900
+      // So a node at 700px screen width (normally live) becomes screenshot-high
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, probe);
+      comp.setThresholdMultiplier(1.5);
+
+      const positions = new Map([
+        ['focused', { x: 0, y: 0 }],
+        ['A', { x: 1, y: 0 }],
+      ]);
+      const tree = { focusedNodeId: 'focused' };
+
+      // zoomScale for 700px node: 700 / 0.8 = 875
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(700) });
+      const tiers = stabilize(comp, tree, positions, zoom);
+
+      // Without multiplier, 700px => live. With 1.5x, live threshold is 900, so screenshot-high
+      expect(tiers.get('A')).toBe('screenshot-high');
+    });
+
+    it('restores original thresholds when multiplier set back to 1.0', () => {
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, probe);
+
+      const positions = new Map([
+        ['focused', { x: 0, y: 0 }],
+        ['A', { x: 1, y: 0 }],
+      ]);
+      const tree = { focusedNodeId: 'focused' };
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(700) });
+
+      comp.setThresholdMultiplier(1.5);
+      const tiersDegrade = stabilize(comp, tree, positions, zoom);
+      expect(tiersDegrade.get('A')).toBe('screenshot-high');
+
+      comp.setThresholdMultiplier(1.0);
+      const tiersNormal = stabilize(comp, tree, positions, zoom);
+      expect(tiersNormal.get('A')).toBe('live');
+    });
+
+    it('multiplier affects all tier thresholds proportionally', () => {
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, probe);
+      comp.setThresholdMultiplier(1.5);
+
+      const positions = new Map([
+        ['focused', { x: 0, y: 0 }],
+        ['A', { x: 1, y: 0 }],
+      ]);
+      const tree = { focusedNodeId: 'focused' };
+
+      // screenshot-low threshold: 80 * 1.5 = 120
+      // Node at 100px (normally screenshot-low) should be favicon with 1.5x multiplier
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100) });
+      const tiers = stabilize(comp, tree, positions, zoom);
+      expect(tiers.get('A')).toBe('favicon');
+    });
+
+    it('focused node is not affected by threshold multiplier', () => {
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, probe);
+      comp.setThresholdMultiplier(1.5);
+
+      const positions = new Map([['focused', { x: 0, y: 0 }]]);
+      const tree = { focusedNodeId: 'focused' };
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(700), level: 0.95 });
+
+      const tiers = stabilize(comp, tree, positions, zoom);
+      expect(tiers.get('focused')).toBe('focused');
     });
   });
 });

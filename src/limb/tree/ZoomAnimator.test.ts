@@ -199,6 +199,49 @@ describe('ZoomAnimator', () => {
     });
   });
 
+  describe('skipToEnd', () => {
+    it('immediately sets level and focusPoint to final values', () => {
+      const animator = new ZoomAnimator();
+      animator.start(0.3, 1.0, { x: 0, y: 0 }, { x: 10, y: 6 });
+      animator.update(50); // partway
+
+      animator.skipToEnd();
+
+      // Next update should return null (no longer animating)
+      expect(animator.isAnimating).toBe(false);
+      expect(animator.update(16)).toBeNull();
+    });
+
+    it('returns the final state frame', () => {
+      const animator = new ZoomAnimator();
+      animator.start(0.3, 1.0, { x: 0, y: 0 }, { x: 10, y: 6 });
+      animator.update(50);
+
+      const finalFrame = animator.skipToEnd();
+      expect(finalFrame).not.toBeNull();
+      expect(finalFrame!.level).toBeCloseTo(1.0);
+      expect(finalFrame!.focusPoint.x).toBeCloseTo(10);
+      expect(finalFrame!.focusPoint.y).toBeCloseTo(6);
+      expect(finalFrame!.done).toBe(true);
+    });
+
+    it('fires animationCompleted probe event', () => {
+      const { probe, calls } = createProbe();
+      const animator = new ZoomAnimator(probe);
+      animator.start(0.3, 1.0, { x: 0, y: 0 }, { x: 10, y: 6 });
+
+      animator.skipToEnd();
+
+      expect(calls.filter(c => c.type === 'completed')).toHaveLength(1);
+    });
+
+    it('returns null when not animating', () => {
+      const animator = new ZoomAnimator();
+      const result = animator.skipToEnd();
+      expect(result).toBeNull();
+    });
+  });
+
   describe('update returns null when not animating', () => {
     it('returns null before start', () => {
       const animator = new ZoomAnimator();

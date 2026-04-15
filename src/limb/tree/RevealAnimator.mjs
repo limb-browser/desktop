@@ -102,6 +102,19 @@ export class RevealAnimator {
   }
 
   /**
+   * Skip all in-progress reveal animations to their final state.
+   * No-op if not animating.
+   */
+  skipToEnd() {
+    if (this.#animations.size === 0) return;
+
+    for (const [nodeId] of this.#animations) {
+      this.#probe?.revealCompleted(nodeId);
+    }
+    this.#animations.clear();
+  }
+
+  /**
    * Update reveal animations for the current frame.
    *
    * @param {Set<string>} visibleNodeIds - Node IDs visible in this frame

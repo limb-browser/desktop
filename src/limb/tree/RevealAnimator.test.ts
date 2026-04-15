@@ -308,6 +308,51 @@ describe('RevealAnimator', () => {
     });
   });
 
+  describe('skipToEnd', () => {
+    it('immediately completes all reveal animations', () => {
+      const parentMap = makeTestTree();
+      const animator = new RevealAnimator();
+
+      animator.update(new Set(['b']), 0.8, 'b', parentMap, 0);
+      animator.update(new Set(['b', 'a', 'c']), 0.6, 'b', parentMap, 0);
+
+      expect(animator.isAnimating).toBe(true);
+
+      animator.skipToEnd();
+
+      expect(animator.isAnimating).toBe(false);
+
+      // After skipToEnd, update should return no reveals (all complete)
+      const reveals = animator.update(new Set(['b', 'a', 'c']), 0.6, 'b', parentMap, 0);
+      expect(reveals.has('a')).toBe(false);
+      expect(reveals.has('c')).toBe(false);
+    });
+
+    it('fires revealCompleted for all in-progress animations', () => {
+      const parentMap = makeTestTree();
+      const probe = makeProbe();
+      const animator = new RevealAnimator(probe);
+
+      animator.update(new Set(['d']), 0.9, 'd', parentMap, 0);
+      animator.update(new Set(['d', 'e', 'b']), 0.7, 'd', parentMap, 0);
+
+      animator.skipToEnd();
+
+      const completedEvents = probe.events.filter(e => e.type === 'completed');
+      expect(completedEvents).toHaveLength(2);
+      expect(completedEvents.map(e => e.nodeId).sort()).toEqual(['b', 'e']);
+    });
+
+    it('is a no-op when not animating', () => {
+      const probe = makeProbe();
+      const animator = new RevealAnimator(probe);
+
+      animator.skipToEnd();
+
+      expect(probe.events).toHaveLength(0);
+    });
+  });
+
   describe('already-visible nodes', () => {
     it('does not animate nodes that were already visible', () => {
       const parentMap = makeTestTree();
