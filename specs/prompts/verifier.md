@@ -49,6 +49,7 @@ Flaws include:
 - **State propagation across adapters:** When an adapter calls methods on two or more modules during a single operation, verify state consistency across modules afterward. If a field like `focusedNodeId` is stored in both module A and module B, check that the adapter updates both. A common miss: the adapter calls `moduleA.updateFocus()` then `moduleB.centerOnNode()` -- but `moduleB`'s internal `focusedNodeId` was never updated, causing focus ring rendering and LOD tier computation to use stale data.
 - **Dependency behavior match:** When a spec says "animate", "transition", "fade", or similar behavior verbs, verify the called method actually implements that behavior -- not just that it's invoked. A method named `centerOnNode` might snap instantly rather than animate. Read the dependency's implementation and compare against the spec's behavioral requirements. A correctly-called method that doesn't produce the spec-required behavior is a finding.
 - **Animation timing compliance:** When a task implements animations, verify the duration and easing curve constants match `interaction-feel.md` exactly. S1.3 defines programmatic zoom timing (350ms, `cubic-bezier(0.25, 0.1, 0.25, 1.0)`). S3.1 defines hover timing (100ms ease-out). S4 defines layout animation timing. Check that constants like `ANIMATION_DURATION_MS` or easing functions produce values matching the spec -- not just "an animation exists." A 300ms animation where the spec says 350ms is a finding. Also verify that different animation types in the same file use their own spec-mandated constants rather than sharing values from an unrelated animation (e.g., reusing hover easing for zoom animation).
+- **Programmatic zoom API discipline:** Run `scripts/check-zoom-animation.sh`. Any adapter or handler that calls `setZoomLevel()` directly is a finding -- all user-triggered zoom level changes are "programmatic zoom" per S1.3 and must animate via `animateToNode()` or `ZoomAnimator.start()`. This applies to all zoom-changing actions: zoom resets, zoom-to-node, auto-zoom, etc. An instant zoom setter from a user-action handler causes a visual discontinuity (S7.1 violation).
 
 ## Workflow
 
@@ -58,7 +59,7 @@ Flaws include:
 4. Read the task's referenced spec sections.
 5. Read all code files the task added or modified (check git diff).
 6. Run `npx vitest run` -- failures are automatic findings.
-7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, `scripts/check-dead-exports.sh`, `scripts/check-dead-locals.sh`, and `scripts/check-chrome-wiring.sh` -- failures are automatic findings.
+7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, `scripts/check-dead-exports.sh`, `scripts/check-dead-locals.sh`, `scripts/check-chrome-wiring.sh`, and `scripts/check-zoom-animation.sh` -- failures are automatic findings.
 8. Apply verification targets systematically.
 9. Write findings to `specs/reviews/review-TASK_NNN-RN.md`:
    ```markdown
