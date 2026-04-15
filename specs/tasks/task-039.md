@@ -3,8 +3,8 @@ title: "Implement LOD performance optimizations — spatial index and frame skip
 spec_ref: "performance.md S2.1 S2.3"
 depends_on:
   - task-011
-progress: ready-for-review
-review: ""
+progress: complete
+review: "specs/reviews/review-task-039-R1.md"
 coverage_sections: []
 commits: []
 ---
