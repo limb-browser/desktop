@@ -20,6 +20,7 @@
 import { ZoomState } from "./ZoomState.mjs";
 import { TreeRenderer } from "./TreeRenderer.mjs";
 import { LODComputer } from "./LODComputer.mjs";
+import { PanInteraction } from "./PanInteraction.mjs";
 
 // Zoom level change per 100px of wheel deltaY
 const ZOOM_SENSITIVITY = 0.05;
@@ -52,6 +53,8 @@ export class LimbTreeView {
   #renderer = null;
   /** @type {LODComputer | null} */
   #lodComputer = null;
+  /** @type {PanInteraction | null} */
+  #panInteraction = null;
 
   /** @type {Map<string, { x: number, y: number }> | null} */
   #positions = null;
@@ -66,6 +69,12 @@ export class LimbTreeView {
   #wheelHandler = null;
   /** @type {(() => void) | null} */
   #resizeHandler = null;
+  /** @type {((e: MouseEvent) => void) | null} */
+  #mousedownHandler = null;
+  /** @type {((e: MouseEvent) => void) | null} */
+  #mousemoveHandler = null;
+  /** @type {((e: MouseEvent) => void) | null} */
+  #mouseupHandler = null;
 
   /**
    * Initialize the tree view with a canvas element.
@@ -86,15 +95,22 @@ export class LimbTreeView {
 
     this.#renderer = new TreeRenderer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT);
     this.#lodComputer = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, lodProbe);
+    this.#panInteraction = new PanInteraction(this.#zoom);
 
     this.#resizeHandler = () => this.#resize();
     this.#wheelHandler = (e) => this.#onWheel(e);
+    this.#mousedownHandler = (e) => this.#onMouseDown(e);
+    this.#mousemoveHandler = (e) => this.#onMouseMove(e);
+    this.#mouseupHandler = (e) => this.#onMouseUp(e);
 
     this.#resize();
     this.#paint();
 
     window.addEventListener("resize", this.#resizeHandler);
     this.#canvas.addEventListener("wheel", this.#wheelHandler, { passive: false });
+    this.#canvas.addEventListener("mousedown", this.#mousedownHandler);
+    this.#canvas.addEventListener("mousemove", this.#mousemoveHandler);
+    this.#canvas.addEventListener("mouseup", this.#mouseupHandler);
   }
 
   /**
@@ -153,7 +169,36 @@ export class LimbTreeView {
 
     const deltaLevel = -(e.deltaY / 100) * ZOOM_SENSITIVITY;
     this.#zoom.zoomAtCursor(deltaLevel, e.clientX, e.clientY);
+    this.#updateCursor();
     this.#paint();
+  }
+
+  /** @param {MouseEvent} e */
+  #onMouseDown(e) {
+    if (!this.#panInteraction) return;
+    this.#panInteraction.onMouseDown(e.clientX, e.clientY);
+    this.#updateCursor();
+  }
+
+  /** @param {MouseEvent} e */
+  #onMouseMove(e) {
+    if (!this.#panInteraction) return;
+    if (this.#panInteraction.onMouseMove(e.clientX, e.clientY)) {
+      this.#updateCursor();
+      this.#paint();
+    }
+  }
+
+  /** @param {MouseEvent} _e */
+  #onMouseUp(_e) {
+    if (!this.#panInteraction) return;
+    this.#panInteraction.onMouseUp();
+    this.#updateCursor();
+  }
+
+  #updateCursor() {
+    if (!this.#canvas || !this.#panInteraction) return;
+    this.#canvas.style.cursor = this.#panInteraction.cursor;
   }
 
   #paint() {
@@ -236,8 +281,19 @@ export class LimbTreeView {
     if (this.#resizeHandler) {
       window.removeEventListener("resize", this.#resizeHandler);
     }
-    if (this.#wheelHandler && this.#canvas) {
-      this.#canvas.removeEventListener("wheel", this.#wheelHandler);
+    if (this.#canvas) {
+      if (this.#wheelHandler) {
+        this.#canvas.removeEventListener("wheel", this.#wheelHandler);
+      }
+      if (this.#mousedownHandler) {
+        this.#canvas.removeEventListener("mousedown", this.#mousedownHandler);
+      }
+      if (this.#mousemoveHandler) {
+        this.#canvas.removeEventListener("mousemove", this.#mousemoveHandler);
+      }
+      if (this.#mouseupHandler) {
+        this.#canvas.removeEventListener("mouseup", this.#mouseupHandler);
+      }
     }
     this.#canvas = null;
     this.#ctx = null;
@@ -245,12 +301,16 @@ export class LimbTreeView {
     this.#zoom = null;
     this.#renderer = null;
     this.#lodComputer = null;
+    this.#panInteraction = null;
     this.#positions = null;
     this.#parentMap = null;
     this.#focusedNodeId = null;
     this.#tiers = null;
     this.#resizeHandler = null;
     this.#wheelHandler = null;
+    this.#mousedownHandler = null;
+    this.#mousemoveHandler = null;
+    this.#mouseupHandler = null;
   }
 
   get isInitialized() {
