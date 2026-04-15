@@ -11,7 +11,15 @@
 # Excluded from checking:
 #   - Port interfaces (src/limb/ports/*) — consumed via type imports at compile time.
 #   - Test doubles (InMemory*, Fake*, Stub*, Mock*) — expected to be test-only.
-#   - .mjs files — loaded by browser chrome context via <script>, not ES import.
+#   - Entry-point .mjs files loaded via <script> in chrome — checked by
+#     check-chrome-wiring.sh instead. Non-entry-point .mjs that export classes
+#     for import ARE checked here.
+#
+# Note on JSDoc false positives:
+#   JSDoc type annotations like `@type {import('./Foo.mjs').Foo}` contain the
+#   word "import" but are NOT runtime imports. The consumer grep uses a
+#   line-anchored pattern (^\s*import\b) to match only actual ES import
+#   statements, avoiding false positives from JSDoc comments.
 #
 # Usage: scripts/check-dead-exports.sh
 # Exit 1 if any domain module export is dead in production.
@@ -20,9 +28,9 @@ set -euo pipefail
 
 exit_code=0
 
-# Find candidate source files: .ts files in src/limb/, excluding tests, ports, and fakes.
+# Find candidate source files: .ts and .mjs files in src/limb/, excluding tests, ports, and fakes.
 mapfile -t source_files < <(
-  find src/limb/ -type f -name '*.ts' \
+  find src/limb/ -type f \( -name '*.ts' -o -name '*.mjs' \) \
     ! -name '*.test.*' ! -name '*.spec.*' \
     ! -name 'InMemory*' ! -name 'Fake*' ! -name 'Stub*' ! -name 'Mock*' \
     ! -path '*/ports/*' ! -path '*/test/*' ! -path '*/__tests__/*' \
@@ -40,10 +48,11 @@ for src_file in "${source_files[@]}"; do
     [ -z "$symbol" ] && continue
 
     # Search for imports of this symbol in non-test production files (excluding the defining file).
-    # Requires "import" keyword to avoid matching comments that mention the symbol name.
+    # Uses line-anchored pattern (^\s*import\b) to match actual ES import statements
+    # and avoid false positives from JSDoc type annotations like @type {import('./Foo').Foo}.
     prod_imports=$(
-      grep -rl --include='*.ts' --include='*.mjs' --include='*.js' \
-        -e "import.*$symbol" -e "new $symbol" \
+      grep -rlP '^\s*import\b.*\b'"$symbol"'\b|^[^/*]*\bnew\s+'"$symbol"'\b' \
+        --include='*.ts' --include='*.mjs' --include='*.js' \
         src/limb/ 2>/dev/null \
       | grep -v '\.test\.' \
       | grep -v '\.spec\.' \
