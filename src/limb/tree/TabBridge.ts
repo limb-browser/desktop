@@ -10,6 +10,7 @@ export class TabBridge<TTab> {
   readonly tabToNode = new Map<TTab, string>();
   #tabPort: TabPort<TTab>;
   #probe: TabBridgeProbe | null;
+  #syncing = false;
 
   constructor(tabPort: TabPort<TTab>, probe?: TabBridgeProbe) {
     this.#tabPort = tabPort;
@@ -43,6 +44,43 @@ export class TabBridge<TTab> {
 
   getNodeForTab(tab: TTab): string | undefined {
     return this.tabToNode.get(tab);
+  }
+
+  async syncFocusToTab(nodeId: string, nodeUrl: string): Promise<void> {
+    if (this.#syncing) return;
+    this.#syncing = true;
+    try {
+      let tab = this.nodeToTab.get(nodeId);
+      if (!tab) {
+        tab = await this.#tabPort.openTab(nodeUrl, nodeId);
+        this.nodeToTab.set(nodeId, tab);
+        this.tabToNode.set(tab, nodeId);
+        this.#probe?.tabCreated(nodeId);
+      } else if (await this.#tabPort.isTabSuspended(tab)) {
+        await this.#tabPort.restoreTab(tab);
+      }
+      await this.#tabPort.selectTab(tab);
+      this.#probe?.focusSynced(nodeId);
+    } finally {
+      this.#syncing = false;
+    }
+  }
+
+  onExternalTabSelected(
+    tab: TTab,
+    focusNode: (nodeId: string) => void
+  ): void {
+    if (this.#syncing) return;
+    this.#syncing = true;
+    try {
+      const nodeId = this.tabToNode.get(tab);
+      if (nodeId) {
+        focusNode(nodeId);
+        this.#probe?.focusSynced(nodeId);
+      }
+    } finally {
+      this.#syncing = false;
+    }
   }
 
   async onNodeRemoved(

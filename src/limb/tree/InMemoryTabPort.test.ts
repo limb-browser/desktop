@@ -42,6 +42,44 @@ describe('InMemoryTabPort', () => {
     });
   });
 
+  describe('selectTab', () => {
+    it('sets the selected tab', async () => {
+      const tab = await port.openTab('https://example.com', 'node-1');
+      await port.selectTab(tab);
+      expect(port.selectedTab).toBe(tab);
+    });
+
+    it('changes selection to a different tab', async () => {
+      const tab1 = await port.openTab('https://a.com', 'n1');
+      const tab2 = await port.openTab('https://b.com', 'n2');
+      await port.selectTab(tab1);
+      await port.selectTab(tab2);
+      expect(port.selectedTab).toBe(tab2);
+    });
+  });
+
+  describe('restoreTab', () => {
+    it('marks a suspended tab as no longer suspended', async () => {
+      const tab = await port.openTab('https://example.com', 'node-1');
+      tab.suspended = true;
+      await port.restoreTab(tab);
+      expect(tab.suspended).toBe(false);
+    });
+  });
+
+  describe('isTabSuspended', () => {
+    it('returns false for a non-suspended tab', async () => {
+      const tab = await port.openTab('https://example.com', 'node-1');
+      expect(await port.isTabSuspended(tab)).toBe(false);
+    });
+
+    it('returns true for a suspended tab', async () => {
+      const tab = await port.openTab('https://example.com', 'node-1');
+      tab.suspended = true;
+      expect(await port.isTabSuspended(tab)).toBe(true);
+    });
+  });
+
   describe('openTabs', () => {
     it('returns only tabs that are not closed', async () => {
       const tab1 = await port.openTab('https://a.com', 'n1');

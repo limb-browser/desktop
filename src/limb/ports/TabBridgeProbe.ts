@@ -5,4 +5,5 @@
 export interface TabBridgeProbe {
   tabCreated(nodeId: string): void;
   tabClosed(nodeId: string): void;
+  focusSynced(nodeId: string): void;
 }

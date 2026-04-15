@@ -5,4 +5,7 @@
 export interface TabPort<TTab> {
   openTab(url: string, nodeId: string): Promise<TTab>;
   closeTab(tab: TTab): Promise<void>;
+  selectTab(tab: TTab): Promise<void>;
+  restoreTab(tab: TTab): Promise<void>;
+  isTabSuspended(tab: TTab): Promise<boolean>;
 }

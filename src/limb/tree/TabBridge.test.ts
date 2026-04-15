@@ -21,6 +21,9 @@ function createFakeProbe(): TabBridgeProbe & {
     tabClosed(nodeId: string) {
       calls.push({ method: 'tabClosed', args: [nodeId] });
     },
+    focusSynced(nodeId: string) {
+      calls.push({ method: 'focusSynced', args: [nodeId] });
+    },
   };
 }
 
@@ -184,7 +187,7 @@ describe('TabBridge', () => {
     });
 
     it('returns undefined for unknown tab', () => {
-      const unknownTab = { url: 'https://x.com', nodeId: 'x', closed: false };
+      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', closed: false, suspended: false };
       expect(bridge.getNodeForTab(unknownTab)).toBeUndefined();
     });
   });
@@ -263,6 +266,144 @@ describe('TabBridge', () => {
     });
   });
 
+  describe('syncFocusToTab (tree → tab)', () => {
+    it('selects the tab associated with the focused node', async () => {
+      await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
+      await bridge.syncFocusToTab('node-1', 'https://example.com');
+      expect(tabPort.selectedTab).toBe(bridge.getTabForNode('node-1'));
+    });
+
+    it('creates a tab if none exists for the node', async () => {
+      await bridge.syncFocusToTab('node-1', 'https://example.com');
+      expect(bridge.getTabForNode('node-1')).toBeDefined();
+      expect(tabPort.selectedTab).toBe(bridge.getTabForNode('node-1'));
+    });
+
+    it('fires tabCreated probe when creating a tab on focus', async () => {
+      probe.calls.length = 0;
+      await bridge.syncFocusToTab('node-1', 'https://example.com');
+      expect(probe.calls).toContainEqual({
+        method: 'tabCreated',
+        args: ['node-1'],
+      });
+    });
+
+    it('restores a suspended tab before selecting it', async () => {
+      await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
+      const tab = bridge.getTabForNode('node-1')!;
+      tab.suspended = true;
+      await bridge.syncFocusToTab('node-1', 'https://example.com');
+      expect(tab.suspended).toBe(false);
+      expect(tabPort.selectedTab).toBe(tab);
+    });
+
+    it('fires focusSynced probe', async () => {
+      await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
+      probe.calls.length = 0;
+      await bridge.syncFocusToTab('node-1', 'https://example.com');
+      expect(probe.calls).toContainEqual({
+        method: 'focusSynced',
+        args: ['node-1'],
+      });
+    });
+  });
+
+  describe('onExternalTabSelected (tab → tree)', () => {
+    it('calls focusNode callback with the node id for the selected tab', async () => {
+      await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
+      const tab = bridge.getTabForNode('node-1')!;
+      const focusCalls: string[] = [];
+      bridge.onExternalTabSelected(tab, (nodeId) => focusCalls.push(nodeId));
+      expect(focusCalls).toEqual(['node-1']);
+    });
+
+    it('updates the tree focused node when a tab is selected externally', async () => {
+      const tree = new BrowsingTree('https://root.com');
+      const child = tree.addChild(tree.rootId, 'https://child.com');
+      await bridge.createTabForNode({ id: child.id, url: child.url });
+      const tab = bridge.getTabForNode(child.id)!;
+
+      bridge.onExternalTabSelected(tab, (nodeId) => tree.focusNode(nodeId));
+      expect(tree.focusedNodeId).toBe(child.id);
+    });
+
+    it('fires focusSynced probe', async () => {
+      await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
+      const tab = bridge.getTabForNode('node-1')!;
+      probe.calls.length = 0;
+      bridge.onExternalTabSelected(tab, () => {});
+      expect(probe.calls).toContainEqual({
+        method: 'focusSynced',
+        args: ['node-1'],
+      });
+    });
+
+    it('is a no-op for an unknown tab', () => {
+      const focusCalls: string[] = [];
+      const unknownTab: FakeTab = { url: 'https://x.com', nodeId: 'x', closed: false, suspended: false };
+      bridge.onExternalTabSelected(unknownTab, (nodeId) => focusCalls.push(nodeId));
+      expect(focusCalls).toHaveLength(0);
+    });
+  });
+
+  describe('loop guard', () => {
+    it('syncFocusToTab is suppressed during onExternalTabSelected', async () => {
+      await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
+      const tab = bridge.getTabForNode('node-1')!;
+
+      bridge.onExternalTabSelected(tab, () => {
+        // Simulate: focusNode callback triggers a listener that calls syncFocusToTab
+        bridge.syncFocusToTab('node-1', 'https://example.com');
+      });
+
+      // selectTab should NOT have been called (syncFocusToTab was guarded)
+      expect(tabPort.selectedTab).toBeNull();
+    });
+
+    it('onExternalTabSelected is suppressed during syncFocusToTab', async () => {
+      const tree = new BrowsingTree('https://root.com');
+      const child = tree.addChild(tree.rootId, 'https://child.com');
+
+      // Custom port that simulates TabSelect firing during selectTab
+      const customPort = new InMemoryTabPort();
+      const customBridge = new TabBridge(customPort, probe);
+      await customBridge.createTabForNode({ id: child.id, url: child.url });
+      const tab = customBridge.getTabForNode(child.id)!;
+
+      let reEntryAttempted = false;
+      const origSelectTab = customPort.selectTab.bind(customPort);
+      customPort.selectTab = async (t: FakeTab) => {
+        await origSelectTab(t);
+        reEntryAttempted = true;
+        // Simulate TabSelect event calling onExternalTabSelected
+        customBridge.onExternalTabSelected(t, (nodeId) => tree.focusNode(nodeId));
+      };
+
+      await customBridge.syncFocusToTab(child.id, child.url);
+
+      expect(reEntryAttempted).toBe(true);
+      // tree.focusedNodeId should still be root — onExternalTabSelected was guarded
+      expect(tree.focusedNodeId).toBe(tree.rootId);
+      // But the tab should be selected
+      expect(customPort.selectedTab!.nodeId).toBe(child.id);
+    });
+
+    it('focus sync is re-enterable after previous sync completes', async () => {
+      await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
+      await bridge.createTabForNode({ id: 'node-2', url: 'https://other.com' });
+
+      // First sync completes
+      await bridge.syncFocusToTab('node-1', 'https://example.com');
+      expect(tabPort.selectedTab!.nodeId).toBe('node-1');
+
+      // Second sync should work (guard is cleared)
+      const focusCalls: string[] = [];
+      const tab2 = bridge.getTabForNode('node-2')!;
+      bridge.onExternalTabSelected(tab2, (nodeId) => focusCalls.push(nodeId));
+      expect(focusCalls).toEqual(['node-2']);
+    });
+  });
+
   describe('without probe', () => {
     it('works when no probe is provided', async () => {
       const noProbeBridge = new TabBridge(tabPort);
@@ -272,6 +413,28 @@ describe('TabBridge', () => {
       });
       await noProbeBridge.closeTabForNode('node-1');
       expect(tabPort.openTabs).toHaveLength(0);
+    });
+
+    it('syncFocusToTab works without a probe', async () => {
+      const noProbeBridge = new TabBridge(tabPort);
+      await noProbeBridge.createTabForNode({
+        id: 'node-1',
+        url: 'https://example.com',
+      });
+      await noProbeBridge.syncFocusToTab('node-1', 'https://example.com');
+      expect(tabPort.selectedTab!.nodeId).toBe('node-1');
+    });
+
+    it('onExternalTabSelected works without a probe', async () => {
+      const noProbeBridge = new TabBridge(tabPort);
+      await noProbeBridge.createTabForNode({
+        id: 'node-1',
+        url: 'https://example.com',
+      });
+      const tab = noProbeBridge.getTabForNode('node-1')!;
+      const focusCalls: string[] = [];
+      noProbeBridge.onExternalTabSelected(tab, (nodeId) => focusCalls.push(nodeId));
+      expect(focusCalls).toEqual(['node-1']);
     });
   });
 });
