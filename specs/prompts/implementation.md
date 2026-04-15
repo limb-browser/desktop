@@ -52,9 +52,9 @@ Before marking a task `ready-for-review`:
 1. **Domain purity:** `src/limb/domain/` has no imports from browser-specific code.
 2. **Tests written first:** Every behavioral code path has a test.
 3. **Tests pass:** `npx vitest run` passes.
-4. **No dead code:** Every type/function you defined is referenced.
+4. **No dead code:** Every type, function, and module-level constant you defined is referenced. This includes non-exported locals (e.g., a `const` array defined at module scope but never read). Run `scripts/check-dead-locals.sh` for `.mjs` files.
 5. **Port completeness:** New I/O capabilities have port interfaces. Every public method on an implementation is declared in its port, and vice versa. Run `scripts/check-port-completeness.sh`.
-6. **Probe coverage:** State transitions have probe calls and test assertions.
+6. **Probe coverage:** State transitions have probe calls and test assertions. When a constructor or factory accepts a probe parameter, the **production** call site (not just tests) must wire a probe instance. A module that emits probe events but is instantiated without a probe in production silently drops observability data.
 7. **Task traceability:** Every acceptance criterion has corresponding code. Re-read the task's "What To Build" numbered list and its test requirements — each item must have a corresponding test. If the task says "write tests for X", the test must exist.
 8. **No invented behavior:** Every code path traces to a spec statement.
 9. **SQL safety:** No `${...}` interpolation in SQL strings. Always use parameterized binding (`:param`). Run `scripts/check-sql-interpolation.sh`.
@@ -67,7 +67,11 @@ Before marking a task `ready-for-review`:
 16. **Event target precision:** When a task specifies an event target (e.g., "on the canvas", "on the sidebar"), verify your `addEventListener` call uses that exact element, not a broader target like `window` or `document`. Broader targets capture events from unrelated UI areas.
 17. **Chrome wiring:** If you add a `.css` file or a new entry-point `.mjs` module in `src/limb/`, it must be loaded by the browser chrome. CSS needs a `<link>` in `zen-assets.inc.xhtml`. Entry-point `.mjs` modules (not imported by another `.mjs`) need `ChromeUtils.importESModule` in `browser-init-js.patch` or a `<script>` tag in `zen-assets.inc.xhtml`. Run `scripts/check-chrome-wiring.sh` and confirm your new files are not in the FAIL list. Also check for failures on any module your task depends on or imports -- if a module you call into is unwired, your feature does not function regardless of who created it. Fix the wiring.
 18. **Async-sync event races:** When calling an async port method that wraps a browser API, consider whether the browser API fires synchronous events during execution. If it does, any state you set *after* `await`-ing that call is not yet visible to synchronous event handlers. Either set state before the `await`, or use a guard flag so the event handler knows the tab was expected.
+<<<<<<< HEAD
 19. **Invariant self-enforcement:** Every public method that mutates shared state (maps, collections, indices) must enforce all invariants of that data structure, not just the ones obvious from its parameters. For bidirectional maps (e.g., `Map<A,B>` paired with `Map<B,A>`), every mutation method must guard both sides. If `createFoo` throws when key A exists, a sibling method `registerFoo` must also throw when key B already exists. Do not rely on callers to check -- the method must be self-protecting. Write a test for the rejected case.
+=======
+19. **Guard condition precision:** When writing compound guard conditions (e.g., `if (a && b)`), verify each term is truly required. If one term checks an optional parameter whose absence should not disable the entire operation, the guard is overly restrictive and silently drops functionality. A guard that prevents a method call should only check preconditions that make the call impossible, not parameters that the callee handles gracefully (e.g., `null` values it can work with).
+>>>>>>> 2dca2a326 (fix: add dead-locals check, guard-precision and probe-wiring rules for task-011 findings)
 
 ## Workflow
 
@@ -77,7 +81,11 @@ Before marking a task `ready-for-review`:
 4. Read the referenced spec sections.
 5. Implement using TDD: test -> fail -> implement -> pass -> refactor.
 6. Run `npx vitest run`. All tests must pass.
+<<<<<<< HEAD
 7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, `scripts/check-dead-exports.sh`, and `scripts/check-chrome-wiring.sh`. Fix any failures. For `check-dead-exports.sh` and `check-chrome-wiring.sh`, verify that modules you created in this task are NOT in the FAIL list. Pre-existing failures from other tasks are acceptable ONLY if your task does not import, call into, or depend on the failing module. If a failing module is in your task's dependency chain (e.g., your code calls a method on a class defined in that module, or your task's spec references it), fix the wiring -- an unwired dependency means your feature does not function.
+=======
+7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, `scripts/check-dead-exports.sh`, `scripts/check-dead-locals.sh`, and `scripts/check-chrome-wiring.sh`. Fix any failures. For `check-dead-exports.sh`, `check-dead-locals.sh`, and `check-chrome-wiring.sh`, verify that modules you created in this task are NOT in the FAIL list (pre-existing failures from other tasks are acceptable).
+>>>>>>> 2dca2a326 (fix: add dead-locals check, guard-precision and probe-wiring rules for task-011 findings)
 8. Run through the Self-Verification Checklist.
 9. Update the task's `progress` field to `ready-for-review`.
 10. Commit using conventional commits, author: "Implementation <jsell-rh.implementation@agents.redhat.com>"

@@ -27,9 +27,10 @@ Flaws include:
 - **LOD threshold compliance:** Verify pixel thresholds match zoom-lod.md S2.1 exactly.
 - **Probe completeness:** Verify probe calls exist for each domain state transition.
 - **Probe assertion coverage:** Verify tests assert probe calls, not just resulting state.
+- **Probe wiring in production:** When a constructor or factory accepts a probe parameter, verify the production call site passes a probe instance. A module that emits probe events but is instantiated without a probe in production silently drops observability data. Tests alone do not prove production observability.
 - **Domain purity:** `src/limb/domain/` must not import browser APIs.
 - **Assertionless tests:** Tests with zero assertions are tautological.
-- **Dead code:** Every export should have a consumer outside its own file.
+- **Dead code:** Every export should have a consumer outside its own file. Every non-exported module-level definition (const, function) should be referenced within its own file. Run `scripts/check-dead-locals.sh` for `.mjs` files.
 - **Algorithm completeness:** When reusing helpers, verify the COMPLETE algorithm is used (e.g., `naiveTier` without `applyHysteresis` is incomplete).
 - **Patch minimality:** Patches to Firefox source should be as small as possible.
 - **SQL injection patterns:** Verify no string interpolation (`${...}`) in SQL statements. All values must use parameterized binding (`:param`). Run `scripts/check-sql-interpolation.sh`.
@@ -43,7 +44,11 @@ Flaws include:
 - **Event target precision:** When a task specifies an event target (e.g., "on the canvas"), verify the `addEventListener` call uses that exact element. Attaching to `window` or `document` instead of the specified target is a spec violation.
 - **Chrome wiring:** Run `scripts/check-chrome-wiring.sh`. If a task adds CSS or entry-point `.mjs` modules to `src/limb/`, verify they appear in the browser chrome loading mechanism (`zen-assets.inc.xhtml` or `browser-init-js.patch`). A file that exists on disk but is never loaded by the browser is not functional. Tests that only verify file contents on disk (e.g., `fs.readFileSync` + assertions on CSS content) do not prove the file is loaded in the running browser. Also check for failures on modules the task depends on or imports -- an unwired dependency means the task's deliverable does not function, even if the failing module was created by a prior task.
 - **Async-sync event races:** When a port method wraps a browser API that fires synchronous events (e.g., `gBrowser.addTab()` fires `TabOpen` synchronously), verify that any state the caller sets *after* awaiting that method is not read by a synchronous event handler before the `await` completes. Use `InMemoryTabPort.onTabCreated` (or equivalent fake callback) to write a test that exercises this timing.
+<<<<<<< HEAD
 - **Invariant self-enforcement:** When a class maintains bidirectional maps or multi-index data structures, verify that every public method that mutates the structure guards all sides of the invariant. If method A throws when key X already exists, a sibling method B that also inserts must throw when key Y already exists. A method that relies on callers to pre-check is a finding -- the method must be self-protecting.
+=======
+- **Guard condition precision:** When a method call is guarded by a compound condition (e.g., `if (a && b)`), verify each term is a true precondition. If one term checks an optional parameter that the callee handles gracefully when absent (e.g., `null`), the guard silently disables the operation. The guard should only check preconditions that make the call impossible, not parameters the callee can work without.
+>>>>>>> 2dca2a326 (fix: add dead-locals check, guard-precision and probe-wiring rules for task-011 findings)
 
 ## Workflow
 
@@ -53,7 +58,7 @@ Flaws include:
 4. Read the task's referenced spec sections.
 5. Read all code files the task added or modified (check git diff).
 6. Run `npx vitest run` -- failures are automatic findings.
-7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, `scripts/check-dead-exports.sh`, and `scripts/check-chrome-wiring.sh` -- failures are automatic findings.
+7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, `scripts/check-dead-exports.sh`, `scripts/check-dead-locals.sh`, and `scripts/check-chrome-wiring.sh` -- failures are automatic findings.
 8. Apply verification targets systematically.
 9. Write findings to `specs/reviews/review-TASK_NNN-RN.md`:
    ```markdown
