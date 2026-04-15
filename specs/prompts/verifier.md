@@ -52,6 +52,9 @@ Flaws include:
 - **Programmatic zoom API discipline:** Run `scripts/check-zoom-animation.sh`. Any adapter or handler that calls `setZoomLevel()` directly is a finding -- all user-triggered zoom level changes are "programmatic zoom" per S1.3 and must animate via `animateToNode()` or `ZoomAnimator.start()`. This applies to all zoom-changing actions: zoom resets, zoom-to-node, auto-zoom, etc. An instant zoom setter from a user-action handler causes a visual discontinuity (S7.1 violation).
 - **Caller completeness on signature changes:** When a task adds parameters to an existing method, verify ALL production callers pass the new parameters. Check the git diff for changed method signatures, then grep for every call site. An optional parameter that no production caller ever passes means the feature it enables is dead at runtime. Pay special attention to callers in other modules (routers, adapters, handlers) that were written before the parameter existed. Run `scripts/check-patch-imports.sh` for unused imports in patch files.
 - **Synthesized data precedence:** When an algorithm processes a mix of real (persisted) and synthesized (generated at runtime for missing data) entries, verify that synthesized entries cannot override or take precedence over real entries in selection or priority logic. For example, if `find()` selects a root from a collection containing both persisted nodes and newly-generated placeholder nodes, a pre-Limb placeholder appearing first in the array should not become root over a real persisted node. Selection logic must distinguish real from synthetic data.
+- **Uncalled public methods:** Run `scripts/check-uncalled-methods.sh`. If a task creates a public method intended to be called by external code (e.g., a hook for URL/title changes, a notification method), verify that at least one production caller invokes it. A public method with zero external callers is dead code — the feature it exposes does not function at runtime. The class being imported and used does not mean every method on it is called.
+- **Dead private fields:** Run `scripts/check-dead-fields.sh`. If a class declares a private field (`#field`) that is assigned and cleared but never read by any method, it is dead storage and a finding.
+- **Cleanup symmetry:** When a class has `install()`/`uninstall()` or `setup()`/`teardown()` pairs, verify that every side-effect of setup has a corresponding undo in teardown. If `install()` calls `target.setProbe(callbacks)`, `uninstall()` must call `target.setProbe(null)`. If `install()` registers an observer, `uninstall()` must remove it. If `install()` starts a timer, `uninstall()` must stop it. Incomplete teardown means probe callbacks, timers, or observers keep firing after disposal — a use-after-dispose bug.
 
 ## Workflow
 
@@ -61,7 +64,7 @@ Flaws include:
 4. Read the task's referenced spec sections.
 5. Read all code files the task added or modified (check git diff).
 6. Run `npx vitest run` -- failures are automatic findings.
-7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, `scripts/check-dead-exports.sh`, `scripts/check-dead-locals.sh`, `scripts/check-chrome-wiring.sh`, `scripts/check-zoom-animation.sh`, and `scripts/check-patch-imports.sh` -- failures are automatic findings.
+7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, `scripts/check-dead-exports.sh`, `scripts/check-dead-locals.sh`, `scripts/check-chrome-wiring.sh`, `scripts/check-zoom-animation.sh`, `scripts/check-patch-imports.sh`, `scripts/check-uncalled-methods.sh`, and `scripts/check-dead-fields.sh` -- failures are automatic findings.
 8. Apply verification targets systematically.
 9. Write findings to `specs/reviews/review-TASK_NNN-RN.md`:
    ```markdown
