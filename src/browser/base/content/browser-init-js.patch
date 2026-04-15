@@ -87,6 +87,18 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      if (node) tabBridge.registerExistingTab(tab, nodeId, node.parentId, node.createdAt);
 +    }
 +    window.gLimbTabBridge = tabBridge;
++    const { UrlEntryRouter } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/UrlEntryRouter.ts",
++      { global: "current" }
++    );
++    const { UrlEntryAdapter } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/UrlEntryAdapter.mjs",
++      { global: "current" }
++    );
++    const urlEntryProbe = { navigatedInPlace(id, url) { console.debug("URL entry in-place:", id, url); }, childCreated(pId, cId, url) { console.debug("URL entry child:", pId, cId, url); } };
++    const urlEntryRouter = new UrlEntryRouter(browsingTree, tabBridge, urlEntryProbe);
++    const urlEntryAdapter = new UrlEntryAdapter(urlEntryRouter);
++    urlEntryAdapter.install(gURLBar);
 +    const confirmPort = new BrowserConfirmationPort(window);
 +    const homeUrl = Services.prefs.getStringPref("limb.home.url", "about:blank");
 +    const branchProbe = { branchCreated(id) { console.debug("Branch created:", id); }, branchDeleted(id) { console.debug("Branch deleted:", id); }, branchDeletionCancelled(id) { console.debug("Branch deletion cancelled:", id); } };
