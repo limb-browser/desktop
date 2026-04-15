@@ -27,6 +27,7 @@ import { hitTestNodes } from "./HitTester.mjs";
 import { ZoomAnimator } from "./ZoomAnimator.mjs";
 import { FrameScheduler } from "./FrameScheduler.mjs";
 import { LayoutAnimator } from "./LayoutAnimator.mjs";
+import { RevealAnimator } from "./RevealAnimator.mjs";
 import { computeFoldNodeFrame, formatFoldLabel } from "./FoldNodeRenderer.mjs";
 
 // Zoom level change per 100px of wheel deltaY
@@ -107,6 +108,8 @@ export class LimbTreeView {
   #layoutAnimator = null;
   /** @type {import('./LayoutAnimator.mjs').AnimatedFrame | null} */
   #layoutAnimatedFrame = null;
+  /** @type {RevealAnimator | null} */
+  #revealAnimator = null;
   /** @type {FrameScheduler | null} */
   #frameScheduler = null;
 
@@ -156,7 +159,7 @@ export class LimbTreeView {
    * @param {HTMLCanvasElement} canvas
    * @param {{ zoomChanged(level: number, zoomScale: number): void }} [probe]
    * @param {{ tierChanged(nodeId: string, previousTier: string, newTier: string): void }} [lodProbe]
-   * @param {{ onNodeClicked?: (nodeId: string) => void, onFoldToggled?: (foldId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe, performanceProbe?: import('../ports/PerformanceProbe').PerformanceProbe }} [options]
+   * @param {{ onNodeClicked?: (nodeId: string) => void, onFoldToggled?: (foldId: string) => void, animationProbe?: import('../ports/ZoomAnimationProbe').ZoomAnimationProbe, frameSchedulerProbe?: import('../ports/FrameSchedulerProbe').FrameSchedulerProbe, layoutAnimationProbe?: import('../ports/LayoutAnimationProbe').LayoutAnimationProbe, performanceProbe?: import('../ports/PerformanceProbe').PerformanceProbe, revealAnimationProbe?: import('../ports/RevealAnimationProbe').RevealAnimationProbe }} [options]
    */
   init(canvas, probe, lodProbe, options) {
     this.#canvas = canvas;
@@ -176,6 +179,7 @@ export class LimbTreeView {
     this.#hoverInteraction = new HoverInteraction();
     this.#zoomAnimator = new ZoomAnimator(options?.animationProbe);
     this.#layoutAnimator = new LayoutAnimator(options?.layoutAnimationProbe);
+    this.#revealAnimator = new RevealAnimator(options?.revealAnimationProbe);
     this.#onNodeClicked = options?.onNodeClicked ?? null;
     this.#onFoldToggled = options?.onFoldToggled ?? null;
     this.#frameScheduler = new FrameScheduler(
@@ -513,6 +517,22 @@ export class LimbTreeView {
       // Store for hit testing on click
       this.#lastFrameNodes = frame.nodes;
 
+      // Compute reveal scales for zoom-out animation
+      let revealScales = new Map();
+      if (this.#revealAnimator) {
+        const visibleIds = new Set(frame.nodes.map(n => n.nodeId));
+        revealScales = this.#revealAnimator.update(
+          visibleIds,
+          zoom.level,
+          this.#focusedNodeId,
+          renderParentMap,
+          deltaMs,
+        );
+        if (this.#revealAnimator.isAnimating) {
+          this.#frameScheduler?.markDirty();
+        }
+      }
+
       // Compute hover state
       let hoverProgress = new Map();
       if (this.#hoverInteraction && zoom.level < 0.9) {
@@ -571,7 +591,14 @@ export class LimbTreeView {
         const progress = easeOut(rawProgress);
         const offsetY = -HOVER_OFFSET_Y * progress;
 
-        const r = Math.min(cornerRadius, node.width / 2, node.height / 2);
+        // Compute reveal scale (zoom-out reveal animation)
+        const revealScale = revealScales.get(node.nodeId) ?? 1;
+        const rw = node.width * revealScale;
+        const rh = node.height * revealScale;
+        const rx = node.x + (node.width - rw) / 2;
+        const ry = node.y + (node.height - rh) / 2;
+
+        const r = Math.min(cornerRadius, rw / 2, rh / 2);
 
         // Apply layout animation opacity for fading in/out nodes
         const nodeAlpha = animated?.opacity?.get(node.nodeId) ?? 1;
@@ -580,10 +607,10 @@ export class LimbTreeView {
         const foldMeta = this.#foldNodes.get(node.nodeId);
         if (foldMeta) {
           const foldFrame = computeFoldNodeFrame({
-            x: node.x,
-            y: node.y + offsetY,
-            width: node.width,
-            height: node.height,
+            x: rx,
+            y: ry + offsetY,
+            width: rw,
+            height: rh,
           });
 
           ctx.save();
@@ -613,7 +640,7 @@ export class LimbTreeView {
 
           // Draw fold label
           const label = formatFoldLabel(foldMeta.monthLabel, foldMeta.branchCount);
-          const fontSize = Math.max(8, Math.min(14, node.width * 0.08));
+          const fontSize = Math.max(8, Math.min(14, rw * 0.08));
           ctx.fillStyle = "#ccc";
           ctx.font = `${fontSize}px system-ui, sans-serif`;
           ctx.textAlign = "center";
@@ -637,14 +664,14 @@ export class LimbTreeView {
             ctx.save();
             ctx.globalAlpha = nodeAlpha;
             ctx.beginPath();
-            ctx.roundRect(node.x, node.y + offsetY, node.width, node.height, r);
+            ctx.roundRect(rx, ry + offsetY, rw, rh, r);
             ctx.clip();
-            ctx.drawImage(/** @type {CanvasImageSource} */ (screenshot), node.x, node.y + offsetY, node.width, node.height);
+            ctx.drawImage(/** @type {CanvasImageSource} */ (screenshot), rx, ry + offsetY, rw, rh);
             ctx.restore();
             ctx.globalAlpha = nodeAlpha;
             ctx.strokeStyle = "#444";
             ctx.beginPath();
-            ctx.roundRect(node.x, node.y + offsetY, node.width, node.height, r);
+            ctx.roundRect(rx, ry + offsetY, rw, rh, r);
             ctx.stroke();
             ctx.globalAlpha = 1;
             continue;
@@ -655,7 +682,7 @@ export class LimbTreeView {
         ctx.fillStyle = TIER_COLORS[tier] ?? "#2a2a2a";
         ctx.strokeStyle = tier === "focused" ? "#88f" : "#444";
         ctx.beginPath();
-        ctx.roundRect(node.x, node.y + offsetY, node.width, node.height, r);
+        ctx.roundRect(rx, ry + offsetY, rw, rh, r);
         ctx.fill();
         ctx.stroke();
         ctx.globalAlpha = 1;
@@ -667,16 +694,21 @@ export class LimbTreeView {
         const rawProgress = hoverProgress.get(frame.focusRing.nodeId) ?? 0;
         const progress = easeOut(rawProgress);
         const offsetY = -HOVER_OFFSET_Y * progress;
+        const frs = revealScales.get(frame.focusRing.nodeId) ?? 1;
+        const frw = frame.focusRing.width * frs;
+        const frh = frame.focusRing.height * frs;
+        const frx = frame.focusRing.x + (frame.focusRing.width - frw) / 2;
+        const fry = frame.focusRing.y + (frame.focusRing.height - frh) / 2;
         ctx.globalAlpha = focusAlpha;
         ctx.strokeStyle = FOCUS_RING_COLOR;
         ctx.lineWidth = FOCUS_RING_WIDTH;
-        const r = Math.min(cornerRadius, frame.focusRing.width / 2, frame.focusRing.height / 2);
+        const r = Math.min(cornerRadius, frw / 2, frh / 2);
         ctx.beginPath();
         ctx.roundRect(
-          frame.focusRing.x,
-          frame.focusRing.y + offsetY,
-          frame.focusRing.width,
-          frame.focusRing.height,
+          frx,
+          fry + offsetY,
+          frw,
+          frh,
           r,
         );
         ctx.stroke();
@@ -775,6 +807,7 @@ export class LimbTreeView {
     this.#zoomAnimator = null;
     this.#layoutAnimator = null;
     this.#layoutAnimatedFrame = null;
+    this.#revealAnimator = null;
     this.#frameScheduler = null;
     this.#positions = null;
     this.#parentMap = null;
