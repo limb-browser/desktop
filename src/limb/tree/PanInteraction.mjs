@@ -35,11 +35,6 @@ export class PanInteraction {
     return this.#zoomState.level < 0.9;
   }
 
-  /** @returns {boolean} */
-  get isDragging() {
-    return this.#isDragging;
-  }
-
   /** @returns {string} */
   get cursor() {
     if (!this.isPanMode) return "default";
