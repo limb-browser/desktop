@@ -58,7 +58,8 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    window.gLimbTreeView = new LimbTreeView();
 +    const navBar = document.getElementById("nav-bar");
 +    const addressBarAdapter = new AddressBarAdapter(navBar, window.gLimbTreeView);
-+    const lodProbe = { tierChanged(nodeId, prev, next) { console.debug("LOD tier:", nodeId, prev, "->", next); } };
++    let tabPositionerRef = null;
++    const lodProbe = { tierChanged(nodeId, prev, next) { console.debug("LOD tier:", nodeId, prev, "->", next); tabPositionerRef?.onTierChanged(nodeId, prev, next); } };
 +    const animationProbe = { animationStarted(from, to) { console.debug("Zoom anim:", from, "->", to); }, animationCompleted() { console.debug("Zoom anim complete"); }, animationCancelled() { console.debug("Zoom anim cancelled"); } };
 +    const frameSchedulerProbe = { loopStarted() { console.debug("Frame loop started"); }, framePainted() {}, loopStopped() { console.debug("Frame loop stopped"); } };
 +    const branchFoldProbe = { foldComputed(r, f) { console.debug("Fold computed:", r, "recent,", f, "folds"); }, foldExpanded(id) { console.debug("Fold expanded:", id); }, foldCollapsed(id) { console.debug("Fold collapsed:", id); } };
@@ -99,6 +100,16 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    const urlEntryRouter = new UrlEntryRouter(browsingTree, tabBridge, urlEntryProbe);
 +    const urlEntryAdapter = new UrlEntryAdapter(urlEntryRouter);
 +    urlEntryAdapter.install(gURLBar);
++    const { TabPositioner } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/TabPositioner.mjs",
++      { global: "current" }
++    );
++    const tabPositionerProbe = { inputModeChanged(mode) { console.debug("Input mode:", mode); }, crossFadeStarted(id, dir) { console.debug("Cross-fade started:", id, dir); }, crossFadeCompleted(id) { console.debug("Cross-fade completed:", id); } };
++    const tabPositioner = new TabPositioner(tabPositionerProbe);
++    tabPositionerRef = tabPositioner;
++    window.gLimbTreeView.setTabPositioner(tabPositioner);
++    window.gLimbTreeView.setTabBridge(tabBridge);
++    window.gLimbTreeView.setMaxLiveTabs(Services.prefs.getIntPref("limb.tree.max-live-tabs", 8));
 +    const confirmPort = new BrowserConfirmationPort(window);
 +    const homeUrl = Services.prefs.getStringPref("limb.home.url", "about:blank");
 +    const branchProbe = { branchCreated(id) { console.debug("Branch created:", id); }, branchDeleted(id) { console.debug("Branch deleted:", id); }, branchDeletionCancelled(id) { console.debug("Branch deletion cancelled:", id); } };

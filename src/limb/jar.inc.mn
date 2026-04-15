@@ -10,6 +10,7 @@
         content/browser/limb/tree/limb-addressbar.css                  (../../limb/tree/limb-addressbar.css)
         content/browser/limb/tree/AddressBarVisibility.mjs             (../../limb/tree/AddressBarVisibility.mjs)
         content/browser/limb/tree/AddressBarAdapter.mjs                (../../limb/tree/AddressBarAdapter.mjs)
+        content/browser/limb/tree/TabPositioner.mjs                    (../../limb/tree/TabPositioner.mjs)
         content/browser/limb/search/limb-search.html                 (../../limb/search/limb-search.html)
         content/browser/limb/search/limb-search.css                  (../../limb/search/limb-search.css)
         content/browser/limb/search/limb-search.mjs                  (../../limb/search/limb-search.mjs)
