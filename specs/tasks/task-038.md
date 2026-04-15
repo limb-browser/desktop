@@ -5,8 +5,8 @@ depends_on:
   - task-006
   - task-007
   - task-022
-progress: ready-for-review
-review: "specs/reviews/review-task-038-R1.md"
+progress: complete
+review: "specs/reviews/review-task-038-R2.md"
 coverage_sections: []
 commits: []
 ---
