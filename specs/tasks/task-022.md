@@ -3,8 +3,8 @@ title: "Implement demand-driven frame loop"
 spec_ref: "performance.md S3.3"
 depends_on:
   - task-007
-progress: ready-for-review
-review: ""
+progress: complete
+review: "specs/reviews/review-task-022-R1.md"
 coverage_sections: []
 commits: []
 ---
