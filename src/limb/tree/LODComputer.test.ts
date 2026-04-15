@@ -718,28 +718,8 @@ describe('LODComputer', () => {
 
     it('reports lodComputationTime after each computeTiers call', () => {
       const { perfProbe, calls } = createPerfProbe();
-      let clock = 0;
-      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
-        performanceProbe: perfProbe,
-        now: () => clock,
-      });
-
-      const positions = new Map([['n1', { x: 0, y: 0 }]]);
-      const tree = createFakeTree('other');
-      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100) });
-
-      // Simulate 2ms of computation by advancing clock when computeTiers runs
-      const origCompute = comp.computeTiers.bind(comp);
-      // We can't easily intercept internal timing, so we advance clock before calling
-      // The implementation will call now() at start and end.
-      // Advance clock by 2ms to simulate computation time.
-      clock = 0;
-      // Monkey-patch won't work well; instead, let's rely on the implementation
-      // calling now() at start, then doing work, then now() at end.
-      // For the test, we need the two now() calls to return different values.
-      // Use a counter-based now:
       let nowCallCount = 0;
-      const comp2 = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
+      const comp = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, undefined, {
         performanceProbe: perfProbe,
         now: () => {
           nowCallCount++;
@@ -748,7 +728,11 @@ describe('LODComputer', () => {
         },
       });
 
-      comp2.computeTiers(tree, positions, zoom);
+      const positions = new Map([['n1', { x: 0, y: 0 }]]);
+      const tree = createFakeTree('other');
+      const zoom = createFakeZoomState({ zoomScale: scaleForWidth(100) });
+
+      comp.computeTiers(tree, positions, zoom);
 
       expect(calls.length).toBe(1);
       expect(calls[0].method).toBe('lodComputationTime');

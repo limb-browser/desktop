@@ -36,13 +36,13 @@ class FakeTimer {
     this.callbacks.delete(id);
   };
 
-  fire(id?: number): void {
+  async fire(id?: number): Promise<void> {
     if (id !== undefined) {
       const cb = this.callbacks.get(id);
-      cb?.fn();
+      if (cb) await cb.fn();
     } else {
       for (const [, cb] of this.callbacks) {
-        cb.fn();
+        await cb.fn();
       }
     }
   }
@@ -83,11 +83,11 @@ describe('PerformanceMonitor', () => {
       expect(timer.getIntervalMs(timer.firstId)).toBe(30000);
     });
 
-    it('fires memorySnapshot with correct data when interval triggers', () => {
+    it('fires memorySnapshot with correct data when interval triggers', async () => {
       const { monitor, timer, calls } = setup({ heapMB: 30.0, screenshotsMB: 10.5, tabCount: 8 });
 
       monitor.install();
-      timer.fire();
+      await timer.fire();
 
       expect(calls.length).toBe(1);
       expect(calls[0]).toEqual({
@@ -96,19 +96,19 @@ describe('PerformanceMonitor', () => {
       });
     });
 
-    it('fires memorySnapshot on each interval tick', () => {
+    it('fires memorySnapshot on each interval tick', async () => {
       const { monitor, timer, calls } = setup();
 
       monitor.install();
-      timer.fire();
-      timer.fire();
-      timer.fire();
+      await timer.fire();
+      await timer.fire();
+      await timer.fire();
 
       expect(calls.length).toBe(3);
       expect(calls.every(c => c.method === 'memorySnapshot')).toBe(true);
     });
 
-    it('uses latest snapshot data on each tick', () => {
+    it('uses latest snapshot data on each tick', async () => {
       const timer = new FakeTimer();
       const { probe, calls } = createPerfProbe();
       let tabCount = 3;
@@ -119,12 +119,33 @@ describe('PerformanceMonitor', () => {
       });
 
       monitor.install();
-      timer.fire();
+      await timer.fire();
       tabCount = 7;
-      timer.fire();
+      await timer.fire();
 
       expect(calls[0].args[2]).toBe(3);
       expect(calls[1].args[2]).toBe(7);
+    });
+  });
+
+  describe('async getSnapshot', () => {
+    it('supports async getSnapshot returning a Promise', async () => {
+      const timer = new FakeTimer();
+      const { probe, calls } = createPerfProbe();
+      const getSnapshot = async () => ({ heapMB: 42.0, screenshotsMB: 8.5, tabCount: 12 });
+      const monitor = new PerformanceMonitor(probe, getSnapshot, {
+        setInterval: timer.setInterval,
+        clearInterval: timer.clearInterval,
+      });
+
+      monitor.install();
+      await timer.fire();
+
+      expect(calls.length).toBe(1);
+      expect(calls[0]).toEqual({
+        method: 'memorySnapshot',
+        args: [42.0, 8.5, 12],
+      });
     });
   });
 
@@ -139,12 +160,12 @@ describe('PerformanceMonitor', () => {
       expect(timer.activeCount).toBe(0);
     });
 
-    it('does not fire after uninstall', () => {
+    it('does not fire after uninstall', async () => {
       const { monitor, timer, calls } = setup();
 
       monitor.install();
       monitor.uninstall();
-      timer.fire(); // fire all (should be none)
+      await timer.fire(); // fire all (should be none)
 
       expect(calls.length).toBe(0);
     });
@@ -179,7 +200,7 @@ describe('PerformanceMonitor', () => {
   });
 
   describe('reinstall after uninstall', () => {
-    it('can reinstall after uninstall', () => {
+    it('can reinstall after uninstall', async () => {
       const { monitor, timer, calls } = setup();
 
       monitor.install();
@@ -187,7 +208,7 @@ describe('PerformanceMonitor', () => {
       monitor.install();
 
       expect(timer.activeCount).toBe(1);
-      timer.fire();
+      await timer.fire();
       expect(calls.length).toBe(1);
     });
   });

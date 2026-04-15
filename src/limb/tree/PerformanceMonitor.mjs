@@ -14,7 +14,7 @@ const SNAPSHOT_INTERVAL_MS = 30000;
 export class PerformanceMonitor {
   /** @type {import('../ports/PerformanceProbe').PerformanceProbe} */
   #probe;
-  /** @type {() => { heapMB: number, screenshotsMB: number, tabCount: number }} */
+  /** @type {() => { heapMB: number, screenshotsMB: number, tabCount: number } | Promise<{ heapMB: number, screenshotsMB: number, tabCount: number }>} */
   #getSnapshot;
   /** @type {(fn: () => void, ms: number) => number} */
   #setInterval;
@@ -25,7 +25,7 @@ export class PerformanceMonitor {
 
   /**
    * @param {import('../ports/PerformanceProbe').PerformanceProbe} probe
-   * @param {() => { heapMB: number, screenshotsMB: number, tabCount: number }} getSnapshot
+   * @param {() => { heapMB: number, screenshotsMB: number, tabCount: number } | Promise<{ heapMB: number, screenshotsMB: number, tabCount: number }>} getSnapshot
    * @param {{ setInterval?: (fn: () => void, ms: number) => number, clearInterval?: (id: number) => void }} [options]
    */
   constructor(probe, getSnapshot, options) {
@@ -37,8 +37,8 @@ export class PerformanceMonitor {
 
   install() {
     if (this.#timerId !== null) return;
-    this.#timerId = this.#setInterval(() => {
-      const { heapMB, screenshotsMB, tabCount } = this.#getSnapshot();
+    this.#timerId = this.#setInterval(async () => {
+      const { heapMB, screenshotsMB, tabCount } = await this.#getSnapshot();
       this.#probe.memorySnapshot(heapMB, screenshotsMB, tabCount);
     }, SNAPSHOT_INTERVAL_MS);
   }
