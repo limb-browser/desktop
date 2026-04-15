@@ -5,6 +5,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { BrowsingTree } from './BrowsingTree';
 import type { BrowsingTreeProbe } from '../ports/BrowsingTreeProbe';
+import { InMemoryTreeStorage } from './InMemoryTreeStorage';
+import type { StoredNode } from '../ports/TreeStoragePort';
 
 function createFakeProbe(): BrowsingTreeProbe & {
   calls: { method: string; args: unknown[] }[];
@@ -26,6 +28,12 @@ function createFakeProbe(): BrowsingTreeProbe & {
     },
     treeSizeSuggestion(nodeCount: number) {
       calls.push({ method: 'treeSizeSuggestion', args: [nodeCount] });
+    },
+    branchActivated(branchRootId: string, nodeCount: number) {
+      calls.push({ method: 'branchActivated', args: [branchRootId, nodeCount] });
+    },
+    branchDeactivated(branchRootId: string) {
+      calls.push({ method: 'branchDeactivated', args: [branchRootId] });
     },
   };
 }
@@ -256,6 +264,43 @@ describe('BrowsingTree', () => {
         method: 'nodeFocused',
         args: [child.id],
       });
+    });
+
+    it('updates branch root lastVisitedAt when descendant is focused', () => {
+      const branch = tree.addChild(tree.rootId, 'https://branch.com');
+      const child = tree.addChild(branch.id, 'https://child.com');
+      const grandchild = tree.addChild(child.id, 'https://grandchild.com');
+
+      // Set branch root to a known old time
+      tree.nodes.get(branch.id)!.lastVisitedAt = 1000;
+
+      tree.focusNode(grandchild.id);
+
+      const branchNode = tree.nodes.get(branch.id)!;
+      const grandchildNode = tree.nodes.get(grandchild.id)!;
+      // Branch root's lastVisitedAt should match the focused node's timestamp
+      expect(branchNode.lastVisitedAt).toBe(grandchildNode.lastVisitedAt);
+      expect(branchNode.lastVisitedAt).toBeGreaterThan(1000);
+    });
+
+    it('does not propagate lastVisitedAt when focusing the root itself', () => {
+      const rootOldTime = tree.nodes.get(tree.rootId)!.lastVisitedAt;
+      tree.focusNode(tree.rootId);
+      // Root's lastVisitedAt should be updated (it's the focused node),
+      // but there's no branch root to propagate to
+      expect(tree.nodes.get(tree.rootId)!.lastVisitedAt).toBeGreaterThanOrEqual(rootOldTime);
+    });
+
+    it('updates branch root when focusing a direct child of root (branch root itself)', () => {
+      const branch = tree.addChild(tree.rootId, 'https://branch.com');
+      const before = Date.now();
+      tree.focusNode(branch.id);
+      const after = Date.now();
+
+      // The branch root IS the focused node, so its lastVisitedAt is the same
+      const branchNode = tree.nodes.get(branch.id)!;
+      expect(branchNode.lastVisitedAt).toBeGreaterThanOrEqual(before);
+      expect(branchNode.lastVisitedAt).toBeLessThanOrEqual(after);
     });
   });
 
@@ -541,6 +586,503 @@ describe('BrowsingTree', () => {
         (c) => c.args.includes(child.id)
       );
       expect(originalPostSetCalls).toHaveLength(0);
+    });
+  });
+
+  describe('descendantCount', () => {
+    it('root starts with descendantCount 0', () => {
+      const root = tree.nodes.get(tree.rootId)!;
+      expect(root.descendantCount).toBe(0);
+    });
+
+    it('new child has descendantCount 0', () => {
+      const child = tree.addChild(tree.rootId, 'https://child.com');
+      expect(child.descendantCount).toBe(0);
+    });
+
+    it('increments parent descendantCount when child is added', () => {
+      tree.addChild(tree.rootId, 'https://child.com');
+      const root = tree.nodes.get(tree.rootId)!;
+      expect(root.descendantCount).toBe(1);
+    });
+
+    it('increments all ancestors when deeply nested child is added', () => {
+      const child = tree.addChild(tree.rootId, 'https://a.com');
+      const grandchild = tree.addChild(child.id, 'https://b.com');
+      tree.addChild(grandchild.id, 'https://c.com');
+
+      expect(tree.nodes.get(tree.rootId)!.descendantCount).toBe(3);
+      expect(tree.nodes.get(child.id)!.descendantCount).toBe(2);
+      expect(tree.nodes.get(grandchild.id)!.descendantCount).toBe(1);
+    });
+
+    it('decrements parent descendantCount when leaf is removed', () => {
+      const child = tree.addChild(tree.rootId, 'https://child.com');
+      tree.removeNode(child.id);
+      expect(tree.nodes.get(tree.rootId)!.descendantCount).toBe(0);
+    });
+
+    it('decrements all ancestors when subtree is removed', () => {
+      const child = tree.addChild(tree.rootId, 'https://a.com');
+      const grandchild = tree.addChild(child.id, 'https://b.com');
+      tree.addChild(grandchild.id, 'https://c.com');
+
+      // root=3, child=2, grandchild=1
+      tree.removeNode(child.id);
+      // root should now be 0 (lost child + grandchild + great-grandchild = 3)
+      expect(tree.nodes.get(tree.rootId)!.descendantCount).toBe(0);
+    });
+
+    it('correctly tracks count with multiple branches', () => {
+      const b1 = tree.addChild(tree.rootId, 'https://b1.com');
+      tree.addChild(b1.id, 'https://b1c1.com');
+      tree.addChild(b1.id, 'https://b1c2.com');
+
+      const b2 = tree.addChild(tree.rootId, 'https://b2.com');
+      tree.addChild(b2.id, 'https://b2c1.com');
+
+      // root: 5 descendants (b1, b1c1, b1c2, b2, b2c1)
+      expect(tree.nodes.get(tree.rootId)!.descendantCount).toBe(5);
+      expect(tree.nodes.get(b1.id)!.descendantCount).toBe(2);
+      expect(tree.nodes.get(b2.id)!.descendantCount).toBe(1);
+
+      tree.removeNode(b1.id);
+      expect(tree.nodes.get(tree.rootId)!.descendantCount).toBe(2);
+    });
+
+    it('is accurate after interleaved add and remove operations', () => {
+      const c1 = tree.addChild(tree.rootId, 'https://a.com');
+      const c2 = tree.addChild(tree.rootId, 'https://b.com');
+      tree.addChild(c1.id, 'https://c.com');
+      tree.removeNode(c2.id);
+      // root has c1 and c1's child = 2 descendants
+      expect(tree.nodes.get(tree.rootId)!.descendantCount).toBe(2);
+      expect(tree.nodes.get(c1.id)!.descendantCount).toBe(1);
+    });
+  });
+
+  describe('branch activation and deactivation', () => {
+    let storage: InMemoryTreeStorage;
+
+    function makeStoredNode(
+      overrides: Partial<StoredNode> & { id: string; branchRootId: string }
+    ): StoredNode {
+      return {
+        url: 'https://example.com',
+        title: 'Example',
+        favicon: null,
+        parentId: null,
+        childIds: [],
+        createdAt: 1000,
+        lastVisitedAt: 2000,
+        descendantCount: 0,
+        ...overrides,
+      };
+    }
+
+    beforeEach(() => {
+      storage = new InMemoryTreeStorage();
+    });
+
+    describe('activateBranch', () => {
+      it('loads full subtree from storage into memory', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        // Simulate storage having child nodes for this branch
+        const storedNodes: StoredNode[] = [
+          makeStoredNode({
+            id: branch.id,
+            url: 'https://branch.com',
+            parentId: tree.rootId,
+            childIds: ['child-1'],
+            branchRootId: branch.id,
+            descendantCount: 1,
+          }),
+          makeStoredNode({
+            id: 'child-1',
+            url: 'https://child.com',
+            parentId: branch.id,
+            branchRootId: branch.id,
+          }),
+        ];
+        await storage.saveBranch(branch.id, storedNodes);
+
+        await tree.activateBranch(branch.id, storage);
+
+        expect(tree.activeBranchId).toBe(branch.id);
+        expect(tree.nodes.has('child-1')).toBe(true);
+        expect(tree.nodes.get('child-1')!.url).toBe('https://child.com');
+      });
+
+      it('sets activeBranchId', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        await storage.saveBranch(branch.id, [
+          makeStoredNode({
+            id: branch.id,
+            url: 'https://branch.com',
+            parentId: tree.rootId,
+            branchRootId: branch.id,
+          }),
+        ]);
+
+        await tree.activateBranch(branch.id, storage);
+        expect(tree.activeBranchId).toBe(branch.id);
+      });
+
+      it('fires branchActivated probe', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        await storage.saveBranch(branch.id, [
+          makeStoredNode({
+            id: branch.id,
+            url: 'https://branch.com',
+            parentId: tree.rootId,
+            childIds: ['c1'],
+            branchRootId: branch.id,
+            descendantCount: 1,
+          }),
+          makeStoredNode({
+            id: 'c1',
+            url: 'https://c1.com',
+            parentId: branch.id,
+            branchRootId: branch.id,
+          }),
+        ]);
+        probe.calls.length = 0;
+
+        await tree.activateBranch(branch.id, storage);
+
+        expect(probe.calls).toContainEqual({
+          method: 'branchActivated',
+          args: [branch.id, 2],
+        });
+      });
+
+      it('throws when branch root does not exist in tree', async () => {
+        await expect(
+          tree.activateBranch('nonexistent', storage)
+        ).rejects.toThrow();
+      });
+
+      it('throws when branch root is not a direct child of root', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        const child = tree.addChild(branch.id, 'https://child.com');
+
+        await expect(
+          tree.activateBranch(child.id, storage)
+        ).rejects.toThrow();
+      });
+
+      it('updates descendantCount on branch root after loading', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        await storage.saveBranch(branch.id, [
+          makeStoredNode({
+            id: branch.id,
+            url: 'https://branch.com',
+            parentId: tree.rootId,
+            childIds: ['c1', 'c2'],
+            branchRootId: branch.id,
+            descendantCount: 2,
+          }),
+          makeStoredNode({
+            id: 'c1',
+            url: 'https://c1.com',
+            parentId: branch.id,
+            branchRootId: branch.id,
+          }),
+          makeStoredNode({
+            id: 'c2',
+            url: 'https://c2.com',
+            parentId: branch.id,
+            branchRootId: branch.id,
+          }),
+        ]);
+
+        await tree.activateBranch(branch.id, storage);
+
+        expect(tree.nodes.get(branch.id)!.descendantCount).toBe(2);
+        expect(tree.nodes.get(tree.rootId)!.descendantCount).toBe(3);
+      });
+    });
+
+    describe('deactivateBranch', () => {
+      it('removes descendants from memory but keeps branch root', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        const child = tree.addChild(branch.id, 'https://child.com');
+        const grandchild = tree.addChild(child.id, 'https://grandchild.com');
+
+        await tree.deactivateBranch(branch.id, storage);
+
+        expect(tree.nodes.has(branch.id)).toBe(true);
+        expect(tree.nodes.has(child.id)).toBe(false);
+        expect(tree.nodes.has(grandchild.id)).toBe(false);
+      });
+
+      it('saves branch to storage before removing', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        tree.addChild(branch.id, 'https://child.com');
+
+        await tree.deactivateBranch(branch.id, storage);
+
+        const stored = await storage.loadBranch(branch.id);
+        expect(stored).toHaveLength(2);
+      });
+
+      it('clears branch root childIds after deactivation', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        tree.addChild(branch.id, 'https://child.com');
+
+        await tree.deactivateBranch(branch.id, storage);
+
+        expect(tree.nodes.get(branch.id)!.childIds).toEqual([]);
+      });
+
+      it('preserves branch root descendantCount after deactivation', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        tree.addChild(branch.id, 'https://child.com');
+        tree.addChild(branch.id, 'https://child2.com');
+
+        await tree.deactivateBranch(branch.id, storage);
+
+        // descendantCount should be preserved for launcher display
+        expect(tree.nodes.get(branch.id)!.descendantCount).toBe(2);
+      });
+
+      it('fires branchDeactivated probe', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        tree.addChild(branch.id, 'https://child.com');
+        probe.calls.length = 0;
+
+        await tree.deactivateBranch(branch.id, storage);
+
+        expect(probe.calls).toContainEqual({
+          method: 'branchDeactivated',
+          args: [branch.id],
+        });
+      });
+
+      it('moves focus to branch root if focused node is a descendant', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        const child = tree.addChild(branch.id, 'https://child.com');
+        tree.focusNode(child.id);
+
+        await tree.deactivateBranch(branch.id, storage);
+
+        expect(tree.focusedNodeId).toBe(branch.id);
+      });
+
+      it('clears activeBranchId when deactivating the active branch', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        tree.activeBranchId = branch.id;
+
+        await tree.deactivateBranch(branch.id, storage);
+
+        expect(tree.activeBranchId).toBeNull();
+      });
+
+      it('throws when branch root does not exist', async () => {
+        await expect(
+          tree.deactivateBranch('nonexistent', storage)
+        ).rejects.toThrow();
+      });
+
+      it('throws when node is not a branch root', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        const child = tree.addChild(branch.id, 'https://child.com');
+
+        await expect(
+          tree.deactivateBranch(child.id, storage)
+        ).rejects.toThrow();
+      });
+    });
+
+    describe('switchBranch', () => {
+      it('deactivates current and activates new branch', async () => {
+        const branch1 = tree.addChild(tree.rootId, 'https://b1.com');
+        const b1Child = tree.addChild(branch1.id, 'https://b1c1.com');
+        tree.activeBranchId = branch1.id;
+
+        const branch2 = tree.addChild(tree.rootId, 'https://b2.com');
+        await storage.saveBranch(branch2.id, [
+          makeStoredNode({
+            id: branch2.id,
+            url: 'https://b2.com',
+            parentId: tree.rootId,
+            childIds: ['b2c1'],
+            branchRootId: branch2.id,
+            descendantCount: 1,
+          }),
+          makeStoredNode({
+            id: 'b2c1',
+            url: 'https://b2c1.com',
+            parentId: branch2.id,
+            branchRootId: branch2.id,
+          }),
+        ]);
+
+        await tree.switchBranch(branch2.id, storage);
+
+        // Old branch descendants removed
+        expect(tree.nodes.has(b1Child.id)).toBe(false);
+        // New branch descendants loaded
+        expect(tree.nodes.has('b2c1')).toBe(true);
+        expect(tree.activeBranchId).toBe(branch2.id);
+      });
+
+      it('preserves data integrity during switch', async () => {
+        const branch1 = tree.addChild(tree.rootId, 'https://b1.com');
+        tree.addChild(branch1.id, 'https://b1c1.com');
+        tree.activeBranchId = branch1.id;
+
+        const branch2 = tree.addChild(tree.rootId, 'https://b2.com');
+        await storage.saveBranch(branch2.id, [
+          makeStoredNode({
+            id: branch2.id,
+            url: 'https://b2.com',
+            parentId: tree.rootId,
+            branchRootId: branch2.id,
+          }),
+        ]);
+
+        await tree.switchBranch(branch2.id, storage);
+
+        // Branch1 data should be in storage
+        const storedB1 = await storage.loadBranch(branch1.id);
+        expect(storedB1.length).toBeGreaterThan(0);
+
+        // Tree integrity: root still has both branch roots
+        const root = tree.nodes.get(tree.rootId)!;
+        expect(root.childIds).toContain(branch1.id);
+        expect(root.childIds).toContain(branch2.id);
+      });
+
+      it('works when no branch is currently active', async () => {
+        const branch = tree.addChild(tree.rootId, 'https://branch.com');
+        await storage.saveBranch(branch.id, [
+          makeStoredNode({
+            id: branch.id,
+            url: 'https://branch.com',
+            parentId: tree.rootId,
+            branchRootId: branch.id,
+          }),
+        ]);
+
+        await tree.switchBranch(branch.id, storage);
+
+        expect(tree.activeBranchId).toBe(branch.id);
+      });
+
+      it('deletes screenshots for deactivated branch descendants', async () => {
+        const branch1 = tree.addChild(tree.rootId, 'https://b1.com');
+        const b1Child = tree.addChild(branch1.id, 'https://b1c1.com');
+        tree.activeBranchId = branch1.id;
+
+        // Store a screenshot for the child
+        await storage.saveScreenshot(
+          b1Child.id,
+          'low',
+          new Uint8Array([1, 2, 3])
+        );
+
+        const branch2 = tree.addChild(tree.rootId, 'https://b2.com');
+        await storage.saveBranch(branch2.id, [
+          makeStoredNode({
+            id: branch2.id,
+            url: 'https://b2.com',
+            parentId: tree.rootId,
+            branchRootId: branch2.id,
+          }),
+        ]);
+
+        await tree.switchBranch(branch2.id, storage);
+
+        // Screenshot should be freed for deactivated descendants
+        const screenshot = await storage.loadScreenshot(b1Child.id, 'low');
+        expect(screenshot).toBeNull();
+      });
+    });
+
+    describe('loadSummaries', () => {
+      it('loads root and branch roots from storage on startup', async () => {
+        // Create a fresh tree for startup simulation
+        const startupTree = new BrowsingTree('about:limb-home', probe);
+
+        // Simulate storage with two branches
+        await storage.saveBranch('branch-a', [
+          makeStoredNode({
+            id: 'branch-a',
+            url: 'https://a.com',
+            title: 'Branch A',
+            parentId: startupTree.rootId,
+            childIds: ['a-child'],
+            branchRootId: 'branch-a',
+            descendantCount: 1,
+          }),
+          makeStoredNode({
+            id: 'a-child',
+            url: 'https://achild.com',
+            parentId: 'branch-a',
+            branchRootId: 'branch-a',
+          }),
+        ]);
+        await storage.saveBranch('branch-b', [
+          makeStoredNode({
+            id: 'branch-b',
+            url: 'https://b.com',
+            title: 'Branch B',
+            parentId: startupTree.rootId,
+            branchRootId: 'branch-b',
+            descendantCount: 0,
+          }),
+        ]);
+
+        await startupTree.loadSummaries(storage);
+
+        // Branch roots should be in memory
+        expect(startupTree.nodes.has('branch-a')).toBe(true);
+        expect(startupTree.nodes.has('branch-b')).toBe(true);
+        // Branch A's child should NOT be loaded
+        expect(startupTree.nodes.has('a-child')).toBe(false);
+        // Root should have branch roots as children
+        const root = startupTree.nodes.get(startupTree.rootId)!;
+        expect(root.childIds).toContain('branch-a');
+        expect(root.childIds).toContain('branch-b');
+      });
+
+      it('branch root preserves descendantCount from storage', async () => {
+        const startupTree = new BrowsingTree('about:limb-home', probe);
+        await storage.saveBranch('branch-a', [
+          makeStoredNode({
+            id: 'branch-a',
+            url: 'https://a.com',
+            parentId: startupTree.rootId,
+            childIds: ['c1', 'c2', 'c3'],
+            branchRootId: 'branch-a',
+            descendantCount: 3,
+          }),
+          makeStoredNode({ id: 'c1', parentId: 'branch-a', branchRootId: 'branch-a' }),
+          makeStoredNode({ id: 'c2', parentId: 'branch-a', branchRootId: 'branch-a' }),
+          makeStoredNode({ id: 'c3', parentId: 'branch-a', branchRootId: 'branch-a' }),
+        ]);
+
+        await startupTree.loadSummaries(storage);
+
+        expect(startupTree.nodes.get('branch-a')!.descendantCount).toBe(3);
+      });
+
+      it('no active branch after loading summaries', async () => {
+        const startupTree = new BrowsingTree('about:limb-home', probe);
+        await storage.saveBranch('branch-a', [
+          makeStoredNode({
+            id: 'branch-a',
+            url: 'https://a.com',
+            parentId: startupTree.rootId,
+            branchRootId: 'branch-a',
+          }),
+        ]);
+
+        await startupTree.loadSummaries(storage);
+
+        expect(startupTree.activeBranchId).toBeNull();
+      });
     });
   });
 });

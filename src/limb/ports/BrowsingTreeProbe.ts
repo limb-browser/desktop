@@ -8,4 +8,6 @@ export interface BrowsingTreeProbe {
   nodeFocused(nodeId: string): void;
   treeSizeWarning(nodeCount: number): void;
   treeSizeSuggestion(nodeCount: number): void;
+  branchActivated(branchRootId: string, nodeCount: number): void;
+  branchDeactivated(branchRootId: string): void;
 }

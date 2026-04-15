@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import type { BrowsingTreeProbe } from '../ports/BrowsingTreeProbe';
+import type { TreeStoragePort, StoredNode } from '../ports/TreeStoragePort';
 
 export type NodeStatus = 'live' | 'screenshot' | 'favicon-only' | 'culled';
 
@@ -17,12 +18,14 @@ export interface TreeNode {
   status: NodeStatus;
   createdAt: number;
   lastVisitedAt: number;
+  descendantCount: number;
 }
 
 export class BrowsingTree {
   rootId: string;
   nodes: Map<string, TreeNode>;
   focusedNodeId: string;
+  activeBranchId: string | null = null;
   #probe: BrowsingTreeProbe | null;
   #warningFired = false;
   #suggestionFired = false;
@@ -42,6 +45,7 @@ export class BrowsingTree {
       status: 'culled',
       createdAt: now,
       lastVisitedAt: now,
+      descendantCount: 0,
     };
     this.rootId = rootId;
     this.focusedNodeId = rootId;
@@ -70,10 +74,12 @@ export class BrowsingTree {
       status: 'culled',
       createdAt: now,
       lastVisitedAt: now,
+      descendantCount: 0,
     };
 
     parent.childIds.push(child.id);
     this.nodes.set(child.id, child);
+    this.#incrementAncestorCounts(parentId);
     this.#probe?.childAdded(parentId, child.id);
     this.#checkTreeSize();
     return child;
@@ -110,11 +116,13 @@ export class BrowsingTree {
       this.#probe?.nodeFocused(this.focusedNodeId);
     }
 
-    // Remove from parent's childIds
+    // Remove from parent's childIds and decrement ancestor counts
     const parent = this.nodes.get(node.parentId!);
     if (parent) {
       parent.childIds = parent.childIds.filter((id) => id !== nodeId);
     }
+    const removedCount = 1 + descendantIds.length;
+    this.#decrementAncestorCounts(node.parentId!, removedCount);
 
     // Remove node and all descendants from the map
     this.nodes.delete(nodeId);
@@ -130,8 +138,30 @@ export class BrowsingTree {
       throw new Error(`Node "${nodeId}" does not exist`);
     }
     this.focusedNodeId = nodeId;
-    this.nodes.get(nodeId)!.lastVisitedAt = Date.now();
+    const now = Date.now();
+    this.nodes.get(nodeId)!.lastVisitedAt = now;
+
+    // Propagate lastVisitedAt to branch root (direct child of root)
+    const branchRootId = this.getBranchRootId(nodeId);
+    if (branchRootId !== null && branchRootId !== nodeId) {
+      this.nodes.get(branchRootId)!.lastVisitedAt = now;
+    }
+
     this.#probe?.nodeFocused(nodeId);
+  }
+
+  getBranchRootId(nodeId: string): string | null {
+    let current = this.nodes.get(nodeId);
+    if (!current) return null;
+    while (current.parentId !== null && current.parentId !== this.rootId) {
+      current = this.nodes.get(current.parentId)!;
+    }
+    // If current's parent is root, current is a branch root
+    if (current.parentId === this.rootId) {
+      return current.id;
+    }
+    // nodeId is the root itself
+    return null;
   }
 
   getAncestors(nodeId: string): TreeNode[] {
@@ -203,6 +233,186 @@ export class BrowsingTree {
       .filter((id) => id !== nodeId)
       .map((id) => this.nodes.get(id)!)
       .filter(Boolean);
+  }
+
+  async activateBranch(
+    branchRootId: string,
+    storage: TreeStoragePort
+  ): Promise<void> {
+    const branchRoot = this.nodes.get(branchRootId);
+    if (!branchRoot) {
+      throw new Error(`Branch root "${branchRootId}" does not exist`);
+    }
+    if (branchRoot.parentId !== this.rootId) {
+      throw new Error(
+        `Node "${branchRootId}" is not a branch root (not a direct child of root)`
+      );
+    }
+
+    const storedNodes = await storage.loadBranch(branchRootId);
+
+    // Insert descendant nodes into the tree
+    for (const stored of storedNodes) {
+      if (stored.id === branchRootId) {
+        // Update branch root from storage data
+        branchRoot.childIds = [...stored.childIds];
+        branchRoot.descendantCount = stored.descendantCount;
+        continue;
+      }
+      const node: TreeNode = {
+        id: stored.id,
+        url: stored.url,
+        title: stored.title,
+        favicon: stored.favicon,
+        screenshot: null,
+        parentId: stored.parentId,
+        childIds: [...stored.childIds],
+        status: 'culled',
+        createdAt: stored.createdAt,
+        lastVisitedAt: stored.lastVisitedAt,
+        descendantCount: stored.descendantCount,
+      };
+      this.nodes.set(node.id, node);
+    }
+
+    // Update root's descendantCount to include newly loaded nodes
+    const loadedDescendants = storedNodes.length - 1; // exclude branch root itself
+    const root = this.nodes.get(this.rootId)!;
+    root.descendantCount += loadedDescendants;
+
+    this.activeBranchId = branchRootId;
+    this.#probe?.branchActivated(branchRootId, storedNodes.length);
+  }
+
+  async deactivateBranch(
+    branchRootId: string,
+    storage: TreeStoragePort
+  ): Promise<void> {
+    const branchRoot = this.nodes.get(branchRootId);
+    if (!branchRoot) {
+      throw new Error(`Branch root "${branchRootId}" does not exist`);
+    }
+    if (branchRoot.parentId !== this.rootId) {
+      throw new Error(
+        `Node "${branchRootId}" is not a branch root (not a direct child of root)`
+      );
+    }
+
+    // Collect all descendants for saving
+    const descendants = this.getDescendants(branchRootId);
+    const storedNodes: StoredNode[] = descendants.map((node) => ({
+      id: node.id,
+      url: node.url,
+      title: node.title,
+      favicon: node.favicon,
+      parentId: node.parentId,
+      childIds: [...node.childIds],
+      createdAt: node.createdAt,
+      lastVisitedAt: node.lastVisitedAt,
+      descendantCount: node.descendantCount,
+      branchRootId,
+    }));
+
+    // Save to storage
+    await storage.saveBranch(branchRootId, storedNodes);
+
+    // Move focus to branch root if focused node is a descendant
+    if (this.focusedNodeId !== branchRootId) {
+      const focusedBranch = this.getBranchRootId(this.focusedNodeId);
+      if (focusedBranch === branchRootId) {
+        this.focusedNodeId = branchRootId;
+        this.#probe?.nodeFocused(branchRootId);
+      }
+    }
+
+    // Remove descendant nodes from memory (keep branch root)
+    const descendantIds = descendants
+      .filter((n) => n.id !== branchRootId)
+      .map((n) => n.id);
+    for (const id of descendantIds) {
+      this.nodes.delete(id);
+    }
+
+    // Update root's descendantCount
+    const root = this.nodes.get(this.rootId)!;
+    root.descendantCount -= descendantIds.length;
+
+    // Clear branch root's childIds but preserve descendantCount for summary
+    branchRoot.childIds = [];
+
+    // Clear active branch if this was it
+    if (this.activeBranchId === branchRootId) {
+      this.activeBranchId = null;
+    }
+
+    this.#probe?.branchDeactivated(branchRootId);
+  }
+
+  async switchBranch(
+    newBranchRootId: string,
+    storage: TreeStoragePort
+  ): Promise<void> {
+    // Deactivate current branch if one is active
+    if (this.activeBranchId !== null) {
+      const oldBranchId = this.activeBranchId;
+
+      // Collect descendant IDs before deactivation (for screenshot cleanup)
+      const descendants = this.getDescendants(oldBranchId);
+      const descendantIds = descendants
+        .filter((n) => n.id !== oldBranchId)
+        .map((n) => n.id);
+
+      await this.deactivateBranch(oldBranchId, storage);
+
+      // Free screenshots for deactivated branch descendants
+      if (descendantIds.length > 0) {
+        await storage.deleteScreenshots(descendantIds);
+      }
+    }
+
+    // Activate new branch
+    await this.activateBranch(newBranchRootId, storage);
+  }
+
+  async loadSummaries(storage: TreeStoragePort): Promise<void> {
+    const summaries = await storage.getBranchSummaries();
+    const root = this.nodes.get(this.rootId)!;
+
+    for (const summary of summaries) {
+      const node: TreeNode = {
+        id: summary.id,
+        url: summary.url,
+        title: summary.title,
+        favicon: summary.favicon,
+        screenshot: null,
+        parentId: this.rootId,
+        childIds: [],
+        status: 'culled',
+        createdAt: summary.createdAt,
+        lastVisitedAt: summary.lastVisitedAt,
+        descendantCount: summary.descendantCount,
+      };
+      this.nodes.set(node.id, node);
+      root.childIds.push(node.id);
+    }
+
+    root.descendantCount = summaries.length;
+  }
+
+  #incrementAncestorCounts(nodeId: string): void {
+    let current = this.nodes.get(nodeId);
+    while (current) {
+      current.descendantCount++;
+      current = current.parentId ? this.nodes.get(current.parentId) : undefined;
+    }
+  }
+
+  #decrementAncestorCounts(nodeId: string, count: number): void {
+    let current = this.nodes.get(nodeId);
+    while (current) {
+      current.descendantCount -= count;
+      current = current.parentId ? this.nodes.get(current.parentId) : undefined;
+    }
   }
 
   #checkTreeSize(): void {

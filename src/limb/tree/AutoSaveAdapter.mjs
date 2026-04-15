@@ -64,6 +64,8 @@ export class AutoSaveAdapter {
       nodeFocused: () => this.#trigger.notifyChange(),
       treeSizeWarning: () => {},
       treeSizeSuggestion: () => {},
+      branchActivated: () => this.#trigger.notifyChange(),
+      branchDeactivated: () => this.#trigger.notifyChange(),
     });
 
     this.#attrHandler = () => this.#trigger.notifyChange();

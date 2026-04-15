@@ -73,6 +73,7 @@ export class TreeRestorer {
         status: 'culled',
         createdAt: tab.createdAt,
         lastVisitedAt: tab.createdAt,
+        descendantCount: 0,
       };
       tree.nodes.set(tab.nodeId, node);
     }
@@ -86,8 +87,25 @@ export class TreeRestorer {
       }
     }
 
+    // Compute descendantCount for each node bottom-up
+    this.#computeDescendantCounts(tree);
+
     this.#probe?.treeRestored(tree.nodes.size);
     return tree;
+  }
+
+  #computeDescendantCounts(tree: BrowsingTree): void {
+    const computeCount = (nodeId: string): number => {
+      const node = tree.nodes.get(nodeId);
+      if (!node) return 0;
+      let count = 0;
+      for (const childId of node.childIds) {
+        count += 1 + computeCount(childId);
+      }
+      node.descendantCount = count;
+      return count;
+    };
+    computeCount(tree.rootId);
   }
 
   #processTabData(
