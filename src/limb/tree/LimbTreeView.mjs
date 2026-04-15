@@ -517,11 +517,11 @@ export class LimbTreeView {
       // Store for hit testing on click
       this.#lastFrameNodes = frame.nodes;
 
-      // Compute reveal scales for zoom-out animation
-      let revealScales = new Map();
+      // Compute reveal state (scale + opacity) for zoom-out animation
+      let revealStates = new Map();
       if (this.#revealAnimator) {
         const visibleIds = new Set(frame.nodes.map(n => n.nodeId));
-        revealScales = this.#revealAnimator.update(
+        revealStates = this.#revealAnimator.update(
           visibleIds,
           zoom.level,
           this.#focusedNodeId,
@@ -546,10 +546,9 @@ export class LimbTreeView {
       for (const edge of frame.edges) {
         const edgeOp = animated?.edgeOpacity?.get(edge.childId);
         const progress = animated?.edgeProgress?.get(edge.childId);
+        const edgeRevealOpacity = revealStates.get(edge.childId)?.opacity ?? 1;
 
-        if (edgeOp !== undefined) {
-          ctx.globalAlpha = edgeOp;
-        }
+        ctx.globalAlpha = (edgeOp ?? 1) * edgeRevealOpacity;
 
         const midY = (edge.startY + edge.endY) / 2;
 
@@ -591,8 +590,10 @@ export class LimbTreeView {
         const progress = easeOut(rawProgress);
         const offsetY = -HOVER_OFFSET_Y * progress;
 
-        // Compute reveal scale (zoom-out reveal animation)
-        const revealScale = revealScales.get(node.nodeId) ?? 1;
+        // Compute reveal scale + opacity (zoom-out reveal animation, S5.2 + S7.1)
+        const reveal = revealStates.get(node.nodeId);
+        const revealScale = reveal?.scale ?? 1;
+        const revealOpacity = reveal?.opacity ?? 1;
         const rw = node.width * revealScale;
         const rh = node.height * revealScale;
         const rx = node.x + (node.width - rw) / 2;
@@ -600,8 +601,8 @@ export class LimbTreeView {
 
         const r = Math.min(cornerRadius, rw / 2, rh / 2);
 
-        // Apply layout animation opacity for fading in/out nodes
-        const nodeAlpha = animated?.opacity?.get(node.nodeId) ?? 1;
+        // Apply layout animation opacity combined with reveal opacity
+        const nodeAlpha = (animated?.opacity?.get(node.nodeId) ?? 1) * revealOpacity;
 
         // Draw fold nodes with stacked-cards appearance
         const foldMeta = this.#foldNodes.get(node.nodeId);
@@ -694,12 +695,14 @@ export class LimbTreeView {
         const rawProgress = hoverProgress.get(frame.focusRing.nodeId) ?? 0;
         const progress = easeOut(rawProgress);
         const offsetY = -HOVER_OFFSET_Y * progress;
-        const frs = revealScales.get(frame.focusRing.nodeId) ?? 1;
+        const frReveal = revealStates.get(frame.focusRing.nodeId);
+        const frs = frReveal?.scale ?? 1;
+        const frRevealOpacity = frReveal?.opacity ?? 1;
         const frw = frame.focusRing.width * frs;
         const frh = frame.focusRing.height * frs;
         const frx = frame.focusRing.x + (frame.focusRing.width - frw) / 2;
         const fry = frame.focusRing.y + (frame.focusRing.height - frh) / 2;
-        ctx.globalAlpha = focusAlpha;
+        ctx.globalAlpha = focusAlpha * frRevealOpacity;
         ctx.strokeStyle = FOCUS_RING_COLOR;
         ctx.lineWidth = FOCUS_RING_WIDTH;
         const r = Math.min(cornerRadius, frw / 2, frh / 2);
@@ -734,8 +737,9 @@ export class LimbTreeView {
           // Opacity: from 70% default to 100% on hover, modulated by layout animation
           const hoverOpacity = label.opacity + (1 - label.opacity) * progress;
           const labelAlpha = animated?.opacity?.get(label.nodeId) ?? 1;
+          const labelRevealOpacity = revealStates.get(label.nodeId)?.opacity ?? 1;
           const offsetY = -HOVER_OFFSET_Y * progress;
-          ctx.globalAlpha = hoverOpacity * labelAlpha;
+          ctx.globalAlpha = hoverOpacity * labelAlpha * labelRevealOpacity;
           ctx.fillStyle = "#ccc";
           ctx.font = `${label.fontSize}px system-ui, sans-serif`;
           ctx.fillText(label.text, label.x, label.y + offsetY);

@@ -109,10 +109,10 @@ export class RevealAnimator {
    * @param {string | null} focusedNodeId - Currently focused node
    * @param {Map<string, string>} parentMap - childId -> parentId
    * @param {number} deltaMs - Time elapsed since last update
-   * @returns {Map<string, number>} nodeId -> reveal scale (0.9 to 1.0); absent = fully revealed (1.0)
+   * @returns {Map<string, { scale: number, opacity: number }>} nodeId -> reveal state; absent = fully revealed (scale 1.0, opacity 1.0)
    */
   update(visibleNodeIds, currentZoomLevel, focusedNodeId, parentMap, deltaMs) {
-    const scales = new Map();
+    const reveals = new Map();
     const isZoomingOut =
       this.#previousZoomLevel !== null &&
       currentZoomLevel < this.#previousZoomLevel;
@@ -126,13 +126,16 @@ export class RevealAnimator {
       if (effectiveElapsed >= REVEAL_DURATION_MS) {
         this.#animations.delete(nodeId);
         this.#probe?.revealCompleted(nodeId);
-        // Scale is 1.0 — omit from map
+        // Scale 1.0, opacity 1.0 — omit from map
       } else if (effectiveElapsed > 0) {
         const t = effectiveElapsed / REVEAL_DURATION_MS;
-        scales.set(nodeId, REVEAL_START_SCALE + (1 - REVEAL_START_SCALE) * easeOut(t));
+        reveals.set(nodeId, {
+          scale: REVEAL_START_SCALE + (1 - REVEAL_START_SCALE) * easeOut(t),
+          opacity: t, // linear interpolation per S7.1
+        });
       } else {
-        // Still in stagger delay
-        scales.set(nodeId, REVEAL_START_SCALE);
+        // Still in stagger delay — not yet visible
+        reveals.set(nodeId, { scale: REVEAL_START_SCALE, opacity: 0 });
       }
     }
 
@@ -143,13 +146,13 @@ export class RevealAnimator {
           const distance = computeRevealDistance(nodeId, focusedNodeId, parentMap);
           const delay = distance * REVEAL_STAGGER_MS;
           this.#animations.set(nodeId, { elapsed: 0, delay, distance });
-          scales.set(nodeId, REVEAL_START_SCALE);
+          reveals.set(nodeId, { scale: REVEAL_START_SCALE, opacity: 0 });
           this.#probe?.revealStarted(nodeId, distance);
         }
       }
     }
 
     this.#previousVisibleNodeIds = new Set(visibleNodeIds);
-    return scales;
+    return reveals;
   }
 }

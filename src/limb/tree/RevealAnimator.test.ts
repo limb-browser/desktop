@@ -119,7 +119,7 @@ describe('reveal distance via probe', () => {
 
 describe('RevealAnimator', () => {
   describe('zoom-out reveal', () => {
-    it('nodes entering viewport during zoom-out start at 90% scale', () => {
+    it('nodes entering viewport during zoom-out start at 90% scale and 0 opacity', () => {
       const parentMap = makeTestTree();
       const probe = makeProbe();
       const animator = new RevealAnimator(probe);
@@ -128,13 +128,15 @@ describe('RevealAnimator', () => {
       animator.update(new Set(['b']), 0.8, 'b', parentMap, 0);
 
       // Second frame: zoom out to 0.6, 'a' and 'c' become visible
-      const scales = animator.update(new Set(['b', 'a', 'c']), 0.6, 'b', parentMap, 16);
+      const reveals = animator.update(new Set(['b', 'a', 'c']), 0.6, 'b', parentMap, 16);
 
-      expect(scales.get('a')).toBe(0.9);
-      expect(scales.get('c')).toBe(0.9);
+      expect(reveals.get('a')!.scale).toBe(0.9);
+      expect(reveals.get('a')!.opacity).toBe(0);
+      expect(reveals.get('c')!.scale).toBe(0.9);
+      expect(reveals.get('c')!.opacity).toBe(0);
     });
 
-    it('nodes reach 100% scale after 150ms', () => {
+    it('nodes reach 100% scale and full opacity after 150ms', () => {
       const parentMap = makeTestTree();
       const animator = new RevealAnimator();
 
@@ -145,10 +147,10 @@ describe('RevealAnimator', () => {
       animator.update(new Set(['b', 'a']), 0.6, 'b', parentMap, 16);
 
       // Advance 30ms (past stagger delay) + 150ms = 180ms total
-      const scales = animator.update(new Set(['b', 'a']), 0.6, 'b', parentMap, 180);
+      const reveals = animator.update(new Set(['b', 'a']), 0.6, 'b', parentMap, 180);
 
       // After delay(30ms) + duration(150ms) = 180ms, animation should be complete
-      expect(scales.has('a')).toBe(false); // completed, scale is 1.0 (no entry)
+      expect(reveals.has('a')).toBe(false); // completed, scale=1.0, opacity=1.0 (no entry)
     });
 
     it('reveal scale interpolates between 0.9 and 1.0 during animation', () => {
@@ -161,11 +163,30 @@ describe('RevealAnimator', () => {
       animator.update(new Set(['b', 'a']), 0.6, 'b', parentMap, 0);
 
       // After 30ms delay + 75ms (halfway through 150ms animation)
-      const scales = animator.update(new Set(['b', 'a']), 0.6, 'b', parentMap, 105);
+      const reveals = animator.update(new Set(['b', 'a']), 0.6, 'b', parentMap, 105);
 
-      const scale = scales.get('a')!;
-      expect(scale).toBeGreaterThan(0.9);
-      expect(scale).toBeLessThan(1.0);
+      const reveal = reveals.get('a')!;
+      expect(reveal.scale).toBeGreaterThan(0.9);
+      expect(reveal.scale).toBeLessThan(1.0);
+    });
+
+    it('opacity interpolates linearly from 0 to 1 during animation', () => {
+      const parentMap = makeTestTree();
+      const animator = new RevealAnimator();
+
+      animator.update(new Set(['b']), 0.8, 'b', parentMap, 0);
+
+      // 'a' appears as sibling (distance=1, delay=30ms)
+      animator.update(new Set(['b', 'a']), 0.6, 'b', parentMap, 0);
+
+      // After 30ms delay + 75ms (halfway through 150ms animation)
+      const reveals = animator.update(new Set(['b', 'a']), 0.6, 'b', parentMap, 105);
+
+      const reveal = reveals.get('a')!;
+      expect(reveal.opacity).toBeGreaterThan(0);
+      expect(reveal.opacity).toBeLessThan(1);
+      // Linear interpolation: at t=0.5, opacity should be 0.5
+      expect(reveal.opacity).toBeCloseTo(0.5, 1);
     });
 
     it('siblings reveal before parent during zoom-out', () => {
@@ -181,13 +202,14 @@ describe('RevealAnimator', () => {
 
       // After 30ms: sibling 'e' (distance=1, delay=30ms) should have started animating
       // parent 'b' (distance=2, delay=60ms) should still be at start scale
-      const scales = animator.update(new Set(['d', 'e', 'b']), 0.7, 'd', parentMap, 45);
+      const reveals = animator.update(new Set(['d', 'e', 'b']), 0.7, 'd', parentMap, 45);
 
-      const siblingScale = scales.get('e')!;
-      const parentScale = scales.get('b')!;
+      const siblingReveal = reveals.get('e')!;
+      const parentReveal = reveals.get('b')!;
 
-      // Sibling should be further along (higher scale) than parent
-      expect(siblingScale).toBeGreaterThan(parentScale);
+      // Sibling should be further along (higher scale, higher opacity) than parent
+      expect(siblingReveal.scale).toBeGreaterThan(parentReveal.scale);
+      expect(siblingReveal.opacity).toBeGreaterThan(parentReveal.opacity);
     });
   });
 
@@ -201,10 +223,10 @@ describe('RevealAnimator', () => {
       animator.update(new Set(['root', 'a', 'b', 'c']), 0.3, 'b', parentMap, 0);
 
       // Zoom IN to 0.5, new nodes 'd' and 'e' appear (from deeper zoom)
-      const scales = animator.update(new Set(['root', 'a', 'b', 'c', 'd', 'e']), 0.5, 'b', parentMap, 16);
+      const reveals = animator.update(new Set(['root', 'a', 'b', 'c', 'd', 'e']), 0.5, 'b', parentMap, 16);
 
       // No reveal animations should start
-      expect(scales.size).toBe(0);
+      expect(reveals.size).toBe(0);
       expect(probe.events.filter(e => e.type === 'started').length).toBe(0);
     });
 
@@ -216,9 +238,9 @@ describe('RevealAnimator', () => {
       animator.update(new Set(['b']), 0.5, 'b', parentMap, 0);
 
       // Same zoom level, new nodes appear (from panning)
-      const scales = animator.update(new Set(['b', 'a', 'c']), 0.5, 'b', parentMap, 16);
+      const reveals = animator.update(new Set(['b', 'a', 'c']), 0.5, 'b', parentMap, 16);
 
-      expect(scales.size).toBe(0);
+      expect(reveals.size).toBe(0);
       expect(probe.events.filter(e => e.type === 'started').length).toBe(0);
     });
   });
@@ -295,7 +317,7 @@ describe('RevealAnimator', () => {
       animator.update(new Set(['b', 'a']), 0.8, 'b', parentMap, 0);
 
       // Zoom out, but 'a' was already visible
-      const scales = animator.update(new Set(['b', 'a', 'c']), 0.6, 'b', parentMap, 16);
+      animator.update(new Set(['b', 'a', 'c']), 0.6, 'b', parentMap, 16);
 
       // Only 'c' should get a reveal animation, not 'a'
       const startEvents = probe.events.filter(e => e.type === 'started');
@@ -316,16 +338,16 @@ describe('RevealAnimator', () => {
       animator.update(new Set(['d', 'e', 'b', 'a']), 0.5, 'd', parentMap, 0);
 
       // At t=31ms: e (delay=30ms) should have just started, b (delay=60ms) still waiting, a (delay=90ms) still waiting
-      const scales31 = animator.update(new Set(['d', 'e', 'b', 'a']), 0.5, 'd', parentMap, 31);
-      expect(scales31.get('e')!).toBeGreaterThan(0.9); // started animating
-      expect(scales31.get('b')!).toBe(0.9); // still in stagger delay
-      expect(scales31.get('a')!).toBe(0.9); // still in stagger delay
+      const reveals31 = animator.update(new Set(['d', 'e', 'b', 'a']), 0.5, 'd', parentMap, 31);
+      expect(reveals31.get('e')!.scale).toBeGreaterThan(0.9); // started animating
+      expect(reveals31.get('b')!.scale).toBe(0.9); // still in stagger delay
+      expect(reveals31.get('a')!.scale).toBe(0.9); // still in stagger delay
 
       // At t=61ms more: b (delay=60ms) should have started, a (delay=90ms) still waiting
-      const scales92 = animator.update(new Set(['d', 'e', 'b', 'a']), 0.5, 'd', parentMap, 31);
+      const reveals62 = animator.update(new Set(['d', 'e', 'b', 'a']), 0.5, 'd', parentMap, 31);
       // Total elapsed = 31 + 31 = 62ms
-      expect(scales92.get('b')!).toBeGreaterThan(0.9); // started animating (62 > 60)
-      expect(scales92.get('a')!).toBe(0.9); // still waiting (62 < 90)
+      expect(reveals62.get('b')!.scale).toBeGreaterThan(0.9); // started animating (62 > 60)
+      expect(reveals62.get('a')!.scale).toBe(0.9); // still waiting (62 < 90)
     });
   });
 });
