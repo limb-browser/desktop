@@ -3,8 +3,8 @@ title: "Implement branch folding at root level"
 spec_ref: "unified-tree.md S4"
 depends_on:
   - task-006
-progress: ready-for-review
-review: ""
+progress: complete
+review: "specs/reviews/review-task-032-R1.md"
 coverage_sections: []
 commits: []
 ---
