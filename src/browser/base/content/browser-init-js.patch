@@ -46,6 +46,7 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +    );
 +    const treeRestorerProbe = { treeRestored(n) { console.debug("Tree restored:", n, "nodes"); }, orphanedNodeReparented(id) { console.debug("Orphan reparented:", id); }, preLimbTabAdopted(id) { console.debug("Pre-Limb tab adopted:", id); } };
 +    const { tree: browsingTree } = restoreTreeFromTabs(gBrowser, treeRestorerProbe);
++    window.gLimbBrowsingTree = browsingTree; // about:limb-home loads limb/home/limb-home.mjs via <script>
 +    const positions = computeLayout(browsingTree);
 +    const parentMap = new Map();
 +    for (const [nodeId, node] of browsingTree.nodes) {

@@ -34,7 +34,7 @@ export class TreeRestorer {
         nodeId: crypto.randomUUID(),
         parentId: null,
         createdAt: now,
-        url: 'about:blank',
+        url: 'about:limb-home',
         title: '',
         favicon: null,
       };

@@ -1,0 +1,28 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Limb Home</title>
+  <link rel="stylesheet" href="chrome://browser/content/limb/home/limb-home.css" />
+</head>
+<body>
+  <div id="launcher">
+    <div id="search-container">
+      <input id="search-bar" type="text" placeholder="Search history..." autocomplete="off" />
+    </div>
+
+    <div id="empty-state" hidden>
+      <button id="start-browsing">Start Browsing</button>
+    </div>
+
+    <div id="branches-container"></div>
+
+    <button id="new-branch" title="New branch">+</button>
+  </div>
+
+  <script type="module" src="chrome://browser/content/limb/home/limb-home.mjs"></script>
+</body>
+</html>

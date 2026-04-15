@@ -190,7 +190,7 @@ describe('TreeRestorer', () => {
       // Root is synthetic
       const root = tree.nodes.get(tree.rootId)!;
       expect(root.parentId).toBeNull();
-      expect(root.url).toBe('about:blank');
+      expect(root.url).toBe('about:limb-home');
       // Children reparented to synthetic root
       expect(root.childIds).toContain('child-1');
       expect(root.childIds).toContain('child-2');
@@ -204,7 +204,7 @@ describe('TreeRestorer', () => {
       expect(tree.nodes.size).toBe(1);
       const root = tree.nodes.get(tree.rootId)!;
       expect(root.parentId).toBeNull();
-      expect(root.url).toBe('about:blank');
+      expect(root.url).toBe('about:limb-home');
     });
   });
 
