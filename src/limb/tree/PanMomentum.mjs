@@ -49,6 +49,8 @@ function easeOut(t) {
 export class PanMomentum {
   /** @type {Array<{ dx: number, dy: number, dt: number }>} */
   #samples = [];
+  /** @type {number} Wall-clock timestamp of the most recent drag sample. */
+  #lastSampleTime = 0;
   /** @type {number} */
   #vx = 0;
   /** @type {number} */
@@ -90,8 +92,10 @@ export class PanMomentum {
    * @param {number} dx - Focus point delta in logical units
    * @param {number} dy - Focus point delta in logical units
    * @param {number} dt - Time delta in ms since last sample
+   * @param {number} now - Wall-clock timestamp (e.g., performance.now())
    */
-  recordDrag(dx, dy, dt) {
+  recordDrag(dx, dy, dt, now) {
+    this.#lastSampleTime = now;
     this.#samples.push({ dx, dy, dt });
 
     // Trim old samples outside the time window
@@ -114,10 +118,21 @@ export class PanMomentum {
    * to the nearest edge. Otherwise, computes velocity from recent drag
    * samples and starts inertial momentum if above the minimum threshold.
    *
+   * Stale samples (older than SAMPLE_WINDOW_MS) are discarded before
+   * velocity computation to prevent phantom motion when the user holds
+   * the mouse still before releasing.
+   *
    * @param {{ x: number, y: number }} focusPoint - Current viewport center (logical)
    * @param {TreeBounds} treeBounds - Tree bounding box (logical)
+   * @param {number} now - Wall-clock timestamp (e.g., performance.now())
    */
-  release(focusPoint, treeBounds) {
+  release(focusPoint, treeBounds, now) {
+    // Expire stale samples: if the last recorded sample is older than
+    // the time window, the user has visually stopped moving.
+    if (this.#samples.length > 0 && now - this.#lastSampleTime > SAMPLE_WINDOW_MS) {
+      this.#samples = [];
+    }
+
     const velocity = this.#computeVelocity();
     this.#samples = [];
 

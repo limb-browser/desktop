@@ -24,11 +24,13 @@ const largeVpSize = { width: 10, height: 10 };
  * Record several drag samples to establish a known velocity.
  * 3 samples of {dx: -1, dy: -0.5} over 16ms each.
  * Velocity: vx = -3/48 = -0.0625, vy = -1.5/48 = -0.03125 units/ms.
+ * @param {PanMomentum} pm
+ * @param {number} [startTime=1000] - Wall-clock start time for samples
  */
-function recordDragSamples(pm) {
-  pm.recordDrag(-1, -0.5, 16);
-  pm.recordDrag(-1, -0.5, 16);
-  pm.recordDrag(-1, -0.5, 16);
+function recordDragSamples(pm, startTime = 1000) {
+  pm.recordDrag(-1, -0.5, 16, startTime);
+  pm.recordDrag(-1, -0.5, 16, startTime + 16);
+  pm.recordDrag(-1, -0.5, 16, startTime + 32);
 }
 
 /** Create a probe that records events into arrays. */
@@ -50,7 +52,7 @@ describe("PanMomentum", () => {
       const pm = new PanMomentum();
       recordDragSamples(pm);
 
-      pm.release({ x: 5, y: 4 }, bounds);
+      pm.release({ x: 5, y: 4 }, bounds, 1048);
       expect(pm.isActive).toBe(true);
 
       const result = pm.update(16, { x: 5, y: 4 }, bounds, vpSize);
@@ -62,17 +64,17 @@ describe("PanMomentum", () => {
     it("does not start momentum with zero velocity", () => {
       const pm = new PanMomentum();
       // No drag samples recorded
-      pm.release({ x: 5, y: 4 }, bounds);
+      pm.release({ x: 5, y: 4 }, bounds, 1000);
       expect(pm.isActive).toBe(false);
     });
 
     it("does not start momentum when velocity is below threshold", () => {
       const pm = new PanMomentum();
       // Very tiny movement
-      pm.recordDrag(0.00001, 0, 16);
-      pm.recordDrag(0.00001, 0, 16);
-      pm.recordDrag(0.00001, 0, 16);
-      pm.release({ x: 5, y: 4 }, bounds);
+      pm.recordDrag(0.00001, 0, 16, 1000);
+      pm.recordDrag(0.00001, 0, 16, 1016);
+      pm.recordDrag(0.00001, 0, 16, 1032);
+      pm.release({ x: 5, y: 4 }, bounds, 1048);
       expect(pm.isActive).toBe(false);
     });
   });
@@ -83,7 +85,7 @@ describe("PanMomentum", () => {
       recordDragSamples(pm);
 
       const focus = { x: 0, y: 0 };
-      pm.release(focus, largeBounds);
+      pm.release(focus, largeBounds, 1048);
 
       // Sample velocity near t=0 with a tiny dt
       const dt = 0.1;
@@ -107,7 +109,7 @@ describe("PanMomentum", () => {
       recordDragSamples(pm);
 
       const focus = { x: 0, y: 0 };
-      pm.release(focus, largeBounds);
+      pm.release(focus, largeBounds, 1048);
 
       const r = pm.update(16, focus, largeBounds, largeVpSize);
       // vx = -0.0625, vy = -0.03125 → ratio dy/dx should be 0.5
@@ -124,7 +126,7 @@ describe("PanMomentum", () => {
       recordDragSamples(pm);
 
       const focus = { x: 0, y: 0 };
-      pm.release(focus, largeBounds);
+      pm.release(focus, largeBounds, 1048);
 
       // Run momentum until it stops
       let f = { ...focus };
@@ -162,14 +164,14 @@ describe("PanMomentum", () => {
     it("applies 80% damping during momentum when outside bounds", () => {
       const pm = new PanMomentum();
       // Give enough velocity for at least one frame
-      pm.recordDrag(-2, 0, 16);
-      pm.recordDrag(-2, 0, 16);
-      pm.recordDrag(-2, 0, 16);
+      pm.recordDrag(-2, 0, 16, 1000);
+      pm.recordDrag(-2, 0, 16, 1016);
+      pm.recordDrag(-2, 0, 16, 1032);
 
       // Use the standard bounds. With vpSize, visibility maxFocusX = 10.5,
       // so x=10.2 is outside bounds (maxX=10) but within visibility range.
       const focus = { x: 5, y: 4 };
-      pm.release(focus, bounds);
+      pm.release(focus, bounds, 1048);
 
       // First update: inside bounds, full speed
       const r1 = pm.update(1, focus, bounds, vpSize);
@@ -190,7 +192,7 @@ describe("PanMomentum", () => {
     it("starts snap-back on release when focusPoint is outside bounds", () => {
       const pm = new PanMomentum();
       recordDragSamples(pm);
-      pm.release({ x: 12, y: 4 }, bounds);
+      pm.release({ x: 12, y: 4 }, bounds, 1048);
       expect(pm.isActive).toBe(true);
 
       // Should animate toward nearest edge (x=10)
@@ -200,7 +202,7 @@ describe("PanMomentum", () => {
 
     it("completes snap-back at the nearest edge after 200ms", () => {
       const pm = new PanMomentum();
-      pm.release({ x: 12, y: 10 }, bounds);
+      pm.release({ x: 12, y: 10 }, bounds, 1000);
 
       // After 200ms, should reach the edge
       const r = pm.update(200, { x: 12, y: 10 }, bounds, vpSize);
@@ -212,7 +214,7 @@ describe("PanMomentum", () => {
 
     it("uses ease-out for snap-back interpolation", () => {
       const pm = new PanMomentum();
-      pm.release({ x: 12, y: 4 }, bounds);
+      pm.release({ x: 12, y: 4 }, bounds, 1000);
 
       // At t=100ms (50% of 200ms), ease-out gives 75% progress
       const r = pm.update(100, { x: 12, y: 4 }, bounds, vpSize);
@@ -224,12 +226,12 @@ describe("PanMomentum", () => {
       const probe = createProbe();
       const pm = new PanMomentum(probe);
       // Small velocity moving right (toward outside bounds)
-      pm.recordDrag(0.05, 0, 16);
-      pm.recordDrag(0.05, 0, 16);
-      pm.recordDrag(0.05, 0, 16);
+      pm.recordDrag(0.05, 0, 16, 1000);
+      pm.recordDrag(0.05, 0, 16, 1016);
+      pm.recordDrag(0.05, 0, 16, 1032);
 
       // Release just inside bounds near right edge
-      pm.release({ x: 9.99, y: 4 }, bounds);
+      pm.release({ x: 9.99, y: 4 }, bounds, 1048);
 
       // Run until momentum stops (it will cross bounds and slow down)
       let f = { x: 9.99, y: 4 };
@@ -284,7 +286,7 @@ describe("PanMomentum", () => {
     it("cancels active momentum on cancel()", () => {
       const pm = new PanMomentum();
       recordDragSamples(pm);
-      pm.release({ x: 5, y: 4 }, bounds);
+      pm.release({ x: 5, y: 4 }, bounds, 1048);
       expect(pm.isActive).toBe(true);
 
       pm.cancel();
@@ -298,7 +300,7 @@ describe("PanMomentum", () => {
 
     it("cancels active snap-back on cancel()", () => {
       const pm = new PanMomentum();
-      pm.release({ x: 12, y: 4 }, bounds);
+      pm.release({ x: 12, y: 4 }, bounds, 1000);
       expect(pm.isActive).toBe(true);
 
       pm.cancel();
@@ -311,8 +313,45 @@ describe("PanMomentum", () => {
       pm.cancel();
 
       // After cancel, release should have no velocity
-      pm.release({ x: 5, y: 4 }, bounds);
+      pm.release({ x: 5, y: 4 }, bounds, 2000);
       expect(pm.isActive).toBe(false);
+    });
+  });
+
+  describe("stale sample expiry", () => {
+    it("does not start momentum when samples are older than the time window", () => {
+      const pm = new PanMomentum();
+      // Record drag samples at t=1000..1032
+      recordDragSamples(pm, 1000);
+
+      // Release 200ms later (well beyond the 150ms window)
+      pm.release({ x: 5, y: 4 }, bounds, 1232);
+      expect(pm.isActive).toBe(false);
+    });
+
+    it("starts momentum when samples are within the time window", () => {
+      const pm = new PanMomentum();
+      // Record drag samples at t=1000..1032
+      recordDragSamples(pm, 1000);
+
+      // Release 16ms after last sample (within 150ms window)
+      pm.release({ x: 5, y: 4 }, bounds, 1048);
+      expect(pm.isActive).toBe(true);
+    });
+
+    it("still starts snap-back on release outside bounds even with stale samples", () => {
+      const pm = new PanMomentum();
+      // Record drag samples at t=1000..1032
+      recordDragSamples(pm, 1000);
+
+      // Release 200ms later outside bounds — stale samples cleared,
+      // but snap-back should still trigger because focusPoint is outside
+      pm.release({ x: 12, y: 4 }, bounds, 1232);
+      expect(pm.isActive).toBe(true);
+
+      // Should animate toward nearest edge (x=10)
+      const r = pm.update(100, { x: 12, y: 4 }, bounds, vpSize);
+      expect(r.dx).toBeLessThan(0);
     });
   });
 
@@ -321,7 +360,7 @@ describe("PanMomentum", () => {
       const probe = createProbe();
       const pm = new PanMomentum(probe);
       recordDragSamples(pm);
-      pm.release({ x: 5, y: 4 }, bounds);
+      pm.release({ x: 5, y: 4 }, bounds, 1048);
 
       expect(probe.events).toHaveLength(1);
       expect(probe.events[0].type).toBe("momentumStarted");
@@ -333,7 +372,7 @@ describe("PanMomentum", () => {
       const probe = createProbe();
       const pm = new PanMomentum(probe);
       recordDragSamples(pm);
-      pm.release({ x: 0, y: 0 }, largeBounds);
+      pm.release({ x: 0, y: 0 }, largeBounds, 1048);
 
       // Run until stopped (large bounds so focus stays inside)
       let f = { x: 0, y: 0 };
@@ -351,7 +390,7 @@ describe("PanMomentum", () => {
     it("fires snapBackStarted on release outside bounds", () => {
       const probe = createProbe();
       const pm = new PanMomentum(probe);
-      pm.release({ x: 12, y: 4 }, bounds);
+      pm.release({ x: 12, y: 4 }, bounds, 1000);
 
       expect(probe.events).toHaveLength(1);
       expect(probe.events[0].type).toBe("snapBackStarted");
@@ -362,7 +401,7 @@ describe("PanMomentum", () => {
     it("fires snapBackCompleted when snap-back finishes", () => {
       const probe = createProbe();
       const pm = new PanMomentum(probe);
-      pm.release({ x: 12, y: 4 }, bounds);
+      pm.release({ x: 12, y: 4 }, bounds, 1000);
       pm.update(200, { x: 12, y: 4 }, bounds, vpSize);
 
       expect(probe.events).toHaveLength(2);
@@ -373,7 +412,7 @@ describe("PanMomentum", () => {
       const probe = createProbe();
       const pm = new PanMomentum(probe);
       recordDragSamples(pm);
-      pm.release({ x: 5, y: 4 }, bounds);
+      pm.release({ x: 5, y: 4 }, bounds, 1048);
 
       pm.cancel();
       expect(probe.events).toHaveLength(2);

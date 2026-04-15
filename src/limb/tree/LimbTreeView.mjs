@@ -493,7 +493,7 @@ export class LimbTreeView {
           // Record drag sample for momentum velocity
           const now = performance.now();
           const dt = this.#lastDragTime > 0 ? now - this.#lastDragTime : 16;
-          this.#panMomentum.recordDrag(damped.dx, damped.dy, dt);
+          this.#panMomentum.recordDrag(damped.dx, damped.dy, dt, now);
           this.#lastDragTime = now;
         }
       }
@@ -519,8 +519,9 @@ export class LimbTreeView {
     if (!wasClick && this.#panMomentum && this.#zoom) {
       const treeBounds = this.#getTreeBounds();
       if (treeBounds) {
-        this.#panMomentum.release(this.#zoom.focusPoint, treeBounds);
+        this.#panMomentum.release(this.#zoom.focusPoint, treeBounds, performance.now());
         if (this.#panMomentum.isActive) {
+          this.#animationLastTime = performance.now();
           this.#frameScheduler?.markDirty();
         }
       }
