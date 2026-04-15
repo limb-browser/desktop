@@ -796,6 +796,10 @@ export class LimbTreeView {
             this.#zoom.setLevel(this.#animation.endLevel);
           }
           this.#animation = null;
+          // Cancel coordinator registration so the stale pan adapter
+          // (which captured a closure reference to the animation object)
+          // does not overwrite the final state on the next tick (S7.4).
+          this.#coordinator?.cancel('zoom');
         }
       }
       if (this.#layoutAnimator?.isAnimating && this.#layoutAnimFrames > 2) {

@@ -82,6 +82,23 @@ export class AnimationCoordinator {
   }
 
   /**
+   * Cancel a single property's animation.
+   *
+   * Used when code bypasses the coordinator to directly set final state
+   * (e.g., degraded-mode skip-to-end) and needs to remove the stale
+   * adapter so coordinator.tick() does not overwrite the final state.
+   *
+   * @param {string} property
+   */
+  cancel(property) {
+    const entry = this.#animations.get(property);
+    if (!entry) return;
+    entry.animation.cancel();
+    this.#animations.delete(property);
+    this.#probe?.animationCancelled(property);
+  }
+
+  /**
    * Cancel all active animations regardless of priority.
    *
    * Used for edge cases like tree mutation during animation (S7.4).

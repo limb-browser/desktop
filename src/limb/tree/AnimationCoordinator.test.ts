@@ -436,6 +436,76 @@ describe('AnimationCoordinator', () => {
     });
   });
 
+  describe('cancel(property) cancels a single property animation', () => {
+    it('cancels the animation and removes it from the registry', () => {
+      const { coordinator } = setup();
+      const anim = createFakeAnimation();
+
+      coordinator.register('zoom', anim.animation, 'programmatic');
+      coordinator.cancel('zoom');
+
+      expect(anim.cancelled).toBe(true);
+      expect(coordinator.isActive('zoom')).toBe(false);
+      expect(coordinator.activeCount).toBe(0);
+    });
+
+    it('does not affect animations on other properties', () => {
+      const { coordinator } = setup();
+      const zoomAnim = createFakeAnimation();
+      const layoutAnim = createFakeAnimation();
+
+      coordinator.register('zoom', zoomAnim.animation, 'programmatic');
+      coordinator.register('layout', layoutAnim.animation, 'programmatic');
+
+      coordinator.cancel('zoom');
+
+      expect(zoomAnim.cancelled).toBe(true);
+      expect(layoutAnim.cancelled).toBe(false);
+      expect(coordinator.isActive('zoom')).toBe(false);
+      expect(coordinator.isActive('layout')).toBe(true);
+      expect(coordinator.activeCount).toBe(1);
+    });
+
+    it('fires cancelled probe for the cancelled property', () => {
+      const { coordinator, calls } = setup();
+      const anim = createFakeAnimation();
+      coordinator.register('zoom', anim.animation, 'programmatic');
+      calls.length = 0;
+
+      coordinator.cancel('zoom');
+
+      expect(calls).toEqual([
+        { type: 'cancelled', property: 'zoom' },
+      ]);
+    });
+
+    it('no-ops when the property has no active animation', () => {
+      const { coordinator, calls } = setup();
+
+      coordinator.cancel('zoom');
+
+      expect(calls).toHaveLength(0);
+      expect(coordinator.activeCount).toBe(0);
+    });
+
+    it('prevents stale adapter from ticking after cancel', () => {
+      const { coordinator, clock } = setup();
+      const anim = createFakeAnimation({ duration: 200 });
+
+      coordinator.register('zoom', anim.animation, 'programmatic');
+      clock.advance(16);
+      coordinator.tick();
+      expect(anim.receivedDeltas).toHaveLength(1);
+
+      coordinator.cancel('zoom');
+
+      clock.advance(16);
+      coordinator.tick();
+      // Should not have received another tick after cancel
+      expect(anim.receivedDeltas).toHaveLength(1);
+    });
+  });
+
   describe('probe events', () => {
     it('fires animationRegistered on register', () => {
       const { coordinator, calls } = setup();
