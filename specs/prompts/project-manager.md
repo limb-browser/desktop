@@ -26,6 +26,10 @@ commits: []
 ## Spec Excerpt
 
 Relevant quote or summary from the referenced spec section.
+Preserve ALL detail from the spec — especially parenthetical
+qualifiers (e.g., "sub-grouped by month"), conditional clauses
+(e.g., "if available"), and enumerated field lists. A lossy
+excerpt causes implementation agents to miss requirements.
 
 ## Current State
 
