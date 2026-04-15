@@ -4,7 +4,7 @@ spec_ref: "zoom-lod.md S2"
 depends_on:
   - task-003
   - task-007
-progress: needs-revision
+progress: ready-for-review
 review: "specs/reviews/review-TASK_011-R1.md"
 coverage_sections: []
 commits: []

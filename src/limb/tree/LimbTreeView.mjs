@@ -71,8 +71,9 @@ export class LimbTreeView {
    * Initialize the tree view with a canvas element.
    * @param {HTMLCanvasElement} canvas
    * @param {{ zoomChanged(level: number, zoomScale: number): void }} [probe]
+   * @param {{ tierChanged(nodeId: string, previousTier: string, newTier: string): void }} [lodProbe]
    */
-  init(canvas, probe) {
+  init(canvas, probe, lodProbe) {
     this.#canvas = canvas;
     this.#ctx = canvas.getContext("2d");
     this.#initialized = true;
@@ -84,7 +85,7 @@ export class LimbTreeView {
     );
 
     this.#renderer = new TreeRenderer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT);
-    this.#lodComputer = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT);
+    this.#lodComputer = new LODComputer(BASE_NODE_WIDTH, BASE_NODE_HEIGHT, lodProbe);
 
     this.#resizeHandler = () => this.#resize();
     this.#wheelHandler = (e) => this.#onWheel(e);
@@ -153,7 +154,7 @@ export class LimbTreeView {
       const zoom = this.#zoom;
 
       // Compute LOD tiers for all nodes
-      if (this.#lodComputer && this.#focusedNodeId) {
+      if (this.#lodComputer) {
         this.#tiers = this.#lodComputer.computeTiers(
           { focusedNodeId: this.#focusedNodeId },
           this.#positions,

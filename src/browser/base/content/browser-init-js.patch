@@ -20,7 +20,8 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      { global: "current" }
 +    );
 +    window.gLimbTreeView = new LimbTreeView();
-+    window.gLimbTreeView.init(document.getElementById("limb-tree-canvas"));
++    const lodProbe = { tierChanged(nodeId, prev, next) { console.debug("LOD tier:", nodeId, prev, "->", next); } };
++    window.gLimbTreeView.init(document.getElementById("limb-tree-canvas"), undefined, lodProbe);
 +    const testTree = buildTestTreeData();
 +    window.gLimbTreeView.setTreeData(testTree.positions, testTree.parentMap, testTree.treeExtent);
      gBrowser.addEventListener("DOMUpdateBlockedPopups", e =>

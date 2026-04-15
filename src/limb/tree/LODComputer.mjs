@@ -7,12 +7,6 @@
  */
 
 /**
- * Ordered list of non-focused visible tiers, lowest to highest.
- * @type {readonly string[]}
- */
-const VISIBLE_TIERS = ['favicon', 'screenshot-low', 'screenshot-high', 'live'];
-
-/**
  * Ordinal index for monotonic clamping. Culled = 0, favicon = 1, etc.
  * @type {Record<string, number>}
  */
