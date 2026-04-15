@@ -39,6 +39,8 @@ Flaws include:
 - **Test naming accuracy:** Test file names and `describe` blocks must name the actual SUT. If tests instantiate `InMemoryFoo`, the describe should say `InMemoryFoo`, not `Foo`.
 - **Boundary precision:** When specs use "exceeds", "above", or "over", the implementation must use strict `>`. When specs use "below" or "under", it must use strict `<`. Only `>=` / `<=` for "at least", "at most", "reaches". Compare the exact spec wording against the comparison operator in code.
 - **UI completeness:** If a task specifies user-visible behavior (notifications, dialogs, buttons, visual indicators), verify that adapters or handlers exist to produce that behavior — not just domain probes. A probe that fires with no subscriber is missing required behavior.
+- **Module integration:** Run `scripts/check-dead-exports.sh`. If a task creates a domain module AND says to wire it into another module, the domain module must be imported and used — not re-implemented inline with private methods. A tested module that is never imported in production code is dead code.
+- **Event target precision:** When a task specifies an event target (e.g., "on the canvas"), verify the `addEventListener` call uses that exact element. Attaching to `window` or `document` instead of the specified target is a spec violation.
 
 ## Workflow
 
@@ -48,7 +50,7 @@ Flaws include:
 4. Read the task's referenced spec sections.
 5. Read all code files the task added or modified (check git diff).
 6. Run `npx vitest run` -- failures are automatic findings.
-7. Run `scripts/check-sql-interpolation.sh` and `scripts/check-port-completeness.sh` -- failures are automatic findings.
+7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, and `scripts/check-dead-exports.sh` -- failures are automatic findings.
 8. Apply verification targets systematically.
 9. Write findings to `specs/reviews/review-TASK_NNN-RN.md`:
    ```markdown

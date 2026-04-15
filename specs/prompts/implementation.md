@@ -63,6 +63,8 @@ Before marking a task `ready-for-review`:
 12. **Test naming accuracy:** Test file names and `describe` blocks must name the actual SUT being tested (e.g., if tests instantiate `InMemoryFoo`, the describe block should say `InMemoryFoo`, not `Foo`).
 13. **Boundary precision:** When specs use "exceeds", "above", or "over", implement as strict `>`. When specs use "below" or "under", implement as strict `<`. Only use `>=` / `<=` when specs say "at least", "at most", "reaches", or "or more". Get the comparison operator right — off-by-one at thresholds is a spec violation.
 14. **UI completeness:** If a task specifies user-visible behavior (notifications, dialogs, visual indicators, buttons), domain probes alone are not sufficient. There must be a port interface, an adapter or handler that subscribes to the probe and produces the required browser UI. Probes fire events; something must listen and act.
+15. **Module integration:** If you created a new module AND the task says to wire it into another module, verify the new module is `import`-ed and used in the target — not re-implemented inline. Run `scripts/check-dead-exports.sh` and confirm your new modules are not in the FAIL list. A tested module that is never imported in production is dead code.
+16. **Event target precision:** When a task specifies an event target (e.g., "on the canvas", "on the sidebar"), verify your `addEventListener` call uses that exact element, not a broader target like `window` or `document`. Broader targets capture events from unrelated UI areas.
 
 ## Workflow
 
@@ -72,7 +74,7 @@ Before marking a task `ready-for-review`:
 4. Read the referenced spec sections.
 5. Implement using TDD: test -> fail -> implement -> pass -> refactor.
 6. Run `npx vitest run`. All tests must pass.
-7. Run `scripts/check-sql-interpolation.sh` and `scripts/check-port-completeness.sh`. Fix any failures.
+7. Run `scripts/check-sql-interpolation.sh`, `scripts/check-port-completeness.sh`, and `scripts/check-dead-exports.sh`. Fix any failures. For `check-dead-exports.sh`, verify that modules you created in this task are NOT in the FAIL list (pre-existing failures from other tasks are acceptable).
 8. Run through the Self-Verification Checklist.
 9. Update the task's `progress` field to `ready-for-review`.
 10. Commit using conventional commits, author: "Implementation <jsell-rh.implementation@agents.redhat.com>"
