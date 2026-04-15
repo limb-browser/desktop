@@ -655,6 +655,143 @@ describe('TabPositioner', () => {
     });
   });
 
+  describe('content deck transform', () => {
+    it('clears transform at zoom 1.0', () => {
+      const state = createFrameState({
+        zoomLevel: 1.0,
+        focusedNodeId: 'n1',
+        tiers: new Map([['n1', 'focused']]),
+        nodePositions: new Map([['n1', { x: 0, y: 0 }]]),
+      });
+
+      const frame = positioner.computeFrame(state);
+
+      expect(frame.contentDeckTransform.transform).toBe('');
+      expect(frame.contentDeckTransform.width).toBe('');
+      expect(frame.contentDeckTransform.height).toBe('');
+    });
+
+    it('clears transform at zoom 0.9', () => {
+      const state = createFrameState({
+        zoomLevel: 0.9,
+        focusedNodeId: 'n1',
+        tiers: new Map([['n1', 'focused']]),
+        nodePositions: new Map([['n1', { x: 0, y: 0 }]]),
+      });
+
+      const frame = positioner.computeFrame(state);
+
+      expect(frame.contentDeckTransform.transform).toBe('');
+    });
+
+    it('applies translate and scale at zoom 0.5', () => {
+      const zoomScale = 500;
+      const vpW = 1920;
+      const vpH = 1080;
+      const logicalToScreen = createFakeLogicalToScreen(zoomScale, 0, 0, vpW, vpH);
+      const state = createFrameState({
+        zoomLevel: 0.5,
+        zoomScale,
+        viewportSize: { width: vpW, height: vpH },
+        focusedNodeId: 'n1',
+        tiers: new Map([['n1', 'live']]),
+        nodePositions: new Map([['n1', { x: 1, y: 1 }]]),
+        logicalToScreen,
+      });
+
+      const frame = positioner.computeFrame(state);
+
+      const screen = logicalToScreen(1, 1);
+      const nodeW = BASE_NODE_WIDTH * zoomScale;
+      const nodeH = BASE_NODE_HEIGHT * zoomScale;
+      const expectedX = screen.x - nodeW / 2;
+      const expectedY = screen.y - nodeH / 2;
+      const expectedScale = nodeW / vpW;
+
+      expect(frame.contentDeckTransform.transform).toBe(
+        `translate(${expectedX}px, ${expectedY}px) scale(${expectedScale})`
+      );
+    });
+
+    it('clears transform when returning to zoom >= 0.9', () => {
+      // First frame at zoom 0.5
+      const zoomScale = 500;
+      const logicalToScreen = createFakeLogicalToScreen(zoomScale);
+      positioner.computeFrame(createFrameState({
+        zoomLevel: 0.5,
+        zoomScale,
+        focusedNodeId: 'n1',
+        tiers: new Map([['n1', 'live']]),
+        nodePositions: new Map([['n1', { x: 1, y: 1 }]]),
+        logicalToScreen,
+      }));
+
+      // Zoom back to >= 0.9
+      const frame = positioner.computeFrame(createFrameState({
+        zoomLevel: 0.95,
+        focusedNodeId: 'n1',
+        tiers: new Map([['n1', 'focused']]),
+        nodePositions: new Map([['n1', { x: 1, y: 1 }]]),
+      }));
+
+      expect(frame.contentDeckTransform.transform).toBe('');
+      expect(frame.contentDeckTransform.width).toBe('');
+      expect(frame.contentDeckTransform.height).toBe('');
+    });
+
+    it('transform interpolates smoothly during zoom animation', () => {
+      const vpW = 1920;
+      const vpH = 1080;
+
+      // Simulate zoom animation from 0.5 to 1.0 by computing frames at intermediate levels
+      const levels = [0.5, 0.6, 0.7, 0.8];
+      const transforms: string[] = [];
+
+      for (const level of levels) {
+        const zoomScale = level * 1000; // approximate scale
+        const logicalToScreen = createFakeLogicalToScreen(zoomScale, 0, 0, vpW, vpH);
+        const frame = positioner.computeFrame(createFrameState({
+          zoomLevel: level,
+          zoomScale,
+          viewportSize: { width: vpW, height: vpH },
+          focusedNodeId: 'n1',
+          tiers: new Map([['n1', 'live']]),
+          nodePositions: new Map([['n1', { x: 0.5, y: 0.5 }]]),
+          logicalToScreen,
+        }));
+        transforms.push(frame.contentDeckTransform.transform);
+      }
+
+      // All frames below 0.9 should have transforms
+      for (const t of transforms) {
+        expect(t).not.toBe('');
+        expect(t).toMatch(/^translate\(.+px, .+px\) scale\(.+\)$/);
+      }
+
+      // Scale should increase as we zoom in
+      const scales = transforms.map(t => {
+        const match = t.match(/scale\(([^)]+)\)/);
+        return match ? parseFloat(match[1]) : 0;
+      });
+      for (let i = 1; i < scales.length; i++) {
+        expect(scales[i]).toBeGreaterThan(scales[i - 1]);
+      }
+    });
+
+    it('clears transform when no focused node at zoom < 0.9', () => {
+      const state = createFrameState({
+        zoomLevel: 0.5,
+        focusedNodeId: null,
+        tiers: new Map([['n1', 'live']]),
+        nodePositions: new Map([['n1', { x: 0, y: 0 }]]),
+      });
+
+      const frame = positioner.computeFrame(state);
+
+      expect(frame.contentDeckTransform.transform).toBe('');
+    });
+  });
+
   describe('edge cases', () => {
     it('returns null focusedTab when no focused node', () => {
       const frame = positioner.computeFrame(createFrameState({

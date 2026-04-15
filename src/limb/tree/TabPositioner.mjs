@@ -12,11 +12,19 @@
  */
 
 /**
+ * @typedef {Object} ContentDeckTransform
+ * @property {string} transform - CSS transform value (empty string to clear)
+ * @property {string} width - CSS width value (empty string to clear)
+ * @property {string} height - CSS height value (empty string to clear)
+ */
+
+/**
  * @typedef {Object} TabPositionFrame
  * @property {TabPositionEntry | null} focusedTab - Fills viewport when tier is 'focused'; null otherwise
  * @property {TabPositionEntry[]} liveTabs - Live-tier tabs positioned at tree coordinates
  * @property {'canvas' | 'tab'} inputMode - Which element receives pointer events
  * @property {Map<string, number>} crossFades - nodeId -> browser element opacity (0 = screenshot visible, 1 = live visible)
+ * @property {ContentDeckTransform} contentDeckTransform - CSS transform for #limb-content-deck
  */
 
 const CROSS_FADE_DURATION_MS = 150;
@@ -208,6 +216,25 @@ export class TabPositioner {
       this.#probe?.crossFadeCompleted(nodeId);
     }
 
-    return { focusedTab, liveTabs, inputMode, crossFades };
+    // --- Content deck transform ---
+    /** @type {ContentDeckTransform} */
+    let contentDeckTransform = { transform: '', width: '', height: '' };
+
+    if (zoomLevel < 0.9 && focusedNodeId) {
+      const pos = nodePositions.get(focusedNodeId);
+      if (pos) {
+        const screen = logicalToScreen(pos.x, pos.y);
+        const x = screen.x - nodeScreenWidth / 2;
+        const y = screen.y - nodeScreenHeight / 2;
+        const scale = nodeScreenWidth / viewportSize.width;
+        contentDeckTransform = {
+          transform: `translate(${x}px, ${y}px) scale(${scale})`,
+          width: '',
+          height: '',
+        };
+      }
+    }
+
+    return { focusedTab, liveTabs, inputMode, crossFades, contentDeckTransform };
   }
 }

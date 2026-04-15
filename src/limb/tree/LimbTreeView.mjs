@@ -164,6 +164,8 @@ export class LimbTreeView {
   #screenshotManager = null;
   /** @type {TabPositioner | null} */
   #tabPositioner = null;
+  /** @type {HTMLElement | null} */
+  #contentDeck = null;
   /** @type {{ getTabForNode(nodeId: string): any, nodeToTab: Map<string, any> } | null} */
   #tabBridge = null;
   /** @type {number} */
@@ -205,6 +207,7 @@ export class LimbTreeView {
   init(canvas, probe, lodProbe, options) {
     this.#canvas = canvas;
     this.#ctx = canvas.getContext("2d");
+    this.#contentDeck = canvas.ownerDocument.getElementById("limb-content-deck");
     this.#initialized = true;
 
     this.#zoom = new ZoomState(
@@ -1223,6 +1226,13 @@ export class LimbTreeView {
       }
     }
 
+    // Apply content deck transform
+    if (this.#contentDeck) {
+      this.#contentDeck.style.transform = posFrame.contentDeckTransform.transform;
+      this.#contentDeck.style.width = posFrame.contentDeckTransform.width;
+      this.#contentDeck.style.height = posFrame.contentDeckTransform.height;
+    }
+
     // Toggle canvas pointer-events
     if (this.#canvas) {
       this.#canvas.style.pointerEvents = posFrame.inputMode === "canvas" ? "auto" : "none";
@@ -1343,6 +1353,7 @@ export class LimbTreeView {
     this.#lastFrameTime = 0;
     this.#screenshotManager = null;
     this.#tabPositioner = null;
+    this.#contentDeck = null;
     this.#tabBridge = null;
     this.#maxLiveTabs = 8;
     this.#lastFrameNodes = [];
