@@ -145,6 +145,7 @@ index 86294fe79c..455309a56b 100644
 +    );
 +    const treeStorage = new TreeStorage();
 +    window.gLimbTreeStorage = treeStorage;
++    browsingTree.loadSummaries(treeStorage).then(() => { branchFoldAdapter.updateLayout(); });
 +    const evictorProbe = { evictionStarted() { console.debug("Screenshot eviction started"); }, retentionEvicted(id, n) { console.debug("Retention evicted:", id, n); }, budgetEvicted(id) { console.debug("Budget evicted:", id); }, evictionCompleted(n) { console.debug("Screenshot eviction completed:", n); } };
 +    window.gLimbScreenshotEvictor = startScreenshotEviction(treeStorage, browsingTree, Services.prefs, evictorProbe);
 +    const perfMonitor = new PerformanceMonitor(performanceProbe, async () => ({ heapMB: Services.memory.heapAllocated / (1024 * 1024), screenshotsMB: (await treeStorage.getScreenshotMemoryUsage()) / (1024 * 1024), tabCount: gBrowser.tabs.length }));

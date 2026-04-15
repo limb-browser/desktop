@@ -393,7 +393,12 @@ export class BrowsingTree {
     const summaries = await storage.getBranchSummaries();
     const root = this.nodes.get(this.rootId);
 
+    let loaded = 0;
     for (const summary of summaries) {
+      // Skip summaries already in tree (e.g. active branch restored from SessionStore)
+      if (this.nodes.has(summary.id)) {
+        continue;
+      }
       const node = {
         id: summary.id,
         url: summary.url,
@@ -409,9 +414,10 @@ export class BrowsingTree {
       };
       this.nodes.set(node.id, node);
       root.childIds.push(node.id);
+      loaded++;
     }
 
-    root.descendantCount = summaries.length;
+    root.descendantCount += loaded;
   }
 
   #incrementAncestorCounts(nodeId) {

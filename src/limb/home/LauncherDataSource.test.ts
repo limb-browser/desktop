@@ -51,14 +51,15 @@ describe('getLauncherData', () => {
       expect(data.groups[0].branches[0].favicon).toBeNull();
     });
 
-    it('counts descendants including branch root', () => {
+    it('uses descendantCount for node count', () => {
       const branch = tree.addChild(tree.rootId, 'https://a.com');
       tree.addChild(branch.id, 'https://b.com');
       tree.addChild(branch.id, 'https://c.com');
       branch.lastVisitedAt = NOW;
 
       const data = getLauncherData(tree, NOW);
-      expect(data.groups[0].branches[0].nodeCount).toBe(3);
+      // descendantCount = 2 (excludes branch root itself)
+      expect(data.groups[0].branches[0].nodeCount).toBe(2);
     });
 
     it('includes lastVisitedAt timestamp', () => {
@@ -251,6 +252,56 @@ describe('getLauncherData', () => {
 
       const data = getLauncherData(tree, NOW);
       expect(data.isEmpty).toBe(false);
+    });
+  });
+
+  describe('summary node nodeCount', () => {
+    it('uses descendantCount for culled branch roots with no loaded children', async () => {
+      // Simulate a stored branch loaded via loadSummaries:
+      // status: culled, childIds: [], descendantCount: 12
+      const branch = tree.addChild(tree.rootId, 'https://stored.com');
+      branch.title = 'Stored Branch';
+      branch.lastVisitedAt = NOW;
+      branch.childIds = [];
+      branch.descendantCount = 12;
+
+      const data = getLauncherData(tree, NOW);
+      // Should show 12 (the descendantCount), not 1 (getDescendants length)
+      expect(data.groups[0].branches[0].nodeCount).toBe(12);
+    });
+
+    it('shows both active and stored branches after loadSummaries', async () => {
+      // Active branch with real children
+      const active = tree.addChild(tree.rootId, 'https://active.com');
+      active.title = 'Active Branch';
+      active.lastVisitedAt = NOW;
+      tree.addChild(active.id, 'https://child1.com');
+      tree.addChild(active.id, 'https://child2.com');
+
+      // Stored branch (summary only, no children loaded)
+      const stored = tree.addChild(tree.rootId, 'https://stored.com');
+      stored.title = 'Stored Branch';
+      stored.lastVisitedAt = NOW - 3600_000;
+      stored.childIds = [];
+      stored.descendantCount = 8;
+
+      const data = getLauncherData(tree, NOW);
+      const allBranches = data.groups.flatMap(
+        (g: { branches: { name: string; nodeCount: number }[] }) => g.branches
+      );
+      expect(allBranches).toHaveLength(2);
+
+      const activeBranch = allBranches.find(
+        (b: { name: string }) => b.name === 'Active Branch'
+      )!;
+      const storedBranch = allBranches.find(
+        (b: { name: string }) => b.name === 'Stored Branch'
+      )!;
+
+      // Active branch: descendantCount = 2 (two children)
+      expect(activeBranch.nodeCount).toBe(2);
+      // Stored branch: uses descendantCount
+      expect(storedBranch.nodeCount).toBe(8);
     });
   });
 

@@ -292,21 +292,26 @@ function init() {
     const card = e.target.closest(".branch-card");
     if (!card) return;
     const nodeId = card.dataset.nodeId;
-    if (nodeId && tree.nodes.has(nodeId)) {
-      if (nodeId !== tree.activeBranchId && storage) {
-        tree.switchBranch(nodeId, storage).then(() => {
-          tree.focusNode(nodeId);
-          if (treeView) {
-            treeView.setFocusedNodeId(nodeId);
-            treeView.animateToNode(nodeId, 1);
-          }
-        });
-      } else {
+    if (!nodeId || !tree.nodes.has(nodeId)) return;
+
+    const branchRoot = tree.nodes.get(nodeId);
+    const needsActivation = branchRoot.childIds.length === 0
+      && nodeId !== tree.activeBranchId
+      && storage;
+
+    if (needsActivation) {
+      tree.switchBranch(nodeId, storage).then(() => {
         tree.focusNode(nodeId);
         if (treeView) {
           treeView.setFocusedNodeId(nodeId);
           treeView.animateToNode(nodeId, 1);
         }
+      });
+    } else {
+      tree.focusNode(nodeId);
+      if (treeView) {
+        treeView.setFocusedNodeId(nodeId);
+        treeView.animateToNode(nodeId, 1);
       }
     }
   });

@@ -20,12 +20,14 @@ export function getLauncherData(tree, now) {
     const node = tree.nodes.get(childId);
     const group = assignTimeGroup(node.lastVisitedAt, now);
 
+    const nodeCount = node.descendantCount;
+
     const card = {
       id: node.id,
       name: node.title,
       favicon: node.favicon,
       screenshot: node.screenshot,
-      nodeCount: tree.getDescendants(node.id).length,
+      nodeCount,
       lastVisitedAt: node.lastVisitedAt,
     };
 

@@ -1231,6 +1231,125 @@ describe('BrowsingTree', () => {
 
         expect(startupTree.activeBranchId).toBeNull();
       });
+
+      it('skips summaries whose id already exists in tree (deduplication)', async () => {
+        const startupTree = new BrowsingTree('about:limb-home', probe);
+
+        // Simulate SessionStore having already restored this branch root
+        const existingBranch = startupTree.addChild(
+          startupTree.rootId,
+          'https://existing.com'
+        );
+        existingBranch.title = 'Session Branch';
+        const existingId = existingBranch.id;
+
+        // Storage also has this branch (from a prior deactivateBranch)
+        await storage.saveBranch(existingId, [
+          makeStoredNode({
+            id: existingId,
+            url: 'https://existing.com',
+            title: 'Storage Branch',
+            parentId: startupTree.rootId,
+            branchRootId: existingId,
+            descendantCount: 5,
+          }),
+        ]);
+        // And a different branch only in storage
+        await storage.saveBranch('storage-only', [
+          makeStoredNode({
+            id: 'storage-only',
+            url: 'https://stored.com',
+            title: 'Stored Only',
+            parentId: startupTree.rootId,
+            branchRootId: 'storage-only',
+            descendantCount: 3,
+          }),
+        ]);
+
+        await startupTree.loadSummaries(storage);
+
+        // The existing branch should NOT be duplicated
+        const root = startupTree.nodes.get(startupTree.rootId)!;
+        const occurrences = root.childIds.filter(
+          (id: string) => id === existingId
+        );
+        expect(occurrences).toHaveLength(1);
+
+        // The existing node should keep its in-memory title (not overwritten by storage)
+        expect(startupTree.nodes.get(existingId)!.title).toBe('Session Branch');
+
+        // The storage-only branch should be loaded
+        expect(startupTree.nodes.has('storage-only')).toBe(true);
+        expect(root.childIds).toContain('storage-only');
+      });
+
+      it('preserves existing descendantCount on root when merging summaries', async () => {
+        const startupTree = new BrowsingTree('about:limb-home', probe);
+
+        // SessionStore restored a branch with 2 children in memory
+        const existing = startupTree.addChild(
+          startupTree.rootId,
+          'https://active.com'
+        );
+        startupTree.addChild(existing.id, 'https://child1.com');
+        startupTree.addChild(existing.id, 'https://child2.com');
+        const rootBefore = startupTree.nodes.get(startupTree.rootId)!;
+        const countBefore = rootBefore.descendantCount; // 3 (branch + 2 children)
+
+        // Storage has one additional branch
+        await storage.saveBranch('stored-branch', [
+          makeStoredNode({
+            id: 'stored-branch',
+            url: 'https://stored.com',
+            parentId: startupTree.rootId,
+            branchRootId: 'stored-branch',
+            descendantCount: 10,
+          }),
+        ]);
+
+        await startupTree.loadSummaries(storage);
+
+        // Root descendantCount should include existing nodes + newly loaded summaries
+        const rootAfter = startupTree.nodes.get(startupTree.rootId)!;
+        expect(rootAfter.descendantCount).toBe(countBefore + 1);
+      });
+
+      it('clicking an inactive branch card triggers activation via switchBranch', async () => {
+        const startupTree = new BrowsingTree('about:limb-home', probe);
+
+        // Storage has a branch with children
+        await storage.saveBranch('stored-branch', [
+          makeStoredNode({
+            id: 'stored-branch',
+            url: 'https://stored.com',
+            title: 'Stored',
+            parentId: startupTree.rootId,
+            childIds: ['child-1'],
+            branchRootId: 'stored-branch',
+            descendantCount: 1,
+          }),
+          makeStoredNode({
+            id: 'child-1',
+            url: 'https://child.com',
+            parentId: 'stored-branch',
+            branchRootId: 'stored-branch',
+          }),
+        ]);
+
+        await startupTree.loadSummaries(storage);
+
+        // The stored branch root is in memory but its children are not
+        expect(startupTree.nodes.has('stored-branch')).toBe(true);
+        expect(startupTree.nodes.has('child-1')).toBe(false);
+        expect(startupTree.activeBranchId).toBeNull();
+
+        // Simulate what the click handler should do: switchBranch
+        await startupTree.switchBranch('stored-branch', storage);
+
+        // After activation, the full subtree is loaded
+        expect(startupTree.activeBranchId).toBe('stored-branch');
+        expect(startupTree.nodes.has('child-1')).toBe(true);
+      });
     });
   });
 });
