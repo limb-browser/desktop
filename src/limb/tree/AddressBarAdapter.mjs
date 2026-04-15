@@ -53,6 +53,7 @@ export class AddressBarAdapter {
    * is initialized.
    */
   attach() {
+    this.#visibility.zoomChanged(this.#treeView.zoomLevel, 0);
     this.#keyHandler = (e) => this.#onKeyDown(e);
     this.#navBar?.ownerDocument.defaultView?.addEventListener(
       "keydown",

@@ -3,8 +3,8 @@ title: "Implement address bar visibility tied to zoom level"
 spec_ref: "navigation.md S2.1 S2.2 S2.4"
 depends_on:
   - task-007
-progress: ready-for-review
-review: ""
+progress: complete
+review: "specs/reviews/review-TASK_015-R1.md"
 coverage_sections: []
 commits: []
 ---
