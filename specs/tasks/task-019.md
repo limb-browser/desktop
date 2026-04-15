@@ -4,7 +4,7 @@ spec_ref: "navigation.md S4.1 S4.2 S4.3"
 depends_on:
   - task-009
   - task-007
-progress: ready-for-review
+progress: needs-revision
 review: "specs/reviews/review-task-019-R2.md"
 coverage_sections: []
 commits: []
