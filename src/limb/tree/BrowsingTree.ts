@@ -398,21 +398,10 @@ export class BrowsingTree {
     storage: TreeStoragePort
   ): Promise<void> {
     // Deactivate current branch if one is active
+    // In-memory screenshots are freed when deactivateBranch removes nodes.
+    // Persistent screenshots are retained per S4.2 eviction policy.
     if (this.activeBranchId !== null) {
-      const oldBranchId = this.activeBranchId;
-
-      // Collect descendant IDs before deactivation (for screenshot cleanup)
-      const descendants = this.getDescendants(oldBranchId);
-      const descendantIds = descendants
-        .filter((n) => n.id !== oldBranchId)
-        .map((n) => n.id);
-
-      await this.deactivateBranch(oldBranchId, storage);
-
-      // Free screenshots for deactivated branch descendants
-      if (descendantIds.length > 0) {
-        await storage.deleteScreenshots(descendantIds);
-      }
+      await this.deactivateBranch(this.activeBranchId, storage);
     }
 
     // Activate new branch

@@ -1118,7 +1118,7 @@ describe('BrowsingTree', () => {
         expect(tree.activeBranchId).toBe(branch.id);
       });
 
-      it('deletes screenshots for deactivated branch descendants', async () => {
+      it('preserves screenshots in persistent storage on branch switch', async () => {
         const branch1 = tree.addChild(tree.rootId, 'https://b1.com');
         const b1Child = tree.addChild(branch1.id, 'https://b1c1.com');
         tree.activeBranchId = branch1.id;
@@ -1142,9 +1142,9 @@ describe('BrowsingTree', () => {
 
         await tree.switchBranch(branch2.id, storage);
 
-        // Screenshot should be freed for deactivated descendants
+        // Screenshots remain in persistent storage (S4.2: eviction is separate)
         const screenshot = await storage.loadScreenshot(b1Child.id, 'low');
-        expect(screenshot).toBeNull();
+        expect(screenshot).not.toBeNull();
       });
     });
 
