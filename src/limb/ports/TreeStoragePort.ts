@@ -27,6 +27,13 @@ export interface BranchSummary {
 
 export type ScreenshotResolution = 'low' | 'high';
 
+export interface ScreenshotEntry {
+  nodeId: string;
+  resolution: ScreenshotResolution;
+  byteSize: number;
+  capturedAt: number;
+}
+
 export interface TreeStoragePort {
   saveBranch(branchRootId: string, nodes: StoredNode[]): Promise<void>;
   loadBranch(branchRootId: string): Promise<StoredNode[]>;
@@ -43,5 +50,6 @@ export interface TreeStoragePort {
   ): Promise<Uint8Array | null>;
   deleteScreenshots(nodeIds: string[]): Promise<void>;
   getScreenshotMemoryUsage(): Promise<number>;
+  getScreenshotEntries(): Promise<ScreenshotEntry[]>;
   close(): Promise<void>;
 }

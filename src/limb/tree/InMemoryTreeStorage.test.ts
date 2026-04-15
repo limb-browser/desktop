@@ -456,6 +456,51 @@ describe('InMemoryTreeStorage', () => {
     });
   });
 
+  describe('getScreenshotEntries', () => {
+    it('returns empty array when no screenshots exist', async () => {
+      const entries = await storage.getScreenshotEntries();
+      expect(entries).toEqual([]);
+    });
+
+    it('returns metadata for all stored screenshots', async () => {
+      await storage.saveScreenshot('a', 'low', new Uint8Array(100));
+      await storage.saveScreenshot('b', 'high', new Uint8Array(250));
+
+      const entries = await storage.getScreenshotEntries();
+      expect(entries).toHaveLength(2);
+
+      const entryA = entries.find((e) => e.nodeId === 'a')!;
+      expect(entryA.resolution).toBe('low');
+      expect(entryA.byteSize).toBe(100);
+      expect(entryA.capturedAt).toBeGreaterThan(0);
+
+      const entryB = entries.find((e) => e.nodeId === 'b')!;
+      expect(entryB.resolution).toBe('high');
+      expect(entryB.byteSize).toBe(250);
+    });
+
+    it('includes both resolutions for the same node', async () => {
+      await storage.saveScreenshot('n1', 'low', new Uint8Array(50));
+      await storage.saveScreenshot('n1', 'high', new Uint8Array(200));
+
+      const entries = await storage.getScreenshotEntries();
+      expect(entries).toHaveLength(2);
+
+      const resolutions = entries.map((e) => e.resolution).sort();
+      expect(resolutions).toEqual(['high', 'low']);
+    });
+
+    it('reflects deletions', async () => {
+      await storage.saveScreenshot('a', 'low', new Uint8Array(100));
+      await storage.saveScreenshot('b', 'low', new Uint8Array(200));
+      await storage.deleteScreenshots(['a']);
+
+      const entries = await storage.getScreenshotEntries();
+      expect(entries).toHaveLength(1);
+      expect(entries[0].nodeId).toBe('b');
+    });
+  });
+
   describe('initial state', () => {
     it('starts with no branches', async () => {
       const summaries = await storage.getBranchSummaries();

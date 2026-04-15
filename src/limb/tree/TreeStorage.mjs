@@ -338,6 +338,26 @@ export class TreeStorage {
   }
 
   /**
+   * Return metadata for all stored screenshots (without blob data).
+   * @returns {Promise<Array<{nodeId: string, resolution: string, byteSize: number, capturedAt: number}>>}
+   */
+  async getScreenshotEntries() {
+    const db = await this.#getDb();
+
+    const rows = await db.execute(
+      `SELECT node_id, resolution, LENGTH(data) AS byte_size, captured_at
+       FROM limb_screenshots`
+    );
+
+    return rows.map((row) => ({
+      nodeId: row.getResultByName("node_id"),
+      resolution: row.getResultByName("resolution"),
+      byteSize: row.getResultByName("byte_size"),
+      capturedAt: row.getResultByName("captured_at"),
+    }));
+  }
+
+  /**
    * Return total byte size of stored screenshots.
    * @returns {Promise<number>}
    */

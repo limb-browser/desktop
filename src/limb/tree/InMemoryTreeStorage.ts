@@ -7,6 +7,7 @@ import type {
   StoredNode,
   BranchSummary,
   ScreenshotResolution,
+  ScreenshotEntry,
 } from '../ports/TreeStoragePort';
 import type { TreeStorageProbe } from '../ports/TreeStorageProbe';
 
@@ -181,6 +182,19 @@ export class InMemoryTreeStorage implements TreeStoragePort {
       total += screenshot.data.byteLength;
     }
     return total;
+  }
+
+  async getScreenshotEntries(): Promise<ScreenshotEntry[]> {
+    const entries: ScreenshotEntry[] = [];
+    for (const screenshot of this.#screenshots.values()) {
+      entries.push({
+        nodeId: screenshot.nodeId,
+        resolution: screenshot.resolution,
+        byteSize: screenshot.data.byteLength,
+        capturedAt: screenshot.capturedAt,
+      });
+    }
+    return entries;
   }
 
   async close(): Promise<void> {

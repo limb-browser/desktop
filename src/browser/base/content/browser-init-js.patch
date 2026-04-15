@@ -96,6 +96,13 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      gBrowser.selectedBrowser.loadURI(Services.io.newURI("about:limb-settings"), { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });
 +    });
 +    keyNavAdapter.install(window);
++    const { startScreenshotEviction } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/ScreenshotEvictorAdapter.mjs",
++      { global: "current" }
++    );
++    const evictorProbe = { evictionStarted() { console.debug("Screenshot eviction started"); }, retentionEvicted(id, n) { console.debug("Retention evicted:", id, n); }, budgetEvicted(id) { console.debug("Budget evicted:", id); }, evictionCompleted(n) { console.debug("Screenshot eviction completed:", n); } };
++    // Deferred: storage wiring blocked on TreeStorage chrome integration.
++    // window.gLimbScreenshotEvictor = startScreenshotEviction(treeStorage, browsingTree, Services.prefs, evictorProbe);
      gBrowser.addEventListener("DOMUpdateBlockedPopups", e =>
        PopupAndRedirectBlockerObserver.handleEvent(e)
      );
