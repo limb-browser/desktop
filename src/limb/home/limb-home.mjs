@@ -293,7 +293,21 @@ function init() {
     if (!card) return;
     const nodeId = card.dataset.nodeId;
     if (nodeId && tree.nodes.has(nodeId)) {
-      tree.focusNode(nodeId);
+      if (nodeId !== tree.activeBranchId && storage) {
+        tree.switchBranch(nodeId, storage).then(() => {
+          tree.focusNode(nodeId);
+          if (treeView) {
+            treeView.setFocusedNodeId(nodeId);
+            treeView.animateToNode(nodeId, 1);
+          }
+        });
+      } else {
+        tree.focusNode(nodeId);
+        if (treeView) {
+          treeView.setFocusedNodeId(nodeId);
+          treeView.animateToNode(nodeId, 1);
+        }
+      }
     }
   });
 
