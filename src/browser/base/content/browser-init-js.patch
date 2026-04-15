@@ -2,7 +2,7 @@ diff --git a/browser/base/content/browser-init.js b/browser/base/content/browser
 index 86294fe79c..455309a56b 100644
 --- a/browser/base/content/browser-init.js
 +++ b/browser/base/content/browser-init.js
-@@ -247,7 +247,154 @@ var gBrowserInit = {
+@@ -247,7 +247,150 @@ var gBrowserInit = {
    },
  
    onLoad() {
@@ -14,10 +14,6 @@ index 86294fe79c..455309a56b 100644
 +
 +    const { BranchFoldAdapter } = ChromeUtils.importESModule(
 +      "chrome://browser/content/limb/tree/BranchFoldAdapter.mjs",
-+      { global: "current" }
-+    );
-+    ChromeUtils.importESModule(
-+      "chrome://browser/content/limb/tree/testTreeData.mjs",
 +      { global: "current" }
 +    );
 +    const { LimbTabCommandAdapter } = ChromeUtils.importESModule(
