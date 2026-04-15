@@ -124,11 +124,64 @@ function renderLauncher(launcherData, container, emptyState) {
   }
 }
 
+function createSearchResultElement(result) {
+  const el = document.createElement("div");
+  el.className = "search-result";
+  el.dataset.nodeId = result.nodeId;
+  el.dataset.branchRootId = result.branchRootId;
+
+  const favicon = document.createElement("span");
+  favicon.className = "search-result-favicon";
+  if (result.favicon) {
+    const img = document.createElement("img");
+    img.src = result.favicon;
+    img.width = 16;
+    img.height = 16;
+    img.alt = "";
+    favicon.appendChild(img);
+  } else {
+    favicon.innerHTML = GLOBE_SVG;
+  }
+
+  const body = document.createElement("div");
+  body.className = "search-result-body";
+
+  const title = document.createElement("div");
+  title.className = "search-result-title";
+  title.textContent = result.title || result.url;
+
+  const url = document.createElement("div");
+  url.className = "search-result-url";
+  url.textContent = result.url;
+
+  const meta = document.createElement("div");
+  meta.className = "search-result-meta";
+
+  const branch = document.createElement("span");
+  branch.textContent = result.branchName || "Unknown branch";
+
+  const time = document.createElement("span");
+  time.textContent = formatRelativeTime(result.timestamp);
+
+  meta.appendChild(branch);
+  meta.appendChild(time);
+
+  body.appendChild(title);
+  body.appendChild(url);
+  body.appendChild(meta);
+
+  el.appendChild(favicon);
+  el.appendChild(body);
+
+  return el;
+}
+
 function init() {
   const container = document.getElementById("branches-container");
   const emptyState = document.getElementById("empty-state");
   const newBranchBtn = document.getElementById("new-branch");
   const startBrowsingBtn = document.getElementById("start-browsing");
+  const searchBar = document.getElementById("search-bar");
 
   // Access the chrome window to get the BrowsingTree
   const chromeWindow = window.browsingContext?.topChromeWindow;
@@ -139,6 +192,7 @@ function init() {
   }
 
   const getLauncherData = ChromeUtils.importESModule("chrome://browser/content/limb/home/LauncherDataSource.ts", { global: "current" }).getLauncherData;
+  const { SearchService } = ChromeUtils.importESModule("chrome://browser/content/limb/search/SearchService.ts", { global: "current" });
 
   const tree = chromeWindow.gLimbBrowsingTree;
   if (!tree) {
@@ -148,6 +202,14 @@ function init() {
   }
 
   const branchRouter = chromeWindow.gLimbBranchRouter;
+  const storage = chromeWindow.gLimbTreeStorage ?? null;
+  const treeView = chromeWindow.gLimbTreeView;
+  const searchProbe = {
+    searchExecuted(query, count) {
+      console.debug("Search:", query, "->", count, "results");
+    },
+  };
+  const searchService = new SearchService(tree, storage, searchProbe);
 
   function refresh() {
     const data = getLauncherData(tree, Date.now());
@@ -156,7 +218,67 @@ function init() {
 
   refresh();
 
+  // Search bar wiring
+  let debounceTimer = null;
+
+  searchBar.addEventListener("input", () => {
+    if (debounceTimer !== null) {
+      clearTimeout(debounceTimer);
+    }
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      performSearch(searchBar.value);
+    }, 100);
+  });
+
+  async function performSearch(query) {
+    if (!query.trim()) {
+      refresh();
+      return;
+    }
+
+    const results = await searchService.search(query);
+    container.textContent = "";
+    emptyState.hidden = true;
+    container.hidden = false;
+
+    if (results.length === 0) {
+      const noResults = document.createElement("div");
+      noResults.className = "search-no-results";
+      noResults.textContent = "No results found.";
+      container.appendChild(noResults);
+      return;
+    }
+
+    for (const result of results) {
+      container.appendChild(createSearchResultElement(result));
+    }
+  }
+
   container.addEventListener("click", (e) => {
+    // Handle search result clicks
+    const resultEl = e.target.closest(".search-result");
+    if (resultEl) {
+      const nodeId = resultEl.dataset.nodeId;
+      const branchRootId = resultEl.dataset.branchRootId;
+      if (nodeId && branchRootId === tree.activeBranchId) {
+        tree.focusNode(nodeId);
+        if (treeView) {
+          treeView.setFocusedNodeId(nodeId);
+          treeView.animateToNode(nodeId, 1);
+        }
+      } else if (nodeId && branchRootId && storage) {
+        tree.switchBranch(branchRootId, storage).then(() => {
+          tree.focusNode(nodeId);
+          if (treeView) {
+            treeView.setFocusedNodeId(nodeId);
+            treeView.animateToNode(nodeId, 1);
+          }
+        });
+      }
+      return;
+    }
+
     const deleteBtn = e.target.closest(".branch-delete");
     if (deleteBtn) {
       e.stopPropagation();
