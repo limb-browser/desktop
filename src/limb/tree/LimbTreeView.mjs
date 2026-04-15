@@ -98,6 +98,24 @@ export class LimbTreeView {
   }
 
   /**
+   * Set the zoom level programmatically.
+   * Used by the address bar adapter to auto-zoom on Ctrl+L.
+   * @param {number} level - Target zoom level (0.0 to 1.0)
+   */
+  setZoomLevel(level) {
+    if (!this.#zoom) return;
+    this.#zoom.setLevel(level);
+    this.#paint();
+  }
+
+  /**
+   * @returns {number} Current zoom level (0.0 to 1.0)
+   */
+  get zoomLevel() {
+    return this.#zoom?.level ?? 0;
+  }
+
+  /**
    * Set the tree data for rendering.
    * @param {Map<string, { x: number, y: number }>} positions - Logical node positions from TreeLayout
    * @param {Map<string, string>} parentMap - childId -> parentId mapping

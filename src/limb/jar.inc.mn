@@ -7,3 +7,6 @@
         content/browser/limb/tree/ZoomState.mjs                        (../../limb/tree/ZoomState.mjs)
         content/browser/limb/tree/testTreeData.mjs                     (../../limb/tree/testTreeData.mjs)
         content/browser/limb/tree/limb-tree-canvas.css                 (../../limb/tree/limb-tree-canvas.css)
+        content/browser/limb/tree/limb-addressbar.css                  (../../limb/tree/limb-addressbar.css)
+        content/browser/limb/tree/AddressBarVisibility.mjs             (../../limb/tree/AddressBarVisibility.mjs)
+        content/browser/limb/tree/AddressBarAdapter.mjs                (../../limb/tree/AddressBarAdapter.mjs)

@@ -19,9 +19,16 @@ index dba83914d1131616ead67f48949bda74105b7d46..86294fe79cd30b2a24b20738c9cd1f51
 +      "chrome://browser/content/limb/tree/LimbTabCommandAdapter.mjs",
 +      { global: "current" }
 +    );
++    const { AddressBarAdapter } = ChromeUtils.importESModule(
++      "chrome://browser/content/limb/tree/AddressBarAdapter.mjs",
++      { global: "current" }
++    );
 +    window.gLimbTreeView = new LimbTreeView();
++    const navBar = document.getElementById("nav-bar");
++    const addressBarAdapter = new AddressBarAdapter(navBar, window.gLimbTreeView);
 +    const lodProbe = { tierChanged(nodeId, prev, next) { console.debug("LOD tier:", nodeId, prev, "->", next); } };
-+    window.gLimbTreeView.init(document.getElementById("limb-tree-canvas"), undefined, lodProbe);
++    window.gLimbTreeView.init(document.getElementById("limb-tree-canvas"), addressBarAdapter.zoomProbe, lodProbe);
++    addressBarAdapter.attach();
 +    const testTree = buildTestTreeData();
 +    window.gLimbTreeView.setTreeData(testTree.positions, testTree.parentMap, testTree.treeExtent);
      gBrowser.addEventListener("DOMUpdateBlockedPopups", e =>

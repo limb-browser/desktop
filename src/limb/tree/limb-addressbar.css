@@ -1,0 +1,13 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* Address bar visibility tied to zoom level (navigation.md S2.1).
+   Opacity and pointer-events are driven by CSS custom properties
+   set from AddressBarAdapter.mjs. CSS transitions handle the fade. */
+
+#nav-bar {
+  opacity: var(--limb-addressbar-opacity, 1);
+  pointer-events: var(--limb-addressbar-pointer-events, auto);
+  transition: opacity 0.15s ease-out;
+}
