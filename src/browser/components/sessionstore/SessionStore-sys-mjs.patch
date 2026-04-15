@@ -1,22 +1,58 @@
 diff --git a/browser/components/sessionstore/SessionStore.sys.mjs b/browser/components/sessionstore/SessionStore.sys.mjs
-index 5414adeca242f00bff98c5e41de74f33dd2846bb..a6324da568873029660c33d8b0a933c34bd599e9 100644
+index 5414adeca2..2395717a35 100644
 --- a/browser/components/sessionstore/SessionStore.sys.mjs
 +++ b/browser/components/sessionstore/SessionStore.sys.mjs
-@@ -6699,6 +6699,17 @@ var SessionStoreInternal = {
-       tab.setAttribute("zen-workspace-id", tabData.zenWorkspace);
+@@ -203,8 +203,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   TabStateCache: "resource:///modules/sessionstore/TabStateCache.sys.mjs",
+   TabStateFlusher: "resource:///modules/sessionstore/TabStateFlusher.sys.mjs",
+   setTimeout: "resource://gre/modules/Timer.sys.mjs",
+-  ZenSessionStore: "resource:///modules/zen/ZenSessionManager.sys.mjs",
+-  ZenWindowSync: "resource:///modules/zen/ZenWindowSync.sys.mjs",
+ });
+ 
+ ChromeUtils.defineLazyGetter(lazy, "blankURI", () => {
+@@ -2185,7 +2183,7 @@ var SessionStoreInternal = {
+           null,
+           "sessionstore-one-or-no-tab-restored"
+         );
+-        lazy.ZenSessionStore.onNewEmptySession(aWindow);
++// [Zen removed] lazy.ZenSessionStore.onNewEmptySession(aWindow);
+         this._deferredAllWindowsRestored.resolve();
+       }
+       // this window was opened by _openWindowWithState
+@@ -2270,7 +2268,7 @@ var SessionStoreInternal = {
+         }
+ 
+         if (newWindowState) {
+-          lazy.ZenSessionStore.onRestoringClosedWindow(newWindowState);
++// [Zen removed] lazy.ZenSessionStore.onRestoringClosedWindow(newWindowState);
+           // Ensure that the window state isn't hidden
+           this._restoreCount = 1;
+           let state = { windows: [newWindowState] };
+@@ -2305,7 +2303,7 @@ var SessionStoreInternal = {
+         windowPromises.push(lazy.TabStateFlusher.flushWindow(window));
+       }
+       Promise.all(windowPromises).finally(() => {
+-        lazy.ZenSessionStore.restoreNewWindow(aWindow, this);
++// [Zen removed] lazy.ZenSessionStore.restoreNewWindow(aWindow, this);
+       });
      }
  
-+    // Restore Limb tree metadata (persistence.md S1.3)
-+    if (tabData.limbNodeId) {
-+      tab.setAttribute("limb-node-id", tabData.limbNodeId);
-+    }
-+    if (tabData.limbTreeParentId) {
-+      tab.setAttribute("limb-tree-parent-id", tabData.limbTreeParentId);
-+    }
-+    if (tabData.limbTreeCreatedAt) {
-+      tab.setAttribute("limb-tree-created-at", tabData.limbTreeCreatedAt);
-+    }
-+
-     if (tabData.pinned) {
-       tabbrowser.pinTab(tab);
-     } else {
+@@ -2587,7 +2585,7 @@ var SessionStoreInternal = {
+ 
+         // Save non-private windows if they have at
+         // least one saveable tab or are the last window.
+-        lazy.ZenWindowSync.on_WindowCloseAndBrowserFlushed(browsers);
++// [Zen removed] lazy.ZenWindowSync.on_WindowCloseAndBrowserFlushed(browsers);
+         if (!winData.isPrivate && !winData.isTaskbarTab && !winData.isZenUnsynced) {
+           this.maybeSaveClosedWindow(winData, isLastWindow, isLastRegularWindow);
+ 
+@@ -2682,7 +2680,7 @@ var SessionStoreInternal = {
+       // _closedWindows from a previous call to this function.
+       let winIndex = this._closedWindows.indexOf(winData);
+       let alreadyStored = winIndex != -1;
+-      lazy.ZenSessionStore.maybeSaveClosedWindow(winData, isLastRegularWindow);
++// [Zen removed] lazy.ZenSessionStore.maybeSaveClosedWindow(winData, isLastRegularWindow);
+       // If sidebar command is truthy, i.e. sidebar is open, store sidebar settings
+       let shouldStore = hasSaveableTabs || isLastWindow;
+ 

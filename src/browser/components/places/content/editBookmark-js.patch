@@ -1,0 +1,12 @@
+diff --git a/browser/components/places/content/editBookmark.js b/browser/components/places/content/editBookmark.js
+index 347203d6ea..fef095f0cb 100644
+--- a/browser/components/places/content/editBookmark.js
++++ b/browser/components/places/content/editBookmark.js
+@@ -1332,6 +1332,7 @@ var gEditItemOverlay = {
+   },
+ 
+   async _initWorkspaceDropdown(aInfo) {
++    return; // Zen workspaces removed (Limb rebase)
+     if(document.documentElement.getAttribute("windowtype") === "Places:Organizer") {
+       return;
+     }

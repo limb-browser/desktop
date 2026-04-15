@@ -1,0 +1,12 @@
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index 372ce9c33a..ac01d16a66 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -3200,7 +3200,6 @@
+             ownerTab,
+             openerTab,
+             pinned,
+-            essential,
+             bulkOrderedOpen,
+             tabGroup: tabGroup ?? openerTab?.group,
+           });
