@@ -50,8 +50,8 @@ export class FrameScheduler {
   constructor(paint, probe, options) {
     this.#paint = paint;
     this.#probe = probe ?? null;
-    this.#requestFrame = options?.requestFrame ?? requestAnimationFrame;
-    this.#cancelFrame = options?.cancelFrame ?? cancelAnimationFrame;
+    this.#requestFrame = options?.requestFrame ?? ((cb) => window.requestAnimationFrame(cb));
+    this.#cancelFrame = options?.cancelFrame ?? ((id) => window.cancelAnimationFrame(id));
     this.#performanceProbe = options?.performanceProbe ?? null;
     this.#now = options?.now ?? (() => performance.now());
     this.#degradedMode = new DegradedModeController(options?.performanceProbe);

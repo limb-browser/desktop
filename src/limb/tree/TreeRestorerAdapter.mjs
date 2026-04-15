@@ -46,5 +46,24 @@ export function restoreTreeFromTabs(tabbrowser, probe) {
   const restorer = new TreeRestorerDomain(probe);
   const tree = restorer.restore(tabsData);
 
+  // If the tree has nodes with no corresponding tab (e.g. synthesized root
+  // for a fresh profile), create real Firefox tabs so the browser has content.
+  for (const [nodeId, node] of tree.nodes) {
+    if (!tabsByNodeId.has(nodeId)) {
+      const tab = tabbrowser.addTrustedTab(node.url);
+      tab.setAttribute("limb-node-id", nodeId);
+      if (node.parentId) {
+        tab.setAttribute("limb-tree-parent-id", node.parentId);
+      }
+      tab.setAttribute("limb-tree-created-at", String(node.createdAt));
+      tabsByNodeId.set(nodeId, tab);
+
+      // Focus the root node's tab
+      if (nodeId === tree.rootId) {
+        tabbrowser.selectedTab = tab;
+      }
+    }
+  }
+
   return { tree, tabMap: tabsByNodeId };
 }

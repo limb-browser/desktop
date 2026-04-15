@@ -22,8 +22,10 @@ const _zenStub = new Proxy(
     privateWindowOrDisabled: true,
     workspaceElement() { return null; },
     getEssentialsSection() { return document.createDocumentFragment(); },
+    getContextIdIfNeeded(userContextId) { return [userContextId, false, undefined]; },
     handleInitialTab() {},
     testingEnabled: false,
+    shouldCloseTabOnBack() { return false; },
     destroy() {},
   },
   _zenStubHandler
@@ -46,4 +48,18 @@ for (const name of [
   if (typeof globalThis[name] === "undefined") {
     globalThis[name] = _zenStub;
   }
+}
+
+// Zen's session manager restores 0 tabs after migration (no zen_workspaces
+// table), leaving selectedTab undefined and the screen blank. Ensure at
+// least one tab exists after startup completes.
+if (typeof Services !== "undefined") {
+  Services.obs.addObserver({
+    observe() {
+      Services.obs.removeObserver(this, "browser-delayed-startup-finished");
+      if (typeof gBrowser !== "undefined" && !gBrowser.selectedTab) {
+        gBrowser.addTrustedTab("about:blank");
+      }
+    },
+  }, "browser-delayed-startup-finished");
 }
