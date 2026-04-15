@@ -3,7 +3,7 @@ title: "Register limb.* preferences"
 spec_ref: "settings.md S1 S2"
 depends_on:
   - task-002
-progress: complete
+progress: not-started
 review: ""
 coverage_sections: []
 commits: []

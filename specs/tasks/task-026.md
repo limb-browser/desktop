@@ -4,6 +4,7 @@ spec_ref: "unified-tree.md S2.3 S2.4; navigation.md S5.2"
 depends_on:
   - task-025
   - task-008
+  - task-021
 progress: not-started
 review: ""
 coverage_sections: []
