@@ -38,6 +38,15 @@ export class TabBridge<TTab> {
     this.#probe?.tabClosed(nodeId);
   }
 
+  registerExistingTab(tab: TTab, nodeId: string): void {
+    if (this.nodeToTab.has(nodeId)) {
+      throw new Error(`Node "${nodeId}" already has a tab`);
+    }
+    this.nodeToTab.set(nodeId, tab);
+    this.tabToNode.set(tab, nodeId);
+    this.#probe?.tabCreated(nodeId);
+  }
+
   getTabForNode(nodeId: string): TTab | undefined {
     return this.nodeToTab.get(nodeId);
   }

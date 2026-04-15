@@ -27,6 +27,9 @@ function createFakeProbe(): TabCommandRouterProbe & {
     orphanTabBlocked() {
       calls.push({ method: 'orphanTabBlocked', args: [] });
     },
+    linkIntercepted(parentId: string, childId: string) {
+      calls.push({ method: 'linkIntercepted', args: [parentId, childId] });
+    },
   };
 }
 
@@ -184,8 +187,7 @@ describe('TabCommandRouter', () => {
   });
 
   describe('handleExternalTabOpen', () => {
-    it('closes tabs that have no node association', async () => {
-      // Simulate Firefox creating a tab outside the tree
+    it('closes tabs that have no node association and no opener', async () => {
       const orphanTab: FakeTab = {
         url: 'https://orphan.com',
         nodeId: '',
@@ -194,11 +196,11 @@ describe('TabCommandRouter', () => {
       };
       tabPort.tabs.push(orphanTab);
 
-      await router.handleExternalTabOpen(orphanTab);
+      await router.handleExternalTabOpen(orphanTab, 'https://orphan.com', null);
       expect(orphanTab.closed).toBe(true);
     });
 
-    it('fires orphanTabBlocked probe', async () => {
+    it('fires orphanTabBlocked probe when no opener', async () => {
       const orphanTab: FakeTab = {
         url: 'https://orphan.com',
         nodeId: '',
@@ -208,7 +210,7 @@ describe('TabCommandRouter', () => {
       tabPort.tabs.push(orphanTab);
 
       probe.calls.length = 0;
-      await router.handleExternalTabOpen(orphanTab);
+      await router.handleExternalTabOpen(orphanTab, 'https://orphan.com', null);
       expect(probe.calls).toContainEqual({
         method: 'orphanTabBlocked',
         args: [],
@@ -218,12 +220,234 @@ describe('TabCommandRouter', () => {
     it('does nothing for tabs that have a node', async () => {
       const rootTab = bridge.getTabForNode(tree.rootId)!;
       probe.calls.length = 0;
-      await router.handleExternalTabOpen(rootTab);
+      await router.handleExternalTabOpen(rootTab, 'https://root.example.com', null);
       expect(rootTab.closed).toBe(false);
       const blockCalls = probe.calls.filter(
         (c) => c.method === 'orphanTabBlocked'
       );
       expect(blockCalls).toHaveLength(0);
+    });
+
+    it('closes tabs when opener is not in the tree', async () => {
+      const orphanTab: FakeTab = {
+        url: 'https://orphan.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(orphanTab);
+      const unknownOpener: FakeTab = {
+        url: 'https://unknown.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+
+      await router.handleExternalTabOpen(orphanTab, 'https://orphan.com', unknownOpener);
+      expect(orphanTab.closed).toBe(true);
+    });
+  });
+
+  describe('link interception', () => {
+    it('creates a child node when a tab opens with an opener in the tree', async () => {
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      const newTab: FakeTab = {
+        url: 'https://link.example.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(newTab);
+
+      const nodeCountBefore = tree.nodes.size;
+      await router.handleExternalTabOpen(newTab, 'https://link.example.com', rootTab);
+      expect(tree.nodes.size).toBe(nodeCountBefore + 1);
+    });
+
+    it('new child has the opener node as parent', async () => {
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      const newTab: FakeTab = {
+        url: 'https://link.example.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(newTab);
+
+      await router.handleExternalTabOpen(newTab, 'https://link.example.com', rootTab);
+      const child = tree.nodes.get(tree.focusedNodeId)!;
+      expect(child.parentId).toBe(tree.rootId);
+    });
+
+    it('uses the new tab URL for the child node', async () => {
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      const newTab: FakeTab = {
+        url: 'https://specific-page.example.com/article',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(newTab);
+
+      await router.handleExternalTabOpen(newTab, 'https://specific-page.example.com/article', rootTab);
+      const child = tree.nodes.get(tree.focusedNodeId)!;
+      expect(child.url).toBe('https://specific-page.example.com/article');
+    });
+
+    it('registers the existing tab with the child node via TabBridge', async () => {
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      const newTab: FakeTab = {
+        url: 'https://link.example.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(newTab);
+
+      await router.handleExternalTabOpen(newTab, 'https://link.example.com', rootTab);
+      const childId = tree.focusedNodeId;
+      expect(bridge.getTabForNode(childId)).toBe(newTab);
+      expect(bridge.getNodeForTab(newTab)).toBe(childId);
+    });
+
+    it('focuses the new child node', async () => {
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      const newTab: FakeTab = {
+        url: 'https://link.example.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(newTab);
+
+      await router.handleExternalTabOpen(newTab, 'https://link.example.com', rootTab);
+      expect(tree.focusedNodeId).not.toBe(tree.rootId);
+      const child = tree.nodes.get(tree.focusedNodeId)!;
+      expect(child.url).toBe('https://link.example.com');
+    });
+
+    it('syncs focus to the new tab', async () => {
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      const newTab: FakeTab = {
+        url: 'https://link.example.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(newTab);
+
+      await router.handleExternalTabOpen(newTab, 'https://link.example.com', rootTab);
+      expect(tabPort.selectedTab).toBe(newTab);
+    });
+
+    it('fires linkIntercepted probe', async () => {
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      const newTab: FakeTab = {
+        url: 'https://link.example.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(newTab);
+
+      probe.calls.length = 0;
+      await router.handleExternalTabOpen(newTab, 'https://link.example.com', rootTab);
+      const childId = tree.focusedNodeId;
+      expect(probe.calls).toContainEqual({
+        method: 'linkIntercepted',
+        args: [tree.rootId, childId],
+      });
+    });
+
+    it('does not fire orphanTabBlocked for intercepted links', async () => {
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      const newTab: FakeTab = {
+        url: 'https://link.example.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(newTab);
+
+      probe.calls.length = 0;
+      await router.handleExternalTabOpen(newTab, 'https://link.example.com', rootTab);
+      const blockCalls = probe.calls.filter(
+        (c) => c.method === 'orphanTabBlocked'
+      );
+      expect(blockCalls).toHaveLength(0);
+    });
+
+    it('window.open creates a child node the same as link clicks', async () => {
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      const windowOpenTab: FakeTab = {
+        url: 'https://popup.example.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(windowOpenTab);
+
+      await router.handleExternalTabOpen(windowOpenTab, 'https://popup.example.com', rootTab);
+      const child = tree.nodes.get(tree.focusedNodeId)!;
+      expect(child.parentId).toBe(tree.rootId);
+      expect(child.url).toBe('https://popup.example.com');
+      expect(bridge.getTabForNode(child.id)).toBe(windowOpenTab);
+    });
+
+    it('no orphan tabs exist after link interception', async () => {
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      const newTab: FakeTab = {
+        url: 'https://link.example.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(newTab);
+
+      await router.handleExternalTabOpen(newTab, 'https://link.example.com', rootTab);
+      for (const tab of tabPort.openTabs) {
+        expect(bridge.getNodeForTab(tab)).toBeDefined();
+      }
+    });
+
+    it('creates nested children for chained link opens', async () => {
+      const rootTab = bridge.getTabForNode(tree.rootId)!;
+      const firstTab: FakeTab = {
+        url: 'https://first.example.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(firstTab);
+
+      await router.handleExternalTabOpen(firstTab, 'https://first.example.com', rootTab);
+      const firstChildId = tree.focusedNodeId;
+
+      const secondTab: FakeTab = {
+        url: 'https://second.example.com',
+        nodeId: '',
+        closed: false,
+        suspended: false,
+      };
+      tabPort.tabs.push(secondTab);
+
+      await router.handleExternalTabOpen(secondTab, 'https://second.example.com', firstTab);
+      const secondChild = tree.nodes.get(tree.focusedNodeId)!;
+      expect(secondChild.parentId).toBe(firstChildId);
+    });
+
+    it('skips tab created during handleNewTab', async () => {
+      // Simulate the race: TabOpen fires during bridge.createTabForNode
+      // before the tab-to-node mapping is established
+      tabPort.onTabCreated = (tab) => {
+        // This simulates the TabOpen handler firing synchronously
+        router.handleExternalTabOpen(tab, homepage, bridge.getTabForNode(tree.rootId)!);
+      };
+
+      const nodeCountBefore = tree.nodes.size;
+      await router.handleNewTab();
+      // Should have exactly 1 new node (from handleNewTab), not 2
+      expect(tree.nodes.size).toBe(nodeCountBefore + 1);
     });
   });
 

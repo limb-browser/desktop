@@ -88,6 +88,45 @@ export class LimbTabCommandAdapter {
    * @param {Event} e
    */
   #onTabOpen(e) {
-    this.#router.handleExternalTabOpen(e.target);
+    const newTab = e.target;
+    const url = newTab.linkedBrowser?.currentURI?.spec ?? "";
+    const openerTab = this.#findOpenerTab(newTab);
+    this.#router.handleExternalTabOpen(newTab, url, openerTab);
+  }
+
+  /**
+   * Determine the tab that opened a new tab.
+   *
+   * For window.open(), the browsing context has an opener reference.
+   * For Ctrl+click / middle-click links, the selected tab at the time
+   * of TabOpen is the opener (TabOpen fires before selection changes).
+   *
+   * @param {*} newTab - the newly opened tab element
+   * @returns {*|null} the opener tab, or null if unknown
+   */
+  #findOpenerTab(newTab) {
+    const win = newTab.ownerGlobal;
+    if (!win?.gBrowser) return null;
+
+    try {
+      const openerBC = newTab.linkedBrowser?.browsingContext?.opener;
+      if (openerBC?.top?.embedderElement) {
+        const tab = win.gBrowser.getTabForBrowser(
+          openerBC.top.embedderElement
+        );
+        if (tab) return tab;
+      }
+    } catch (_) {
+      // browsingContext may not be available yet
+    }
+
+    // Fallback: the selected tab is the opener for link clicks.
+    // TabOpen fires before the new tab becomes selected.
+    const selected = win.gBrowser.selectedTab;
+    if (selected && selected !== newTab) {
+      return selected;
+    }
+
+    return null;
   }
 }

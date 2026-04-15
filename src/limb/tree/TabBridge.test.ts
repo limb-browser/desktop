@@ -413,6 +413,47 @@ describe('TabBridge', () => {
     });
   });
 
+  describe('registerExistingTab', () => {
+    it('registers node-to-tab mapping', () => {
+      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', closed: false, suspended: false };
+      bridge.registerExistingTab(tab, 'node-1');
+      expect(bridge.getTabForNode('node-1')).toBe(tab);
+    });
+
+    it('registers tab-to-node mapping', () => {
+      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', closed: false, suspended: false };
+      bridge.registerExistingTab(tab, 'node-1');
+      expect(bridge.getNodeForTab(tab)).toBe('node-1');
+    });
+
+    it('fires tabCreated probe', () => {
+      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', closed: false, suspended: false };
+      probe.calls.length = 0;
+      bridge.registerExistingTab(tab, 'node-1');
+      expect(probe.calls).toContainEqual({
+        method: 'tabCreated',
+        args: ['node-1'],
+      });
+    });
+
+    it('throws if node already has a tab', async () => {
+      await bridge.createTabForNode({ id: 'node-1', url: 'https://example.com' });
+      const anotherTab: FakeTab = { url: 'https://other.com', nodeId: 'node-1', closed: false, suspended: false };
+      expect(() => bridge.registerExistingTab(anotherTab, 'node-1')).toThrow();
+    });
+
+    it('maintains bidirectional map consistency', () => {
+      const tab: FakeTab = { url: 'https://example.com', nodeId: 'node-1', closed: false, suspended: false };
+      bridge.registerExistingTab(tab, 'node-1');
+      for (const [nodeId, t] of bridge.nodeToTab) {
+        expect(bridge.tabToNode.get(t)).toBe(nodeId);
+      }
+      for (const [t, nodeId] of bridge.tabToNode) {
+        expect(bridge.nodeToTab.get(nodeId)).toBe(t);
+      }
+    });
+  });
+
   describe('closeOrphanTab', () => {
     it('closes a tab that has no node association', async () => {
       const orphan: FakeTab = { url: 'https://orphan.com', nodeId: '', closed: false, suspended: false };

@@ -6,4 +6,5 @@ export interface TabCommandRouterProbe {
   newTabRouted(parentId: string, childId: string): void;
   closeTabRouted(nodeId: string): void;
   orphanTabBlocked(): void;
+  linkIntercepted(parentId: string, childId: string): void;
 }

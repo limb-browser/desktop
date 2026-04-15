@@ -4,7 +4,7 @@ spec_ref: "navigation.md S1.1 S1.3"
 depends_on:
   - task-008
   - task-009
-progress: not-started
+progress: ready-for-review
 review: ""
 coverage_sections: []
 commits: []

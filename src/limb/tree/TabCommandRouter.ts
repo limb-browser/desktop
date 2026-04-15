@@ -11,6 +11,7 @@ export class TabCommandRouter<TTab> {
   #bridge: TabBridge<TTab>;
   #homepage: string;
   #probe: TabCommandRouterProbe | null;
+  #creatingTab = false;
 
   constructor(
     tree: BrowsingTree,
@@ -25,12 +26,17 @@ export class TabCommandRouter<TTab> {
   }
 
   async handleNewTab(): Promise<void> {
-    const parentId = this.#tree.focusedNodeId;
-    const child = this.#tree.addChild(parentId, this.#homepage);
-    await this.#bridge.createTabForNode({ id: child.id, url: child.url });
-    this.#tree.focusNode(child.id);
-    await this.#bridge.syncFocusToTab(child.id, child.url);
-    this.#probe?.newTabRouted(parentId, child.id);
+    this.#creatingTab = true;
+    try {
+      const parentId = this.#tree.focusedNodeId;
+      const child = this.#tree.addChild(parentId, this.#homepage);
+      await this.#bridge.createTabForNode({ id: child.id, url: child.url });
+      this.#tree.focusNode(child.id);
+      await this.#bridge.syncFocusToTab(child.id, child.url);
+      this.#probe?.newTabRouted(parentId, child.id);
+    } finally {
+      this.#creatingTab = false;
+    }
   }
 
   async handleCloseTab(): Promise<void> {
@@ -52,10 +58,30 @@ export class TabCommandRouter<TTab> {
     this.#probe?.closeTabRouted(nodeId);
   }
 
-  async handleExternalTabOpen(tab: TTab): Promise<void> {
+  async handleExternalTabOpen(
+    tab: TTab,
+    url: string,
+    openerTab: TTab | null
+  ): Promise<void> {
+    if (this.#creatingTab) {
+      return;
+    }
     if (this.#bridge.getNodeForTab(tab)) {
       return;
     }
+
+    if (openerTab) {
+      const openerNodeId = this.#bridge.getNodeForTab(openerTab);
+      if (openerNodeId) {
+        const child = this.#tree.addChild(openerNodeId, url);
+        this.#bridge.registerExistingTab(tab, child.id);
+        this.#tree.focusNode(child.id);
+        await this.#bridge.syncFocusToTab(child.id, url);
+        this.#probe?.linkIntercepted(openerNodeId, child.id);
+        return;
+      }
+    }
+
     await this.#bridge.closeOrphanTab(tab);
     this.#probe?.orphanTabBlocked();
   }
