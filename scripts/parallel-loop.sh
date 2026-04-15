@@ -158,6 +158,8 @@ merge_worker() {
   # Workers may have stale copies of other tasks' files -- auto-resolve by
   # keeping dev's version of all task files except the worker's own.
   local commits pick_ok=1
+  local pre_merge_head
+  pre_merge_head=$(git rev-parse HEAD)
   commits=$(git log --reverse --format='%H' dev.."$branch" 2>/dev/null)
   if [ -z "$commits" ]; then
     log "    No commits to merge for $task_name"
@@ -186,7 +188,7 @@ merge_worker() {
         log "    !!! Unresolvable conflict in $task_name on commit $msg"
         log "    !!! Conflicting files: $(echo "$conflict_files" | tr '\n' ' ')"
         git cherry-pick --abort 2>/dev/null
-        git reset --hard HEAD 2>/dev/null
+        git reset --hard "$pre_merge_head" 2>/dev/null
         pick_ok=0
         break
       fi

@@ -3,7 +3,7 @@ title: "Hide tab bar and route Ctrl+T/Ctrl+W through tree model"
 spec_ref: "tab-bridge.md S4.3 S4.4"
 depends_on:
   - task-008
-progress: needs-revision
+progress: complete
 review: "specs/reviews/review-TASK_010-R1.md"
 coverage_sections: []
 commits: []
